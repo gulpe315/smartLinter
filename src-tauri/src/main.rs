@@ -56,7 +56,9 @@ fn main() {
             // Initialize Local LLM Provider & MicroScopingQueue (Task 4, 15.5)
             let ollama_provider: Arc<dyn LocalLlmProvider> =
                 Arc::new(OllamaProvider::with_default_url());
-            let queue = MicroScopingQueue::new(ollama_provider, DEFAULT_MODEL_NAME);
+            let queue = tauri::async_runtime::block_on(async {
+                MicroScopingQueue::new(ollama_provider, DEFAULT_MODEL_NAME)
+            });
             app.manage(queue);
 
             // Launch Local Bridge Server (Task 3) in background runtime
