@@ -207,7 +207,7 @@
             var parsedBody = null;
             if (bodyText) {
                 try {
-                    parsedBody = JSON.parse(bodyText.trim());
+                    parsedBody = JSON.parse(bodyText.replace(/^[\s\r\n]+|[\s\r\n]+$/g, ''));
                 } catch (e) {
                     parsedBody = bodyText;
                 }

@@ -379,6 +379,80 @@ describe('ExtendScript JSON Polyfill (json2_polyfill.jsx)', () => {
             assert.ok(res.message.indexOf('Invalid ReplacementCommand') !== -1, 'Replacer successfully parsed JSON payload');
             assert.strictEqual(res.commandId, 'unknown');
         });
+
+        it('should execute httpRequest parsing in daemon bundle when String.prototype.trim is undefined', () => {
+            const daemonPath = path.resolve(__dirname, '../extendscript/smartlinter_daemon.jsx');
+            let content = fs.readFileSync(daemonPath, 'utf8');
+            const dir = path.dirname(daemonPath);
+
+            // Preprocess #include recursively
+            content = content.replace(/^[ \t]*#include\s+["']([^"']+)["']/gm, (_match, relPath) => {
+                const fullIncludePath = path.resolve(dir, relPath);
+                if (fs.existsSync(fullIncludePath)) {
+                    const incContent = fs.readFileSync(fullIncludePath, 'utf8')
+                        .replace(/^[ \t]*#targetengine[^\n]*/gm, '// #targetengine (included)');
+                    return `\n// --- Begin #include "${relPath}" ---\n` + incContent + `\n// --- End #include "${relPath}" ---\n`;
+                }
+                return _match;
+            });
+            content = content.replace(/^[ \t]*#[a-zA-Z_]+/gm, '// $&');
+
+            const sandbox: Record<string, any> = {
+                console,
+                Date,
+                Math,
+                Number,
+                Boolean,
+                Array,
+                Object,
+                RegExp,
+                parseInt,
+                parseFloat,
+                isFinite,
+                isNaN,
+                setTimeout: () => {},
+                clearTimeout: () => {},
+                setInterval: () => {},
+                clearInterval: () => {},
+                module: { exports: {} },
+                exports: {}
+            };
+            sandbox.$ = { global: sandbox, writeln: () => {} };
+            sandbox.global = sandbox;
+
+            const ctx = vm.createContext(sandbox);
+            // Strictly delete String.prototype.trim
+            vm.runInContext('delete String.prototype.trim;', ctx);
+            assert.strictEqual(vm.runInContext('typeof String.prototype.trim', ctx), 'undefined');
+
+            vm.runInContext(content, ctx, { filename: 'smartlinter_daemon.jsx' });
+
+            // Mock socket returning HTTP 200 with whitespace-padded JSON response
+            let socketEof = false;
+            const mockSocket = {
+                timeout: 3,
+                encoding: 'UTF-8',
+                get eof() { return socketEof; },
+                open: () => { socketEof = false; return true; },
+                write: () => true,
+                read: () => {
+                    socketEof = true;
+                    return 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n  {"success":true,"sessionToken":"poly-token-123"}  \r\n';
+                },
+                close: () => { socketEof = true; return true; }
+            };
+
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                socketFactory: () => mockSocket
+            });
+
+            const res = bridgeSocket.httpRequest('POST', '/auth/handshake', { token: 't' });
+            assert.strictEqual(res.ok, true);
+            assert.strictEqual(res.statusCode, 200);
+            assert.ok(res.body, 'Body must be parsed without trim() exception');
+            assert.strictEqual(res.body.success, true);
+            assert.strictEqual(res.body.sessionToken, 'poly-token-123');
+        });
     });
 });
 

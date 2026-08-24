@@ -346,14 +346,29 @@ mod tests {
     #[tokio::test]
     async fn test_live_ollama_analyze_paragraph_and_execute_ai_command() {
         use std::sync::Arc;
-        let provider = Arc::new(crate::ai::OllamaProvider::with_default_url());
+        let provider = Arc::new(crate::ai::OllamaProvider::with_default_url().with_timeout(std::time::Duration::from_secs(90)));
         let health = provider.health_check().await.unwrap();
         if !health.is_alive {
             println!("Skipping live test: Ollama offline");
             return;
         }
 
-        let queue = MicroScopingQueue::new(provider.clone(), "qwen2.5:7b");
+        let models = provider.list_models().await.unwrap_or_default();
+        if models.is_empty() {
+            println!("Skipping live test: No Ollama models installed");
+            return;
+        }
+
+        let model_to_use = models
+            .iter()
+            .find(|m| m.name.starts_with("qwen2.5:7b") || m.name.starts_with("qwen2.5"))
+            .map(|m| m.name.clone())
+            .unwrap_or_else(|| models[0].name.clone());
+
+        let queue = MicroScopingQueue::with_config(
+            provider.clone(),
+            crate::ai::QueueConfig::new(&model_to_use).with_timeout(std::time::Duration::from_secs(90)),
+        );
 
         // 1. Test live analyze_paragraph flow with qwen2.5:7b
         let para = ParagraphPayload {

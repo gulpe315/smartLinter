@@ -55,6 +55,11 @@ impl OllamaProvider {
     /// Sets custom default HTTP timeout.
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.default_timeout = timeout;
+        self.client = Client::builder()
+            .timeout(timeout)
+            .tcp_keepalive(Some(Duration::from_secs(60)))
+            .build()
+            .unwrap_or_else(|_| Client::new());
         self
     }
 

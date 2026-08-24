@@ -321,6 +321,71 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             assert.equal(bridgeSocket.sessionToken, 'session-id-indesign-999');
         });
 
+        it('should complete authentication handshake and parse HTTP response when String.prototype.trim is undefined (ExtendScript ES3 engine)', () => {
+            const env = new MockInDesignEnvironment();
+            const serverPort = 49152;
+            const validToken = 'smartlinter-default-dev-token-secret-32b';
+
+            env.socketHandler = (req: string) => {
+                const bodyStr = JSON.stringify({
+                    success: true,
+                    sessionToken: 'session-id-indesign-no-trim',
+                    serverNonce: 'nonce-indesign-no-trim'
+                });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n  ${bodyStr}  \r\n`;
+            };
+
+            // Create isolated VM context where String.prototype.trim is deleted
+            const sandbox: Record<string, any> = {
+                console,
+                Date,
+                Math,
+                JSON,
+                parseInt,
+                parseFloat,
+                module: { exports: {} },
+                exports: {}
+            };
+            sandbox.global = sandbox;
+            sandbox.globalThis = sandbox;
+            const ctx = vm.createContext(sandbox);
+            vm.runInContext('delete String.prototype.trim;', ctx);
+
+            const isTrimUndefined = vm.runInContext('typeof String.prototype.trim === "undefined"', ctx);
+            assert.strictEqual(isTrimUndefined, true, 'String.prototype.trim must be undefined in simulation context');
+
+            const bridgeScript = fs.readFileSync(bridgeSocketPath, 'utf8')
+                .replace(/^[ \t]*#[a-zA-Z_]+/gm, '// $&');
+            vm.runInContext(bridgeScript, ctx, { filename: 'bridge_socket.jsx' });
+
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: serverPort,
+                token: validToken,
+                version: '0.1.0',
+                socketFactory: env.createSocketFactory()
+            });
+
+            // 1. Verify httpRequest parses response body without error
+            const res = bridgeSocket.httpRequest('POST', '/auth/handshake', {
+                token: validToken,
+                editorType: 'InDesign',
+                version: '0.1.0',
+                clientNonce: 'test-nonce'
+            });
+            assert.strictEqual(res.ok, true);
+            assert.strictEqual(res.statusCode, 200);
+            assert.ok(res.body, 'Parsed body must exist');
+            assert.strictEqual(res.body.success, true);
+            assert.strictEqual(res.body.sessionToken, 'session-id-indesign-no-trim');
+
+            // 2. Verify full handshake flow succeeds and sets status to CONNECTED
+            const connected = bridgeSocket.handshake();
+            assert.strictEqual(connected, true);
+            assert.strictEqual(bridgeSocket.status, 'CONNECTED');
+            assert.strictEqual(bridgeSocket.sessionToken, 'session-id-indesign-no-trim');
+        });
+
         it('should handle authentication rejection (401 Unauthorized)', () => {
             const env = new MockInDesignEnvironment();
             env.socketHandler = () => {
