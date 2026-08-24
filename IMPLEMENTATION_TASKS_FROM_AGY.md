@@ -521,6 +521,29 @@ graph TD
 
 ---
 
+### Task 18.5: 로컬 파일 기반 최초 페어링 토큰 공유 (Local File-Based First-Pairing Token Bootstrap) — 신규 추가
+* **(1) 목표:**
+  * **[설계 결정 완료 사항 (2026-08-24, 사용자 승인)]** Task 19 실제 InDesign 환경 검증 중 발견: 브릿지 서버(`BridgeServer::with_defaults()`)가 `AuthManager::new()`로 **매 앱 구동마다 새 무작위 64자 토큰**을 생성하는데, Task 18에서 이미 만들어둔 `KeyringStore::get_or_create_token()`(재구동해도 토큰 고정)이 어디서도 호출되지 않고 있었음. 게다가 에디터 플러그인(InDesign `bridge_socket.jsx`, Word `bridge_client.ts`)은 하드코딩된 개발용 기본 토큰(`smartlinter-default-dev-token-secret-32b`)을 쓰고 있어 서버의 실제 토큰과 절대 일치하지 않음 → 실제 InDesign 사이드로드 테스트에서 핸드셰이크가 매번 401로 실패함(로그: `Auth Handshake failed with status 401`). 즉 "최초 1회 페어링 후 무개입 자동 연결"이라는 설계 목표를 실제로 달성할 방법이 전혀 없는 구조적 공백이었음.
+  * 이 태스크는 **InDesign만** 대상으로 함(Word는 taskpane HTML/dev 서버 자체가 아직 없는 별도 공백이라 범위 밖 — 추후 taskpane 구축 태스크 때 함께 처리).
+* **(2) 설계 근거:**
+  * `SmartLinter_Plan.md` > `1.C. 로컬 통신 보안 및 페어링 UX` ("최초 1회 연동 후 로컬 키체인/스토리지에 자동 저장되어... 무개입 자동 연결")
+  * Task 18 산출물(`src-tauri/src/server/keyring_store.rs`의 `KeyringStore`/`SecureTokenStore` 트레이트)을 실제로 연결하는 태스크
+* **(3) 완료조건 (Acceptance Criteria):**
+  * `src-tauri/src/main.rs`(또는 `server/mod.rs`)의 `BridgeServer::with_defaults()` 호출부가 `AuthManager::new()` 대신 `KeyringStore::default().get_or_create_token()`으로 얻은 토큰을 `AuthManager::with_token(...)`에 주입하도록 수정 — 대시보드를 재시작해도 같은 페어링 토큰이 유지됨을 확인.
+  * 서버가 시작할 때 이 토큰을 현재 Windows 사용자만 접근 가능한 로컬 파일(`%LOCALAPPDATA%\SmartLinter\pairing_token.txt`, 토큰 문자열만 기록)에도 함께 기록. 파일 쓰기 실패는 치명적 에러로 만들지 말고 로그만 남길 것(키체인 저장 자체는 이미 성공했으므로).
+  * `plugins/indesign/extendscript/bridge_socket.jsx`의 `SmartLinterBridgeSocket` 생성자(또는 `smartlinter_daemon.jsx`의 데몬 초기화 시점)에서, ExtendScript `File` API로 `%LOCALAPPDATA%\SmartLinter\pairing_token.txt`를 읽어 존재하면 그 값을 `this.token`으로 사용하고, 파일이 없거나 읽기 실패 시에만 기존 하드코딩된 개발용 기본 토큰으로 폴백(기존 동작 유지, 회귀 없음).
+  * 실제 InDesign 2026(버전 21.4.1)에서 SmartLinter 대시보드 앱(`npm run tauri dev`)을 구동한 뒤 InDesign 데몬 스크립트를 재실행하면, 사용자 개입 없이 `bridgeStatus=CONNECTED` 및 유효한 `sessionToken`을 받는 것을 실제로 확인할 것(Claude가 사용자와 함께 실제 InDesign에서 재검증 — 이 부분은 agy 작업 범위 밖).
+  * `keyring_store.rs`의 기존 `SecureTokenStore` 트레이트/`KeyringStore`/`InMemoryTokenStore` 구현은 건드리지 말 것(이미 Task 18에서 완성·검증됨) — 이번 태스크는 그것을 "연결"만 하는 것.
+  * 기존 `cargo test`, `npm test`, `npm run test:ui`, `npm run build` 전부 회귀 없이 통과.
+* **(4) 선행 조건/의존성:**
+  * Task 3(브릿지 서버/AuthManager), Task 9(InDesign 데몬), Task 18(KeyringStore), 이번 세션에서 추가된 JSON 폴리필(`json2_polyfill.jsx`) — File API 결과를 다루려면 정상 동작해야 함(이미 완료).
+* **(5) 예상 산출물:**
+  * `src-tauri/src/main.rs` 또는 `src-tauri/src/server/mod.rs` 수정 (KeyringStore 연결)
+  * `src-tauri/src/server/mod.rs` 또는 신규 헬퍼: 로컬 파일 토큰 export 로직
+  * `plugins/indesign/extendscript/bridge_socket.jsx` 수정 (파일에서 토큰 로드, 폴백 유지)
+
+---
+
 ## Phase 6: E2E 통합 검증 및 패키징/배포 (E2E Integration & Packaging)
 
 ### Task 19: Word & InDesign 전체 워크플로우 E2E 통합 검증 (End-to-End Integration Test Suite)
