@@ -482,9 +482,21 @@ export class TauriBridgeService implements IBridgeService {
         let tauriUnlisten: (() => void) | null = null;
 
         tauri.event
-          .listen(event, (evt: { payload: BridgeEventMap[K] }) => {
+          .listen(event, (evt: { payload: any }) => {
             if (active) {
-              handler(evt.payload);
+              if (event === 'bridge-status-changed' && evt.payload?.state) {
+                const state = evt.payload.state;
+                const isConnected = state.status === 'CONNECTED';
+                const payload: BridgeStatusPayload = {
+                  connected: isConnected,
+                  editorType: isConnected ? state.editorType : null,
+                  sessionId: state.sessionId,
+                  activeDocument: state.activeDocument,
+                };
+                handler(payload as any);
+              } else {
+                handler(evt.payload);
+              }
             }
           })
           .then((unlistenFn: () => void) => {
@@ -725,14 +737,14 @@ export class TauriBridgeService implements IBridgeService {
 
     try {
       const tauri = (window as any).__TAURI__;
-      if (tauri?.window?.getCurrentWindow) {
+      if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('set_always_on_top', { pinned });
+      } else if (tauri?.window?.getCurrentWindow) {
         await tauri.window.getCurrentWindow().setAlwaysOnTop(pinned);
         return true;
-      } else if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('set_always_on_top', { pinned });
       }
     } catch (e) {
-      console.warn('Tauri invoke setAlwaysOnTop failed, using fallback:', e);
+      console.warn('Tauri invoke set_always_on_top failed, using fallback:', e);
     }
 
     return this.fallbackService.setAlwaysOnTop(pinned);

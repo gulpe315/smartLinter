@@ -4,7 +4,9 @@
 //! and local bridge server integration for SmartLinter.
 
 pub mod ai;
+pub mod commands;
 pub mod protocol;
 pub mod server;
 pub mod tm;
+
 

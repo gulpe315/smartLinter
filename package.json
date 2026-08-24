@@ -16,7 +16,8 @@
     "test:indesign": "node --test --experimental-strip-types plugins/indesign/__tests__/indesign_plugin.test.ts plugins/indesign/__tests__/atomic_replacer.test.ts",
     "test:ui": "vitest run",
     "test:ui:watch": "vitest",
-    "test:all": "npm run test:shared && npm run test:unit && npm run test:ui"
+    "test:all": "npm run test:shared && npm run test:unit && npm run test:ui",
+    "tauri": "tauri"
   },
   "keywords": [
     "linter",
@@ -30,6 +31,8 @@
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/cli": "^2.2.7",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.6",
