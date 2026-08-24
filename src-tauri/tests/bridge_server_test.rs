@@ -25,7 +25,7 @@ use smart_linter::protocol::{
 use smart_linter::server::{
     close_codes, generate_crypto_token, generate_nonce, AuthManager,
     BridgeServer, BridgeServerConfig, BridgeStatusEvent, BroadcastEventSink, ConnectionState,
-    DEFAULT_BRIDGE_PORT,
+    DEFAULT_BRIDGE_PORT, DEFAULT_HEARTBEAT_TIMEOUT,
 };
 
 /// Helper to start an ephemeral test server on port 0.
@@ -42,7 +42,7 @@ async fn start_test_server(
     let sink = event_sink.unwrap_or_else(|| Arc::new(BroadcastEventSink::new(128)));
     let config = BridgeServerConfig::new()
         .with_port(0) // Bind to random free port
-        .with_heartbeat_timeout(heartbeat_timeout.unwrap_or(Duration::from_secs(15)));
+        .with_heartbeat_timeout(heartbeat_timeout.unwrap_or(DEFAULT_HEARTBEAT_TIMEOUT));
 
     let server = BridgeServer::new(config, auth.clone(), sink.clone());
     let handle = server.start().await.expect("Server should start successfully");
@@ -56,7 +56,8 @@ async fn test_default_config_constants() {
     assert_eq!(config.host, "127.0.0.1");
     assert_eq!(config.port, DEFAULT_BRIDGE_PORT);
     assert_eq!(config.port, 49152);
-    assert_eq!(config.heartbeat_timeout, Duration::from_secs(15));
+    assert_eq!(config.heartbeat_timeout, Duration::from_secs(45));
+    assert_eq!(config.heartbeat_timeout, DEFAULT_HEARTBEAT_TIMEOUT);
 }
 
 #[tokio::test]

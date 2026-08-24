@@ -96,7 +96,11 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
   - 세 건 모두 Rust `cargo test`(97개)와 InDesign JS `npm run test:indesign`(51개), `npm test`(142개) 전체 Claude가 직접 재실행해 회귀 없음 독립 검증. `git diff`로 매번 범위 이탈 없음 확인.
   - **교훈 (2026-08-24):** 이 3건은 전부 짧은 연결 확인(핸드셰이크 성공 여부)만으로는 못 잡고, InDesign을 몇 분 이상 실제로 붙여둬야(하트비트 사이클이 여러 번 돌아야) 드러나는 종류였음 — "페어링됨" 확인만으로 "실사용 가능"을 판단하면 안 됨.
 
-**네 번째 이슈 발견 — 아직 미수정, 원인 진단만 완료 (2026-08-24 세션 종료 시점):**
+**네 번째 이슈 — 수정 완료 (2026-08-24 후속 세션, 커밋 `e668192`):** 아래 agy 제안 1~4번 전부 구현됨. `attemptConnection(force)`로 상태체크+쓰로틀 로직을 단일화하고 `onSelectionChanged`/`onAttributeChanged`/신규 `onActivate`(afterActivate) 핸들러 맨 앞에서 호출, `onIdleTick`은 하트비트 실패 시 `attemptConnection(true)`로 쓰로틀 우회 즉시 재시도, `event.idleTime = this.sleepMs/1000` 명시. 부수적으로 `bridge_socket.jsx`의 `sendTelemetry`/`sendReplacementResult` 실패 시에도 `status='ERROR'`로 동기화(기존엔 handshake/heartbeat만 이렇게 됐었음). 신규 단위테스트 8개 추가. Claude가 `npm run test:indesign`(59개)/`npm test`(150개)/`npm run test:ui`(176개) 전부 독립 재실행해 agy 보고 수치와 일치 확인, `git diff`로 범위 이탈 없음 확인 후 커밋. 상세는 `AGY_REPORT_RECONNECT_FIX.md` 참고.
+
+**다음 재개 지점 (실제 InDesign 검증 남음):** 코드 수정만 됐고 실제 InDesign 환경 재확인은 아직 안 함. Scripts 패널 경로(`C:\Users\user\AppData\Roaming\Adobe\InDesign\Version 21.0-J\ko_KR\Scripts\Scripts Panel\SmartLinter\`)에 수정된 `smartlinter_daemon.jsx`/`bridge_socket.jsx`를 동기화하고, `#targetengine`이 기존 인스턴스를 재사용하지 않도록 InDesign을 완전히 재시작한 뒤, "포커스 잃었다가 클릭 시 즉시 재연결"을 사용자가 재현 확인해야 함. 통과하면 QA 카드/TM/롤백 등 Task 19의 나머지 시나리오 실검증으로 진행.
+
+**(과거 기록, 참고용) 원 진단 — 이제 해결됨:**
 
 InDesign 창이 OS 포커스를 잃으면(사용자가 다른 창을 보는 동안) 몇 분 안에 세션이 죽고, **포커스를 되찾아도 자동 재연결이 즉시 되지 않음**(10초 넘게 기다려도 `/health`가 계속 `connected:false`). 사용자가 직접 focus-click 테스트로 재현 확인함.
 
@@ -111,7 +115,7 @@ InDesign 창이 OS 포커스를 잃으면(사용자가 다른 창을 보는 동�
 4. (부차) `onIdleTick` 핸들러 종료 시 `event.idleTime = this.sleepMs` 명시.
 - 상세 분석 원본: agy가 별도 파일로 작성함(`C:\Users\user\.gemini\antigravity-cli\brain\bf4d66a6-4398-4893-930c-6a5b6feec3a6\indesign_heartbeat_reconnect_analysis.md` — agy 측 경로라 다음 세션에서 접근 안 될 수 있음, 위 요약이 사실상 전체 내용).
 
-- **다음 세션 재개 지점:** 위 agy 제안(특히 1, 2번)을 agy에게 구현 위임 → cargo test/npm test 독립 검증 → 실제 InDesign에서 "포커스 잃었다가 클릭으로 즉시 재연결되는지" 재확인 → 확인되면 QA 카드 생성/적용, TM 매칭, 롤백 등 Task 19의 4개 시나리오 실검증으로 진행.
+- (구현 완료됨 — 위 "수정 완료" 절 참고, 이 항목은 과거 상태 기록으로만 남김)
 
 Task 20(패키징)은 Task 19 전체(헤드리스+Word+InDesign 실제 환경) 완료가 선행조건 — 아직 멀었음.
 
