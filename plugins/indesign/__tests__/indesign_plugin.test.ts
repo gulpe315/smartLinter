@@ -75,13 +75,40 @@ function loadExtendScript(filePath: string, context: Record<string, any> = {}) {
 
     sandbox.global = sandbox;
     sandbox.globalThis = sandbox;
+    if (!sandbox.File) {
+        sandbox.File = class MockExtendScriptFile {
+            fsName: string;
+            exists: boolean;
+            private isOpen: boolean = false;
+            constructor(filePath: string) {
+                this.fsName = filePath;
+                this.exists = fs.existsSync(filePath);
+            }
+            open(mode: string) {
+                this.isOpen = true;
+                return true;
+            }
+            read() {
+                if (!this.isOpen || !fs.existsSync(this.fsName)) return '';
+                return fs.readFileSync(this.fsName, 'utf8');
+            }
+            close() {
+                this.isOpen = false;
+                return true;
+            }
+        };
+    }
     if (!sandbox.$) {
         sandbox.$ = {
             global: sandbox,
-            writeln: () => {}
+            writeln: () => {},
+            getenv: (key: string) => process.env[key] || null
         };
     } else {
         sandbox.$.global = sandbox;
+        if (!sandbox.$.getenv) {
+            sandbox.$.getenv = (key: string) => process.env[key] || null;
+        }
     }
 
     vm.createContext(sandbox);
@@ -355,6 +382,68 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             assert.equal(telSent, true);
             assert.equal(lastDispatchedPayload.paragraphId, 'indesign-para-123456');
             assert.equal(lastDispatchedPayload.editorType, 'InDesign');
+        });
+
+        it('should bootstrap pairing token from local pairing_token.txt file when present (Task 18.5)', () => {
+            const tempDir = fs.mkdtempSync(path.join(path.resolve(__dirname, '../../../'), 'temp-token-test-'));
+            const appDataSmartLinterDir = path.join(tempDir, 'SmartLinter');
+            fs.mkdirSync(appDataSmartLinterDir, { recursive: true });
+
+            const testFileToken = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+            fs.writeFileSync(path.join(appDataSmartLinterDir, 'pairing_token.txt'), testFileToken + '\r\n', 'utf8');
+
+            try {
+                const sandbox = loadExtendScript(bridgeSocketPath, {
+                    $: {
+                        getenv: (k: string) => k === 'LOCALAPPDATA' ? tempDir : null,
+                        writeln: () => {}
+                    }
+                });
+
+                // Socket created without explicit token -> should load testFileToken from file
+                const bridgeSocket = new sandbox.SmartLinterBridgeSocket();
+                assert.equal(bridgeSocket.token, testFileToken, 'Should resolve token from pairing_token.txt');
+            } finally {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        });
+
+        it('should fallback to default development token when pairing_token.txt is absent (Task 18.5)', () => {
+            const tempDir = fs.mkdtempSync(path.join(path.resolve(__dirname, '../../../'), 'temp-token-empty-'));
+            try {
+                const sandbox = loadExtendScript(bridgeSocketPath, {
+                    $: {
+                        getenv: (k: string) => k === 'LOCALAPPDATA' ? tempDir : null,
+                        writeln: () => {}
+                    }
+                });
+
+                const bridgeSocket = new sandbox.SmartLinterBridgeSocket();
+                assert.equal(bridgeSocket.token, 'smartlinter-default-dev-token-secret-32b');
+            } finally {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
+        });
+
+        it('should prioritize explicit config.token over local file token (Task 18.5)', () => {
+            const tempDir = fs.mkdtempSync(path.join(path.resolve(__dirname, '../../../'), 'temp-token-override-'));
+            const appDataSmartLinterDir = path.join(tempDir, 'SmartLinter');
+            fs.mkdirSync(appDataSmartLinterDir, { recursive: true });
+            fs.writeFileSync(path.join(appDataSmartLinterDir, 'pairing_token.txt'), 'file-token-12345', 'utf8');
+
+            try {
+                const sandbox = loadExtendScript(bridgeSocketPath, {
+                    $: {
+                        getenv: (k: string) => k === 'LOCALAPPDATA' ? tempDir : null,
+                        writeln: () => {}
+                    }
+                });
+
+                const bridgeSocket = new sandbox.SmartLinterBridgeSocket({ token: 'explicit-override-token' });
+                assert.equal(bridgeSocket.token, 'explicit-override-token');
+            } finally {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+            }
         });
     });
 

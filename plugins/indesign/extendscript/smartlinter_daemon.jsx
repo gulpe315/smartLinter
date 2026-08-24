@@ -49,7 +49,7 @@
             this.bridgeSocket = new BridgeSocketClass({
                 host: config.host || '127.0.0.1',
                 port: config.port || 49152,
-                token: config.token || 'smartlinter-default-dev-token-secret-32b',
+                token: config.token,
                 version: config.version || '0.1.0',
                 socketFactory: config.socketFactory || null
             });

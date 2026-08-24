@@ -16,7 +16,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub use auth_manager::{
     constant_time_compare, generate_crypto_token, generate_nonce, generate_session_token,
@@ -129,10 +129,36 @@ impl BridgeServer {
         }
     }
 
-    /// Creates a server with default configuration and generated crypto token.
+    /// Creates a server with default configuration and persistent pairing token loaded from OS Keyring.
+    ///
+    /// Loads or creates a token via `KeyringStore::default().get_or_create_token()`, exports it to
+    /// `%LOCALAPPDATA%\SmartLinter\pairing_token.txt` for zero-friction editor plugin bootstrapping,
+    /// and initializes `AuthManager` with this token.
     pub fn with_defaults(event_sink: Arc<dyn BridgeEventSink>) -> Self {
+        let keyring = KeyringStore::default();
+        Self::with_token_store(&keyring, event_sink)
+    }
+
+    /// Creates a server with default configuration and token resolved from a specified `SecureTokenStore`.
+    pub fn with_token_store<S: SecureTokenStore>(
+        store: &S,
+        event_sink: Arc<dyn BridgeEventSink>,
+    ) -> Self {
         let config = BridgeServerConfig::default();
-        let auth_manager = Arc::new(AuthManager::new());
+        let token = store
+            .get_or_create_token()
+            .unwrap_or_else(|e| {
+                warn!(
+                    "Failed to get or create token from secure store: {}. Generating fallback crypto token.",
+                    e
+                );
+                generate_crypto_token()
+            });
+
+        // Export token to local bootstrap file for InDesign/Word plugin discovery
+        export_pairing_token_to_file(&token);
+
+        let auth_manager = Arc::new(AuthManager::with_token(token));
         Self::new(config, auth_manager, event_sink)
     }
 
@@ -297,5 +323,126 @@ impl ServerHandle {
                 Err(ServerError::JoinError(e.to_string()))
             }
         }
+    }
+}
+
+/// Returns the path to the local pairing token bootstrap file (`%LOCALAPPDATA%\SmartLinter\pairing_token.txt`).
+pub fn get_pairing_token_file_path() -> Option<std::path::PathBuf> {
+    if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+        let trimmed = local_app_data.trim();
+        if !trimmed.is_empty() {
+            return Some(
+                std::path::PathBuf::from(trimmed)
+                    .join("SmartLinter")
+                    .join("pairing_token.txt"),
+            );
+        }
+    }
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        let trimmed = user_profile.trim();
+        if !trimmed.is_empty() {
+            return Some(
+                std::path::PathBuf::from(trimmed)
+                    .join("AppData")
+                    .join("Local")
+                    .join("SmartLinter")
+                    .join("pairing_token.txt"),
+            );
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let trimmed = home.trim();
+        if !trimmed.is_empty() {
+            return Some(
+                std::path::PathBuf::from(trimmed)
+                    .join(".smartlinter")
+                    .join("pairing_token.txt"),
+            );
+        }
+    }
+    None
+}
+
+/// Exports the pairing token to a specific filesystem path for editor plugin bootstrap.
+pub fn export_pairing_token_to_path(token: &str, path: &std::path::Path) {
+    if let Some(parent) = path.parent() {
+        if let Err(e) = std::fs::create_dir_all(parent) {
+            warn!(
+                "Failed to create directory {:?} for pairing token bootstrap: {}",
+                parent,
+                e
+            );
+            return;
+        }
+    }
+    if let Err(e) = std::fs::write(path, token.trim()) {
+        warn!(
+            "Failed to write pairing token to {:?}: {}",
+            path,
+            e
+        );
+    } else {
+        info!(
+            "Pairing token bootstrap file successfully written to {:?}",
+            path
+        );
+    }
+}
+
+/// Exports the pairing token to the default local user file (`%LOCALAPPDATA%\SmartLinter\pairing_token.txt`).
+///
+/// If writing fails, logs a warning without panicking or interrupting server startup.
+pub fn export_pairing_token_to_file(token: &str) {
+    if let Some(path) = get_pairing_token_file_path() {
+        export_pairing_token_to_path(token, &path);
+    } else {
+        warn!("Could not determine local app data path for pairing token bootstrap export");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pairing_token_file_path_resolution() {
+        let path = get_pairing_token_file_path();
+        assert!(path.is_some(), "Pairing token file path should resolve in standard test environment");
+        let path_buf = path.unwrap();
+        assert!(
+            path_buf.to_string_lossy().ends_with("pairing_token.txt"),
+            "Path must end with pairing_token.txt"
+        );
+        assert!(
+            path_buf.to_string_lossy().contains("SmartLinter") || path_buf.to_string_lossy().contains(".smartlinter"),
+            "Path must contain SmartLinter directory"
+        );
+    }
+
+    #[test]
+    fn test_export_pairing_token_to_file_and_read_back() {
+        let test_token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let temp_dir = std::env::temp_dir().join(format!("smartlinter_test_{}", rand::random::<u32>()));
+        let test_file_path = temp_dir.join("pairing_token.txt");
+
+        export_pairing_token_to_path(test_token, &test_file_path);
+
+        assert!(test_file_path.exists(), "Exported token file must exist");
+        let read_token = std::fs::read_to_string(&test_file_path).expect("File must be readable");
+        assert_eq!(read_token.trim(), test_token);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_bridge_server_with_token_store() {
+        let known_token = "test_custom_token_fixed_for_reconnect_testing_1234567890abcdef";
+        let store = InMemoryTokenStore::with_initial_token(known_token);
+        let sink = Arc::new(NoopEventSink);
+        let server = BridgeServer::with_token_store(&store, sink);
+
+        let active_token = server.auth_manager().get_token().await;
+        assert_eq!(active_token, known_token);
+        assert!(server.auth_manager().validate_token(known_token).await);
     }
 }

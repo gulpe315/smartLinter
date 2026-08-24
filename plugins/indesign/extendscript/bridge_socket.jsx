@@ -12,6 +12,74 @@
     'use strict';
 
     /**
+     * Reads the pairing token exported by Tauri BridgeServer from local app data file.
+     * Searches %LOCALAPPDATA%\SmartLinter\pairing_token.txt with fallbacks.
+     * @returns {string|null} Token string or null if not found/readable
+     */
+    function resolvePairingTokenFromFile() {
+        try {
+            var candidatePaths = [];
+
+            // 1. Check %LOCALAPPDATA% via $.getenv
+            if (typeof $ !== 'undefined' && typeof $.getenv === 'function') {
+                var localAppData = $.getenv('LOCALAPPDATA');
+                if (localAppData && localAppData.length > 0) {
+                    candidatePaths.push(localAppData + '/SmartLinter/pairing_token.txt');
+                    candidatePaths.push(localAppData + '\\SmartLinter\\pairing_token.txt');
+                }
+                var userProfile = $.getenv('USERPROFILE');
+                if (userProfile && userProfile.length > 0) {
+                    candidatePaths.push(userProfile + '/AppData/Local/SmartLinter/pairing_token.txt');
+                }
+            }
+
+            // 2. Check Folder.userData (Roaming -> Local)
+            if (typeof Folder !== 'undefined' && Folder.userData) {
+                try {
+                    if (Folder.userData.parent) {
+                        var appDataRoot = Folder.userData.parent.fsName || Folder.userData.parent.fullName;
+                        if (appDataRoot) {
+                            candidatePaths.push(appDataRoot + '/Local/SmartLinter/pairing_token.txt');
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            // 3. Check ExtendScript tilde path (~/AppData/Local/SmartLinter/...)
+            candidatePaths.push('~/AppData/Local/SmartLinter/pairing_token.txt');
+
+            // 4. Test each candidate path with ExtendScript File API
+            if (typeof File !== 'undefined') {
+                for (var i = 0; i < candidatePaths.length; i++) {
+                    var filePath = candidatePaths[i];
+                    try {
+                        var f = new File(filePath);
+                        if (f.exists) {
+                            var opened = f.open('r');
+                            if (opened) {
+                                var content = f.read();
+                                f.close();
+                                if (content) {
+                                    // Trim whitespace and newlines
+                                    var token = content.replace(/^[\s\r\n]+|[\s\r\n]+$/g, '');
+                                    if (token.length > 0) {
+                                        return token;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (err) {
+                        // Ignore individual path access error and try next
+                    }
+                }
+            }
+        } catch (e) {
+            // Suppress error and return null to trigger fallback
+        }
+        return null;
+    }
+
+    /**
      * SmartLinterBridgeSocket
      * @param {Object} [config]
      */
@@ -19,7 +87,9 @@
         config = config || {};
         this.host = config.host || '127.0.0.1';
         this.port = config.port || 49152;
-        this.token = config.token || 'smartlinter-default-dev-token-secret-32b';
+        var defaultDevToken = 'smartlinter-default-dev-token-secret-32b';
+        var fileToken = resolvePairingTokenFromFile();
+        this.token = config.token || fileToken || defaultDevToken;
         this.version = config.version || '0.1.0';
         this.timeout = config.timeout || 3; // socket timeout in seconds
         this.status = 'DISCONNECTED'; // DISCONNECTED | CONNECTING | CONNECTED | ERROR
@@ -250,6 +320,9 @@
         this.sessionToken = null;
     };
 
+    // Expose helper on constructor
+    SmartLinterBridgeSocket.resolvePairingTokenFromFile = resolvePairingTokenFromFile;
+
     // Register globally in ExtendScript
     if (typeof $ !== 'undefined' && $.global) {
         $.global.SmartLinterBridgeSocket = SmartLinterBridgeSocket;
@@ -260,7 +333,8 @@
     // CommonJS export for Node.js / unit tests
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
-            SmartLinterBridgeSocket: SmartLinterBridgeSocket
+            SmartLinterBridgeSocket: SmartLinterBridgeSocket,
+            resolvePairingTokenFromFile: resolvePairingTokenFromFile
         };
     }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
