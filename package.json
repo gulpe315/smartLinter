@@ -5,12 +5,18 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "test": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts shared/engine/__tests__/hash_util.test.ts shared/engine/__tests__/diff_engine.test.ts shared/engine/__tests__/special_elements.test.ts tests/unit/protocol_serialization_test.ts plugins/word/__tests__/word_plugin.test.ts plugins/word/tests/replacement_executor.test.ts plugins/indesign/__tests__/indesign_plugin.test.ts plugins/indesign/__tests__/atomic_replacer.test.ts",
     "test:shared": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts shared/engine/__tests__/hash_util.test.ts shared/engine/__tests__/diff_engine.test.ts shared/engine/__tests__/special_elements.test.ts",
     "test:engine": "node --test --experimental-strip-types shared/engine/__tests__/hash_util.test.ts shared/engine/__tests__/diff_engine.test.ts shared/engine/__tests__/special_elements.test.ts",
     "test:unit": "node --test --experimental-strip-types tests/unit/protocol_serialization_test.ts",
     "test:word": "node --test --experimental-strip-types plugins/word/__tests__/word_plugin.test.ts plugins/word/tests/replacement_executor.test.ts",
-    "test:indesign": "node --test --experimental-strip-types plugins/indesign/__tests__/indesign_plugin.test.ts plugins/indesign/__tests__/atomic_replacer.test.ts"
+    "test:indesign": "node --test --experimental-strip-types plugins/indesign/__tests__/indesign_plugin.test.ts plugins/indesign/__tests__/atomic_replacer.test.ts",
+    "test:ui": "vitest run",
+    "test:ui:watch": "vitest",
+    "test:all": "npm run test:shared && npm run test:unit && npm run test:ui"
   },
   "keywords": [
     "linter",
@@ -21,5 +27,30 @@
     "tauri"
   ],
   "author": "SmartLinter Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.6",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "autoprefixer": "^10.5.4",
+    "jsdom": "^30.0.1",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.33.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.6.0",
+    "zustand": "^5.0.15"
+  }
 }
