@@ -1,0 +1,119 @@
+[
+  {
+    "id": "para_01_term_inconsistency",
+    "category": "용어 일관성 결여",
+    "source": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+    "target": "새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오. 설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.",
+    "word_count": 68,
+    "char_count": 218,
+    "expected_issues": [
+      "가상머신 용어 혼용(가상서버 인스턴스와 불일치)",
+      "사이드바 표기"
+    ]
+  },
+  {
+    "id": "para_02_passive_voice_style",
+    "category": "번역투 이중 피동문",
+    "source": "The database snapshot is automatically created every 24 hours and backed up to object storage for disaster recovery.",
+    "target": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.",
+    "word_count": 62,
+    "char_count": 204,
+    "expected_issues": [
+      "생성되어지는 (이중 피동)",
+      "백업되어지게 됩니다 (이중 피동)"
+    ]
+  },
+  {
+    "id": "para_03_punctuation_and_josa",
+    "category": "조사/문장부호 공백 오류",
+    "source": "Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.",
+    "target": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 . 방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.",
+    "word_count": 74,
+    "char_count": 222,
+    "expected_issues": [
+      "조사 앞 공백(포트 와)",
+      "마침표 앞 공백(확인하세요 .)",
+      "띄어쓰기(실패할수있습니다)"
+    ]
+  },
+  {
+    "id": "para_04_ui_quote_rule",
+    "category": "UI 요소 표기 규칙 위반",
+    "source": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+    "target": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오. 키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.",
+    "word_count": 65,
+    "char_count": 215,
+    "expected_issues": [
+      "UI 버튼명따옴표/대괄호 누락([Submit])",
+      "Key/키 혼용"
+    ]
+  },
+  {
+    "id": "para_05_number_mismatch",
+    "category": "숫자/단위 오역",
+    "source": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+    "target": "해당 스토리지 볼륨은 볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다. 대규모 I/O 작업이 필요한 트랜잭션 워크로드에 최적화되어 있습니다.",
+    "word_count": 71,
+    "char_count": 224,
+    "expected_issues": [
+      "숫자 불일치(10,000 vs 1,000)"
+    ]
+  },
+  {
+    "id": "para_06_untranslated_term",
+    "category": "미번역 영단어 방치",
+    "source": "When load balancer health checks fail consecutively three times, the backend target is marked as unhealthy.",
+    "target": "로드 밸런서의 health check가 3회 연속 실패하는 경우, 백엔드 대상은 unhealthy 상태로 표시됩니다. 트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.",
+    "word_count": 70,
+    "char_count": 230,
+    "expected_issues": [
+      "health check 미번역",
+      "unhealthy 미번역",
+      "타깃/대상 혼용"
+    ]
+  },
+  {
+    "id": "para_07_clean_perfect",
+    "category": "오류 없음 (클린 문단)",
+    "source": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+    "target": "CPU 사용률이 5분 이상 85%를 초과하면 클라우드 모니터링 알람이 이메일 또는 SMS를 통해 관리자에게 알림을 전송합니다. 알림 수신 후 임계치를 조정하거나 오토 스케일링 정책을 트리거할 수 있습니다.",
+    "word_count": 78,
+    "char_count": 245,
+    "expected_issues": []
+  },
+  {
+    "id": "para_08_grammar_and_typo",
+    "category": "맞춤법/오탈자",
+    "source": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+    "target": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다. 별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다.",
+    "word_count": 73,
+    "char_count": 232,
+    "expected_issues": [
+      "됨니다(됩니다)",
+      "잇습니다(있습니다)"
+    ]
+  },
+  {
+    "id": "para_09_long_complex_paragraph",
+    "category": "외래어 표기법 및 번역투",
+    "source": "In order to optimize network latency across distributed regions, edge caching policies should be configured with appropriate TTL values and origin shield configurations.",
+    "target": "분산된 리전 간의 네트워크 지연 시간을 최적화하기 위해, 적절한 TTL 값과 오리진 쉴드 구성을 포함하는 엣지 캐싱 정책을 설정해야 합니다. 이를 통하여 반복적인 정적 컨텐츠 요청 시 오리진 서버의 부하를 대폭 경감시킬 수 있습니다.",
+    "word_count": 86,
+    "char_count": 268,
+    "expected_issues": [
+      "컨텐츠(콘텐츠)",
+      "이를 통하여(번역투)"
+    ]
+  },
+  {
+    "id": "para_10_bullet_like_inline",
+    "category": "용어 통일성 및 문장 구조",
+    "source": "Key prerequisites include: 1) Node.js version 18 or higher, 2) minimum 4GB allocated RAM, and 3) administrative access to the cluster.",
+    "target": "주요 사전 요구사항은 다음과 같습니다: 1) Node.js 버전 18 이상, 2) 최소 4GB 이상의 할당된 RAM, 3) 클러스터에 대한 관리자 권한. 모든 요구조건이 충족되어야만 설치 스크립트가 정상적으로 실행될 수 있습니다.",
+    "word_count": 79,
+    "char_count": 252,
+    "expected_issues": [
+      "요구사항 vs 요구조건"
+    ]
+  }
+]

@@ -1,0 +1,49 @@
+﻿{
+  "manifestVersion": 5,
+  "id": "com.smartlinter.indesign.bridge",
+  "name": "SmartLinter InDesign Bridge",
+  "version": "1.0.0",
+  "main": "indesign_panel.html",
+  "host": [
+    {
+      "app": "ID",
+      "minVersion": "18.5"
+    }
+  ],
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "smartlinterPanel",
+      "label": {
+        "default": "SmartLinter Bridge"
+      },
+      "minimumSize": {
+        "width": 240,
+        "height": 320
+      },
+      "maximumSize": {
+        "width": 600,
+        "height": 900
+      },
+      "preferredDocked": true
+    }
+  ],
+  "requiredPermissions": {
+    "localFileSystem": "fullAccess",
+    "network": {
+      "domains": [
+        "http://127.0.0.1:49152",
+        "ws://127.0.0.1:49152"
+      ]
+    }
+  },
+  "icons": [
+    {
+      "width": 23,
+      "height": 23,
+      "path": "icons/icon_dark.png",
+      "scale": [1, 2],
+      "theme": ["dark", "darkest"]
+    }
+  ]
+}

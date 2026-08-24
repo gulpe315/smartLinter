@@ -1,0 +1,78 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SmartLinter Word Bridge</title>
+    <!-- Office.js library -->
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+        h2 { margin-top: 0; font-size: 1.1rem; color: #0f172a; }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .badge-active { background-color: #dcfce7; color: #166534; }
+        .badge-hidden { background-color: #fef3c7; color: #92400e; }
+        .badge-error { background-color: #fee2e2; color: #991b1b; }
+        .btn-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+        button {
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            background: #ffffff;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover { background: #f1f5f9; }
+        button.primary { background: #2563eb; color: #ffffff; border-color: #1d4ed8; }
+        button.primary:hover { background: #1d4ed8; }
+        #logArea {
+            margin-top: 12px;
+            height: 180px;
+            overflow-y: auto;
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: Consolas, monospace;
+            font-size: 0.75rem;
+            padding: 8px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h2>⚡ SmartLinter Bridge</h2>
+    <div>
+        <span id="visibilityBadge" class="badge badge-active">Visibility: Visible</span>
+        <span id="heartbeatBadge" class="badge badge-active">Heartbeat: Ticking</span>
+    </div>
+    <p style="font-size: 0.85rem; color: #64748b;">
+        Shared Runtime Active (<span id="runtimeMode">lifetime="long"</span>)
+    </p>
+
+    <div class="btn-group">
+        <button id="btnHide" class="primary">Hide Task Pane (Office.addin.hide())</button>
+        <button id="btnSimulateEvent">Simulate Doc Change Event</button>
+        <button id="btnClearLog">Clear Log</button>
+    </div>
+
+    <div><strong>Telemetry Log:</strong></div>
+    <div id="logArea"></div>
+
+    <script src="word_taskpane.js"></script>
+</body>
+</html>

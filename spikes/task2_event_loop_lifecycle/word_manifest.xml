@@ -1,0 +1,124 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+  
+  <Id>d1a3c7b2-84e5-4f2a-9e16-7c3a8b2d4e5f</Id>
+  <Version>1.0.0.0</Version>
+  <ProviderName>SmartLinter</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="SmartLinter Bridge" />
+  <Description DefaultValue="SmartLinter Background Bridge for MS Word" />
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png" />
+  <SupportUrl DefaultValue="https://smartlinter.dev/support" />
+  
+  <AppDomains>
+    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>http://127.0.0.1:49152</AppDomain>
+  </AppDomains>
+
+  <Hosts>
+    <Host Name="Document" />
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://localhost:3000/word_taskpane.html" />
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <!-- Shared Runtime: lifetime="long" keeps JS engine alive even when Task Pane is hidden -->
+        <Runtimes>
+          <Runtime resid="Taskpane.Url" lifetime="long" />
+        </Runtimes>
+        
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          
+          <FunctionFile resid="Taskpane.Url"/>
+          
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <CustomTab id="SmartLinterTab">
+              <Group id="SmartLinterGroup">
+                <Label resid="SmartLinter.GroupLabel" />
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16" />
+                  <bt:Image size="32" resid="Icon.32" />
+                  <bt:Image size="80" resid="Icon.80" />
+                </Icon>
+                
+                <!-- Button 1: Toggle / Show Task Pane -->
+                <Control xsi:type="Button" id="ShowTaskpaneButton">
+                  <Label resid="ShowTaskpane.Label" />
+                  <Supertip>
+                    <Title resid="ShowTaskpane.Label" />
+                    <Description resid="ShowTaskpane.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>SmartLinterTaskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+                
+                <!-- Button 2: Direct Command to Hide / Sync via Shared Runtime Function -->
+                <Control xsi:type="Button" id="HideTaskpaneButton">
+                  <Label resid="HideTaskpane.Label" />
+                  <Supertip>
+                    <Title resid="HideTaskpane.Label" />
+                    <Description resid="HideTaskpane.Tooltip" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16" />
+                    <bt:Image size="32" resid="Icon.32" />
+                    <bt:Image size="80" resid="Icon.80" />
+                  </Icon>
+                  <Action xsi:type="ExecuteFunction">
+                    <FunctionName>btnToggleHide</FunctionName>
+                  </Action>
+                </Control>
+              </Group>
+            </CustomTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/word_taskpane.html"/>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://smartlinter.dev"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title" DefaultValue="SmartLinter Bridge Loaded"/>
+        <bt:String id="SmartLinter.GroupLabel" DefaultValue="SmartLinter"/>
+        <bt:String id="ShowTaskpane.Label" DefaultValue="Open Linter Pane"/>
+        <bt:String id="HideTaskpane.Label" DefaultValue="Hide Linter Pane"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Background bridge connecting Word to SmartLinter Tauri Dashboard."/>
+        <bt:String id="ShowTaskpane.Tooltip" DefaultValue="Displays the SmartLinter Bridge configuration panel."/>
+        <bt:String id="HideTaskpane.Tooltip" DefaultValue="Hides the Task Pane while keeping the background bridge active."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>
