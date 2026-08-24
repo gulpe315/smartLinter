@@ -447,6 +447,19 @@
             } catch (e) {}
         } else {
             daemonInstance = $.global.SmartLinterDaemonInstance;
+            try {
+                if (daemonInstance && typeof daemonInstance.stop === 'function') {
+                    daemonInstance.stop();
+                }
+            } catch (e) {}
+            $.global.SmartLinterDaemonInstance = null;
+            try {
+                daemonInstance = new SmartLinterDaemon();
+                $.global.SmartLinterDaemonInstance = daemonInstance;
+                if (typeof app !== 'undefined') {
+                    daemonInstance.start();
+                }
+            } catch (e) {}
         }
     } else if (typeof global !== 'undefined') {
         global.SmartLinterDaemon = SmartLinterDaemon;

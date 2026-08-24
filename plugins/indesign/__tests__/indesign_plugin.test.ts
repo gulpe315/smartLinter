@@ -35,7 +35,11 @@ const uxpJsPath = path.resolve(__dirname, '../uxp/index.js');
  * ExtendScript File Loader & Preprocessor
  * Simulates InDesign's ExtendScript engine preprocessor (#include, #targetengine) and executes in sandbox.
  */
-function loadExtendScript(filePath: string, context: Record<string, any> = {}) {
+function loadExtendScript(
+    filePath: string,
+    context: Record<string, any> = {},
+    existingSandbox?: Record<string, any>
+) {
     let content = fs.readFileSync(filePath, 'utf8');
     const dir = path.dirname(filePath);
 
@@ -53,7 +57,7 @@ function loadExtendScript(filePath: string, context: Record<string, any> = {}) {
     // Replace ExtendScript preprocessor directives starting with # with comment
     content = content.replace(/^[ \t]*#[a-zA-Z_]+/gm, '// $&');
 
-    const sandbox: Record<string, any> = {
+    const sandbox: Record<string, any> = existingSandbox || {
         console,
         Buffer,
         setTimeout,
@@ -111,7 +115,9 @@ function loadExtendScript(filePath: string, context: Record<string, any> = {}) {
         }
     }
 
-    vm.createContext(sandbox);
+    if (!vm.isContext(sandbox)) {
+        vm.createContext(sandbox);
+    }
     vm.runInContext(content, sandbox, { filename: filePath });
     return sandbox;
 }
@@ -145,6 +151,23 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             assert.ok(daemon);
             assert.equal(daemon.engineId, 'smartlinter_persistent_monitor');
             assert.equal(daemon.getStatus().engine, 'smartlinter_persistent_engine');
+        });
+
+        it('should replace an existing daemon singleton when the script is re-evaluated', () => {
+            const env = new MockInDesignEnvironment();
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const calls: string[] = [];
+            const oldDaemon = {
+                stop: () => calls.push('stop')
+            };
+            sandbox.SmartLinterDaemonInstance = oldDaemon;
+
+            loadExtendScript(daemonScriptPath, {}, sandbox);
+
+            assert.deepEqual(calls, ['stop']);
+            assert.notEqual(sandbox.SmartLinterDaemonInstance, oldDaemon);
+            assert.ok(sandbox.SmartLinterDaemonInstance instanceof sandbox.SmartLinterDaemon);
+            assert.equal(sandbox.SmartLinterDaemonInstance.isRunning, true);
         });
     });
 
