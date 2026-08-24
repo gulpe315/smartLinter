@@ -439,6 +439,28 @@ graph TD
 
 ---
 
+### Task 15.5: Tauri AI 파이프라인 커맨드 연결 (Tauri AI Pipeline Command Wiring) — 신규 추가
+* **(1) 목표:**
+  * **[설계 결정 완료 사항 (2026-08-24, 사용자 승인)]** Task 15 검토 중 발견: 프론트엔드(`src/services/tauriBridge.ts`)의 `analyzeParagraph`/`executeAiCommand`는 각각 `tauri.core.invoke('analyze_paragraph', ...)` / `tauri.core.invoke('execute_ai_command', ...)`를 호출하지만, `src-tauri/src/commands.rs`에는 `set_always_on_top` 하나만 등록되어 있어 두 커맨드 모두 존재하지 않음 → invoke가 즉시 실패 → try/catch로 조용히 `MockBridgeService`(하드코딩된 정규식 치환)로 폴백됨. 즉, 실제 데스크톱 앱을 구동해도 QA 분석과 AI 커맨드 채팅 둘 다 **한 번도 실제 로컬 LLM(Ollama/qwen2.5:7b)을 호출하지 않는다.** Task 4/5에서 이미 구현된 `LocalLlmProvider`/`OllamaProvider`/`MicroScopingQueue`/`PromptBuilder`/`QaParser`(모두 `src-tauri/src/ai/` 참고)를 실제 Tauri 커맨드로 연결하는 것이 이 태스크의 목표.
+* **(2) 설계 근거:**
+  * `SmartLinter_Plan.md` > `4. 로컬 하드웨어 최적화 전략`(Micro-Scoping Queue 실사용 경로 확보)
+  * Task 4(`src-tauri/src/ai/micro_queue.rs`, `provider.rs`, `ollama_client.rs`), Task 5(`prompt_builder.rs`, `qa_parser.rs`)의 산출물을 실제로 소비하는 통합 레이어
+* **(3) 완료조건 (Acceptance Criteria):**
+  * `src-tauri/src/main.rs`의 `setup()`에서 `OllamaProvider`(`Arc<dyn LocalLlmProvider>`)와 이를 감싼 `MicroScopingQueue` 인스턴스를 생성하고, `app.manage(...)`로 Tauri 앱 상태에 등록하여 커맨드 핸들러가 `tauri::State<...>`로 접근 가능하게 할 것.
+  * `src-tauri/src/commands.rs`에 `#[tauri::command] async fn analyze_paragraph(paragraph: ParagraphPayload, ...) -> Result<QaReport, String>` 구현: `PromptBuilder`로 압축 프롬프트 구성 → `MicroScopingQueue::submit()`으로 큐 제출 → `QaParser::parse()`로 응답 파싱 → `QaReport` 반환. (TS `QaReport` 타입과 필드 일치할 것 — `shared/protocol/types.ts` 및 `qa_parser.rs`의 `QaReport` 참고)
+  * `src-tauri/src/commands.rs`에 `#[tauri::command] async fn execute_ai_command(instruction: String, paragraph: ParagraphPayload, ...) -> Result<AiCommandResultDto, String>` 구현: 문단 텍스트 + 사용자 자연어 지시를 조합한 프롬프트를 `MicroScopingQueue`로 제출하고, 모델의 수정 제안 텍스트를 추출해 TS `AiCommandResult`(`{ suggestedText, durationMs, model, error? }`)와 동일한 셰이프로 반환.
+  * `src-tauri/src/main.rs`의 `tauri::generate_handler![...]`에 `commands::analyze_paragraph`, `commands::execute_ai_command`를 `set_always_on_top`과 함께 등록.
+  * Ollama 구동 상태에서 `npm run tauri dev`로 실행 → 대시보드에서 실제 문단에 대해 QA 카드 생성 및 AI 커맨드 채팅 지시를 내렸을 때, 매번 동일한 하드코딩된 정규식 결과가 아니라 실제 qwen2.5:7b 모델의 자연스러운(매 호출 결과가 달라지는) 응답이 반환됨을 직접 확인.
+  * Ollama가 꺼져 있거나 타임아웃되는 예외 상황에서는 기존 TS `try/catch` → `MockBridgeService` 폴백 경로가 그대로 동작하여 UI가 깨지지 않음을 확인(폴백 자체는 유지 — 삭제하지 말 것).
+  * 기존 `cargo test`, `npm test`, `npm run test:ui`, `npm run build` 전부 회귀 없이 통과.
+* **(4) 선행 조건/의존성:**
+  * Task 4(로컬 LLM 클라이언트), Task 5(프롬프트 압축/QA 파서), Task 13.5(Tauri 앱 셸), Task 13(QA 카드 UI), Task 15(AI 커맨드 채팅 UI)
+* **(5) 예상 산출물:**
+  * `src-tauri/src/commands.rs` (`analyze_paragraph`, `execute_ai_command` 추가)
+  * `src-tauri/src/main.rs` (AI 상태 관리 및 핸들러 등록)
+
+---
+
 ## Phase 5: 안전장치, 충돌 방지 및 예외 UX 고도화 (Resilience & Edge-Case UX)
 
 ### Task 16: Stale 상태 충돌 방지 및 단일 문단 자동 재스캔 UX (Stale Conflict Rejection & Auto-Rescan UX)
