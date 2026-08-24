@@ -1,0 +1,2898 @@
+{
+  "timestamp": "2026-08-24T09:26:43+0900",
+  "hardware": {
+    "gpu_name": "NVIDIA GeForce RTX 3050",
+    "vram_total_mb": 8192.0,
+    "vram_used_during_benchmark_mb": 5540.0,
+    "vram_free_headroom_mb": 2503.0
+  },
+  "model": {
+    "name": "qwen2.5:7b",
+    "quantization": "Q4_K_M",
+    "parameter_size": "7.6B"
+  },
+  "iterations_per_condition": 35,
+  "baseline_stats": {
+    "sample_count": 35,
+    "json_valid_rate_pct": 100.0,
+    "wall_latency_ms": {
+      "mean": 10378.93,
+      "median": 10102.43,
+      "p90": 12413.53,
+      "p95": 12699.78,
+      "min": 8138.16,
+      "max": 14935.68,
+      "stddev": 1631.7
+    },
+    "ttft_ms": {
+      "mean": 333.38,
+      "median": 321.64,
+      "p90": 347.72,
+      "p95": 352.73,
+      "min": 287.84,
+      "max": 782.56,
+      "stddev": 79.97
+    },
+    "prompt_tokens": {
+      "mean": 872.43,
+      "median": 873,
+      "p90": 889.0,
+      "p95": 894.0,
+      "min": 848,
+      "max": 894,
+      "stddev": 12.82
+    },
+    "gen_tokens": {
+      "mean": 421.54,
+      "median": 415,
+      "p90": 510.0,
+      "p95": 521.1,
+      "min": 326,
+      "max": 620,
+      "stddev": 69.84
+    },
+    "gen_tps": {
+      "mean": 41.96,
+      "median": 41.95,
+      "p90": 42.53,
+      "p95": 42.62,
+      "min": 40.6,
+      "max": 42.7,
+      "stddev": 0.45
+    },
+    "prompt_eval_tps": {
+      "mean": 10307.04,
+      "median": 10668.46,
+      "p90": 11639.88,
+      "p95": 12022.97,
+      "min": 1628.52,
+      "max": 12300.91,
+      "stddev": 1807.99
+    }
+  },
+  "compressed_stats": {
+    "sample_count": 35,
+    "json_valid_rate_pct": 100.0,
+    "wall_latency_ms": {
+      "mean": 7219.78,
+      "median": 6997.16,
+      "p90": 12647.21,
+      "p95": 14572.87,
+      "min": 586.07,
+      "max": 15051.2,
+      "stddev": 4147.98
+    },
+    "ttft_ms": {
+      "mean": 294.38,
+      "median": 288.09,
+      "p90": 328.57,
+      "p95": 336.62,
+      "min": 249.43,
+      "max": 352.25,
+      "stddev": 23.48
+    },
+    "prompt_tokens": {
+      "mean": 188.43,
+      "median": 189,
+      "p90": 205.0,
+      "p95": 210.0,
+      "min": 164,
+      "max": 210,
+      "stddev": 12.82
+    },
+    "gen_tokens": {
+      "mean": 294.2,
+      "median": 288,
+      "p90": 514.4,
+      "p95": 609.6,
+      "min": 15,
+      "max": 631,
+      "stddev": 176.12
+    },
+    "gen_tps": {
+      "mean": 42.91,
+      "median": 42.8,
+      "p90": 44.74,
+      "p95": 45.18,
+      "min": 41.16,
+      "max": 45.94,
+      "stddev": 1.18
+    },
+    "prompt_eval_tps": {
+      "mean": 4567.68,
+      "median": 5269.4,
+      "p90": 5712.26,
+      "p95": 5891.89,
+      "min": 2194.11,
+      "max": 5978.48,
+      "stddev": 1414.92
+    }
+  },
+  "comparison": {
+    "mean_wall_latency_ms": {
+      "baseline": 10378.93,
+      "compressed": 7219.78,
+      "diff": 3159.15,
+      "pct_improvement": 30.44
+    },
+    "p95_wall_latency_ms": {
+      "baseline": 12699.78,
+      "compressed": 14572.87,
+      "diff": -1873.09,
+      "pct_improvement": -14.75
+    },
+    "mean_ttft_ms": {
+      "baseline": 333.38,
+      "compressed": 294.38,
+      "diff": 39.0,
+      "pct_improvement": 11.7
+    },
+    "p95_ttft_ms": {
+      "baseline": 352.73,
+      "compressed": 336.62,
+      "diff": 16.11,
+      "pct_improvement": 4.57
+    },
+    "mean_prompt_tokens": {
+      "baseline": 872.43,
+      "compressed": 188.43,
+      "diff": 684.0,
+      "pct_improvement": 78.4
+    },
+    "mean_gen_tokens": {
+      "baseline": 421.54,
+      "compressed": 294.2,
+      "diff": 127.34,
+      "pct_improvement": 30.21
+    },
+    "mean_gen_tps": {
+      "baseline": 41.96,
+      "compressed": 42.91,
+      "diff": 0.95,
+      "pct_improvement": 2.26
+    }
+  },
+  "baseline_raw_records": [
+    {
+      "wall_latency_ms": 11227.03,
+      "ttft_ms": 782.56,
+      "prompt_tokens": 875,
+      "prompt_eval_time_ms": 537.3,
+      "prompt_eval_tps": 1628.52,
+      "gen_tokens": 438,
+      "gen_time_ms": 10440.35,
+      "gen_tps": 41.95,
+      "total_server_dur_ms": 11220.73,
+      "load_dur_ms": 229.15,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"The translation contains issues related to terminology, grammar, and UI string conventions.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"VPC Management Console\",\n      \"suggestion\": \"VPC 관리 콘솔\",\n      \"reason\": \"术语应保持一致，建议使用标准术语。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Compute > Instances\",\n      \"suggestion\": \"컴퓨트 > 인스턴스\",\n      \"reason\": \"UI元素名称应使用英文原名或正确翻译，建议保留英文。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"suggestion\": \"좌측 사이드바에서 '컴퓨트 > 인스턴스'를 선택하십시오.\",\n      \"reason\": \"UI元素名称前后不应有空格，且应使用英文原名或正确翻译。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Numerical and Unit Accuracy\",\n      \"original\": \"subnet and virtual machine specifications\",\n      \"suggestion\": \"서브넷과 가상머신 사양\",\n      \"reason\": \"术语应保持一致，建议使用标准术语。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Style/Passive\",\n      \"original\": \"설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.\",\n      \"suggestion\": \"설정 마법사에서 원하는 서브넷과 가상머신 사양을 설정할 수 있습니다.\",\n      \"reason\": \"避免使用被动语态，建议改为积极主动的表达。\",\n      \"severity\": \"MEDIUM\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "The translation contains issues related to terminology, grammar, and UI string conventions.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "VPC Management Console",
+            "suggestion": "VPC 관리 콘솔",
+            "reason": "术语应保持一致，建议使用标准术语。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Terminology",
+            "original": "Compute > Instances",
+            "suggestion": "컴퓨트 > 인스턴스",
+            "reason": "UI元素名称应使用英文原名或正确翻译，建议保留英文。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "suggestion": "좌측 사이드바에서 '컴퓨트 > 인스턴스'를 선택하십시오.",
+            "reason": "UI元素名称前后不应有空格，且应使用英文原名或正确翻译。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Numerical and Unit Accuracy",
+            "original": "subnet and virtual machine specifications",
+            "suggestion": "서브넷과 가상머신 사양",
+            "reason": "术语应保持一致，建议使用标准术语。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Style/Passive",
+            "original": "설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.",
+            "suggestion": "설정 마법사에서 원하는 서브넷과 가상머신 사양을 설정할 수 있습니다.",
+            "reason": "避免使用被动语态，建议改为积极主动的表达。",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "iteration": 1,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 10101.59,
+      "ttft_ms": 316.59,
+      "prompt_tokens": 865,
+      "prompt_eval_time_ms": 77.63,
+      "prompt_eval_tps": 11142.74,
+      "gen_tokens": 411,
+      "gen_time_ms": 9771.47,
+      "gen_tps": 42.06,
+      "total_server_dur_ms": 10095.76,
+      "load_dur_ms": 223.81,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, passive constructions, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24 시간마다 자동으로 생성됩니다\",\n      \"reason\": \"‘구조’는 불필요하고, ‘생성되어지는’은 이중 피동문을 형성합니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"‘백업되어지게 됩니다’는 번역투 이중 피동문, ‘위하여’는 불필요한 접속사입니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24 시간마다 자동으로 생성됩니다\",\n      \"reason\": \"조사 앞 공백 제거, ‘시간’ 뒤에 공백 추가\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"suggestion\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"reason\": \"마침표 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, passive constructions, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24 시간마다 자동으로 생성됩니다",
+            "reason": "‘구조’는 불필요하고, ‘생성되어지는’은 이중 피동문을 형성합니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Terminology",
+            "original": "재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "‘백업되어지게 됩니다’는 번역투 이중 피동문, ‘위하여’는 불필요한 접속사입니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24 시간마다 자동으로 생성됩니다",
+            "reason": "조사 앞 공백 제거, ‘시간’ 뒤에 공백 추가",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "suggestion": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "reason": "마침표 앞 공백 제거",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 2,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 12442.73,
+      "ttft_ms": 291.08,
+      "prompt_tokens": 873,
+      "prompt_eval_time_ms": 83.64,
+      "prompt_eval_tps": 10437.84,
+      "gen_tokens": 513,
+      "gen_time_ms": 12148.19,
+      "gen_tps": 42.23,
+      "total_server_dur_ms": 12438.22,
+      "load_dur_ms": 200.82,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 78,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 포트 443과 포트 80이 열려 있는지 확인하세요.\",\n      \"reason\": \"포트 번호는 숫자와 함께 명시하는 것이 더 자연스럽고 명확합니다. 또한, '와' 대신 '과'를 사용하여 문장 구조를 개선할 수 있습니다.\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.\",\n      \"suggestion\": \"방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.\",\n      \"reason\": \"문장 구조를 개선하여 자연스러운 표현으로 변경합니다. '활성화된 경우' 대신 '활성화되면'로 수정하여 문장의 흐름을 원활하게 합니다.\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"포트 443과 포트 80이 열려 있는지 확인하세요 .\",\n      \"suggestion\": \"포트 443과 포트 80이 열려 있는지 확인하세요.\",\n      \"reason\": \"마침표 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.\",\n      \"suggestion\": \"방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.\",\n      \"reason\": \"마침표 추가\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 78,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .",
+            "suggestion": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 포트 443과 포트 80이 열려 있는지 확인하세요.",
+            "reason": "포트 번호는 숫자와 함께 명시하는 것이 더 자연스럽고 명확합니다. 또한, '와' 대신 '과'를 사용하여 문장 구조를 개선할 수 있습니다.",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar",
+            "original": "방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.",
+            "suggestion": "방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.",
+            "reason": "문장 구조를 개선하여 자연스러운 표현으로 변경합니다. '활성화된 경우' 대신 '활성화되면'로 수정하여 문장의 흐름을 원활하게 합니다.",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "포트 443과 포트 80이 열려 있는지 확인하세요 .",
+            "suggestion": "포트 443과 포트 80이 열려 있는지 확인하세요.",
+            "reason": "마침표 앞 공백 제거",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.",
+            "suggestion": "방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.",
+            "reason": "마침표 추가",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 3,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 10361.3,
+      "ttft_ms": 287.84,
+      "prompt_tokens": 848,
+      "prompt_eval_time_ms": 70.84,
+      "prompt_eval_tps": 11971.31,
+      "gen_tokens": 430,
+      "gen_time_ms": 10070.16,
+      "gen_tps": 42.7,
+      "total_server_dur_ms": 10357.53,
+      "load_dur_ms": 210.46,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Submit 버튼을 클릭하십시오\",\n      \"suggestion\": \"제출 버튼을 클릭하십시오\",\n      \"reason\": \"提交按钮的标准术语是“제출 버튼”，而非“Submit 버튼”。建议使用本地化术语。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar and Natural Collocations\",\n      \"original\": \"키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.\",\n      \"suggestion\": \"키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.\",\n      \"reason\": \"建议将两个句子合并为一个更自然的表达方式。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음, Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"建议在“Submit”前添加逗号，以符合韩语的标点规则。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"UI String Conventions\",\n      \"original\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.\",\n      \"suggestion\": \"[인증 설정] > [API Key와 Secret Key 입력] > [Submit]\",\n      \"reason\": \"建议使用标准的UI字符串格式，以确保一致性。\",\n      \"severity\": \"MEDIUM\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Submit 버튼을 클릭하십시오",
+            "suggestion": "제출 버튼을 클릭하십시오",
+            "reason": "提交按钮的标准术语是“제출 버튼”，而非“Submit 버튼”。建议使用本地化术语。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar and Natural Collocations",
+            "original": "키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.",
+            "suggestion": "키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.",
+            "reason": "建议将两个句子合并为一个更自然的表达方式。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음, Submit 버튼을 클릭하십시오.",
+            "reason": "建议在“Submit”前添加逗号，以符合韩语的标点规则。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "UI String Conventions",
+            "original": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.",
+            "suggestion": "[인증 설정] > [API Key와 Secret Key 입력] > [Submit]",
+            "reason": "建议使用标准的UI字符串格式，以确保一致性。",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "iteration": 4,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 12283.68,
+      "ttft_ms": 327.16,
+      "prompt_tokens": 878,
+      "prompt_eval_time_ms": 83.79,
+      "prompt_eval_tps": 10478.58,
+      "gen_tokens": 510,
+      "gen_time_ms": 11953.17,
+      "gen_tps": 42.67,
+      "total_server_dur_ms": 12279.99,
+      "load_dur_ms": 237.05,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, numerical accuracy, and awkward phrasing.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"suggestion\": \"최대 10,000 IOPS를 지원하며, 각 볼륨 당 최대 500 MB/s의 대역폭을 제공합니다.\",\n      \"reason\": \"IOPS와 MB/s의 단위가 일치하지 않으며, 볼륨당 처리량은 명확하게 표현되어야 합니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Numerical and Unit Accuracy\",\n      \"original\": \"볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"suggestion\": \"최대 10,000 IOPS를 지원하며, 각 볼륨 당 최대 500 MB/s의 대역폭을 제공합니다.\",\n      \"reason\": \"IOPS 값이 1,000에서 10,000으로 수정되어야 합니다. 그리고 처리량은 초당 단위로 표현해야 합니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Style/Passive\",\n      \"original\": \"대규모 I/O 작업이 필요한 트랜잭션 워크로드에 최적화되어 있습니다\",\n      \"suggestion\": \"대규모 I/O 작업을 처리하기 위한 트랜잭션 워크로드에 최적화되어 있습니다.\",\n      \"reason\": \"被动语态表达不够自然，建议使用主动语态。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"suggestion\": \"초당 최대 500 MB/s의 처리량을 지원합니다.\",\n      \"reason\": \"“초당”前面不需要空格。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, numerical accuracy, and awkward phrasing.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다",
+            "suggestion": "최대 10,000 IOPS를 지원하며, 각 볼륨 당 최대 500 MB/s의 대역폭을 제공합니다.",
+            "reason": "IOPS와 MB/s의 단위가 일치하지 않으며, 볼륨당 처리량은 명확하게 표현되어야 합니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Numerical and Unit Accuracy",
+            "original": "볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다",
+            "suggestion": "최대 10,000 IOPS를 지원하며, 각 볼륨 당 최대 500 MB/s의 대역폭을 제공합니다.",
+            "reason": "IOPS 값이 1,000에서 10,000으로 수정되어야 합니다. 그리고 처리량은 초당 단위로 표현해야 합니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Style/Passive",
+            "original": "대규모 I/O 작업이 필요한 트랜잭션 워크로드에 최적화되어 있습니다",
+            "suggestion": "대규모 I/O 작업을 처리하기 위한 트랜잭션 워크로드에 최적화되어 있습니다.",
+            "reason": "被动语态表达不够自然，建议使用主动语态。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "초당 최대 500 MB/s의 처리량을 지원합니다",
+            "suggestion": "초당 최대 500 MB/s의 처리량을 지원합니다.",
+            "reason": "“초당”前面不需要空格。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 5,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    },
+    {
+      "wall_latency_ms": 13050.2,
+      "ttft_ms": 306.27,
+      "prompt_tokens": 863,
+      "prompt_eval_time_ms": 77.95,
+      "prompt_eval_tps": 11071.34,
+      "gen_tokens": 540,
+      "gen_time_ms": 12740.56,
+      "gen_tps": 42.38,
+      "total_server_dur_ms": 13045.78,
+      "load_dur_ms": 221.58,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to all quality criteria.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used in the target text are consistent with standard technical terminology:\n     - \"로드 밸런서의 health check\" (Load balancer health checks)\n     - \"백엔드 대상\" (Backend target)\n     - \"unhealthy 상태\" (unhealthy state)\n   - No issues found.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure is natural and grammatically correct.\n   - There are no awkward double-passive constructions:\n     - \"백엔드 대상은 unhealthy 상태로 표시됩니다\" (The backend target is marked as unhealthy)\n     - \"트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다\" (Traffic is automatically routed to other healthy target instances immediately)\n   - No issues found.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - The use of particles and punctuation marks is correct:\n     - \"3회 연속 실패하는 경우,\" (When health checks fail consecutively three times,)\n     - \"백엔드 대상은 unhealthy 상태로 표시됩니다.\" (The backend target is marked as unhealthy.)\n     - \"트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.\" (Traffic is automatically routed to other healthy target instances immediately.)\n   - No issues found.\n\n4. **UI String Conventions:**\n   - The text does not contain any UI strings that require bracketing.\n   - No issues found.\n\n5. **Numerical and Unit Accuracy:**\n   - The number \"3\" is correctly used without any numerical or unit accuracy issues.\n   - No issues found.\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - All foreign words are properly transliterated:\n     - \"로드 밸런서\" (Load balancer)\n     - \"health check\"\n     - \"unhealthy\"\n     - \"traffic\"\n     - \"target instances\"\n   - No issues found.\n\n### Conclusion:\nThe translation is accurate, natural, and adheres to all quality criteria.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to all quality criteria.",
+        "issues": []
+      },
+      "iteration": 6,
+      "paragraph_id": "para_06_untranslated_term",
+      "category": "미번역 영단어 방치"
+    },
+    {
+      "wall_latency_ms": 8509.55,
+      "ttft_ms": 300.17,
+      "prompt_tokens": 881,
+      "prompt_eval_time_ms": 85.66,
+      "prompt_eval_tps": 10285.33,
+      "gen_tokens": 343,
+      "gen_time_ms": 8205.73,
+      "gen_tps": 41.8,
+      "total_server_dur_ms": 8505.3,
+      "load_dur_ms": 207.96,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to the provided source text without any issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance**:\n   - The terms used in the target text are consistent with common technical terminology.\n   - There are no discrepancies or deviations from standard terms.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions**:\n   - The sentence structure is natural and grammatically correct.\n   - There are no awkward double-passive constructions detected in the target text.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks**:\n   - The punctuation marks (periods, commas) are used correctly.\n   - There are no spacing issues before or after particles.\n\n4. **UI String Conventions**:\n   - No UI strings were identified in the provided text, so this criterion is not applicable here.\n\n5. **Numerical and Unit Accuracy**:\n   - The numbers (85%, 5 minutes) and units (CPU utilization, email, SMS) are accurately translated.\n   - There are no numerical or unit accuracy issues.\n\n6. **Foreign Word Transliteration and Loanword Orthography**:\n   - Foreign words like \"email\" and \"SMS\" are correctly transliterated into Korean.\n   - The orthography of loanwords is correct.\n\nGiven the thorough evaluation, there are no issues to report, hence a perfect score.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to the provided source text without any issues.",
+        "issues": []
+      },
+      "iteration": 7,
+      "paragraph_id": "para_07_clean_perfect",
+      "category": "오류 없음 (클린 문단)"
+    },
+    {
+      "wall_latency_ms": 11255.61,
+      "ttft_ms": 293.91,
+      "prompt_tokens": 866,
+      "prompt_eval_time_ms": 79.29,
+      "prompt_eval_tps": 10922.07,
+      "gen_tokens": 458,
+      "gen_time_ms": 10957.88,
+      "gen_tps": 41.8,
+      "total_server_dur_ms": 11250.53,
+      "load_dur_ms": 208.84,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and awkward constructions.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다\",\n      \"suggestion\": \"AES-256 암호화를 기본적으로 활성화합니다\",\n      \"reason\": \"AES-256 키와 저장 데이터 암호화는 명확한 관계 표현이 필요하며, '활성화 됨니다'는 자연스러운 표현이 아닙니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다\",\n      \"suggestion\": \"별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다\",\n      \"reason\": \"문법 오류와 불필요한 '잇'의 사용. '있습니다'는 제거되어야 합니다.\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키\",\n      \"reason\": \"조사 앞 공백이 필요하지 않음.\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Style/Passive\",\n      \"original\": \"저장 데이터 암호화가 기본적으로 활성화 됨니다\",\n      \"suggestion\": \"저장 데이터를 AES-256로 기본적으로 암호화합니다\",\n      \"reason\": \"이중 피동문을 피하고 명확한 주체 표현.\",\n      \"severity\": \"HIGH\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and awkward constructions.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다",
+            "suggestion": "AES-256 암호화를 기본적으로 활성화합니다",
+            "reason": "AES-256 키와 저장 데이터 암호화는 명확한 관계 표현이 필요하며, '활성화 됨니다'는 자연스러운 표현이 아닙니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Grammar",
+            "original": "별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다",
+            "suggestion": "별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다",
+            "reason": "문법 오류와 불필요한 '잇'의 사용. '있습니다'는 제거되어야 합니다.",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키",
+            "reason": "조사 앞 공백이 필요하지 않음.",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Style/Passive",
+            "original": "저장 데이터 암호화가 기본적으로 활성화 됨니다",
+            "suggestion": "저장 데이터를 AES-256로 기본적으로 암호화합니다",
+            "reason": "이중 피동문을 피하고 명확한 주체 표현.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "iteration": 8,
+      "paragraph_id": "para_08_grammar_and_typo",
+      "category": "맞춤법/오탈자"
+    },
+    {
+      "wall_latency_ms": 9263.03,
+      "ttft_ms": 332.64,
+      "prompt_tokens": 889,
+      "prompt_eval_time_ms": 87.77,
+      "prompt_eval_tps": 10128.28,
+      "gen_tokens": 374,
+      "gen_time_ms": 8926.68,
+      "gen_tps": 41.9,
+      "total_server_dur_ms": 9259.35,
+      "load_dur_ms": 237.66,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to the provided source text without any issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used in the target text are consistent with industry standards.\n   - \"TTL\" (Time To Live) is correctly translated as \"TTL 값\".\n   - \"Origin Shield\" is accurately translated as \"오리진 쉴드\".\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure in Korean is natural and fluent.\n   - There are no awkward double-passive constructions.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - The use of particles and punctuation marks is correct.\n   - Proper spacing before and after particles such as \"과\" (and) and \"을/를\" (object marker) is maintained.\n\n4. **UI String Conventions:**\n   - There are no UI strings or button names in this paragraph, so this criterion does not apply.\n\n5. **Numerical and Unit Accuracy:**\n   - The text does not contain any numerical values or units that require verification, so this criterion does not apply.\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - Foreign words are correctly transliterated into Korean characters.\n   - \"TTL\" is properly written as \"TTL 값\", and \"Origin Shield\" is accurately translated to \"오리진 쉴드\".\n\nGiven the thorough evaluation, no issues were identified in this translation.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to the provided source text without any issues.",
+        "issues": []
+      },
+      "iteration": 9,
+      "paragraph_id": "para_09_long_complex_paragraph",
+      "category": "외래어 표기법 및 번역투"
+    },
+    {
+      "wall_latency_ms": 8152.96,
+      "ttft_ms": 348.55,
+      "prompt_tokens": 894,
+      "prompt_eval_time_ms": 112.84,
+      "prompt_eval_tps": 7922.65,
+      "gen_tokens": 326,
+      "gen_time_ms": 7800.5,
+      "gen_tps": 41.79,
+      "total_server_dur_ms": 8148.63,
+      "load_dur_ms": 229.17,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and compliant with the provided source text. No issues were identified.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n- **Terminology Consistency**: The terminology used in the target matches the source (e.g., Node.js version, RAM allocation, administrative access). There are no discrepancies or deviations from standard terms.\n  \n- **Korean Grammar and Natural Collocations**: The sentence structure is natural and grammatically correct. Phrases like \"주요 사전 요구사항은 다음과 같습니다\" and \"모든 요구조건이 충족되어야만 설치 스크립트가 정상적으로 실행될 수 있습니다\" are well-formed and idiomatic.\n  \n- **Punctuation Rules**: Proper spacing before/after particles and punctuation marks is maintained. There are no issues with spacing or punctuation.\n  \n- **UI String Conventions**: The text does not contain any UI strings that require bracketing, so this criterion is met without issue.\n  \n- **Numerical and Unit Accuracy**: Numbers (18) and units (4GB) are accurately translated and consistent with the source. There are no numerical or unit accuracy issues.\n  \n- **Foreign Word Transliteration and Loanword Orthography**: The foreign words \"Node.js\" and \"RAM\" are correctly transliterated, and there are no issues with loanword orthography.\n\nGiven that all criteria are met without any identified issues, the translation is deemed perfect.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and compliant with the provided source text. No issues were identified.",
+        "issues": []
+      },
+      "iteration": 10,
+      "paragraph_id": "para_10_bullet_like_inline",
+      "category": "용어 통일성 및 문장 구조"
+    },
+    {
+      "wall_latency_ms": 9324.8,
+      "ttft_ms": 315.67,
+      "prompt_tokens": 875,
+      "prompt_eval_time_ms": 80.08,
+      "prompt_eval_tps": 10925.89,
+      "gen_tokens": 370,
+      "gen_time_ms": 9005.48,
+      "gen_tps": 41.09,
+      "total_server_dur_ms": 9320.49,
+      "load_dur_ms": 229.46,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"The translation contains issues related to terminology, grammar, and UI string conventions.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"VPC Management Console\",\n      \"suggestion\": \"VPC 관리 콘솔\",\n      \"reason\": \"建议使用标准术语，确保与企业内部的一致性。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Compute > Instances\",\n      \"suggestion\": \"컴퓨트 > 인스턴스\",\n      \"reason\": \"建议保持术语一致性，并使用标准的UI元素名称。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"suggestion\": \"좌측 사이드바에서 [컴퓨트 > 인스턴스]를 선택하십시오.\",\n      \"reason\": \"建议在UI元素名称前后添加方括号，以保持一致性。\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.\",\n      \"suggestion\": \"설정 마법사에서 원하는 서브넷과 가상 머신 사양을 지정할 수 있습니다.\",\n      \"reason\": \"建议在“虚拟”前添加“가상”，以保持术语一致性。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "The translation contains issues related to terminology, grammar, and UI string conventions.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "VPC Management Console",
+            "suggestion": "VPC 관리 콘솔",
+            "reason": "建议使用标准术语，确保与企业内部的一致性。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Terminology",
+            "original": "Compute > Instances",
+            "suggestion": "컴퓨트 > 인스턴스",
+            "reason": "建议保持术语一致性，并使用标准的UI元素名称。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "suggestion": "좌측 사이드바에서 [컴퓨트 > 인스턴스]를 선택하십시오.",
+            "reason": "建议在UI元素名称前后添加方括号，以保持一致性。",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.",
+            "suggestion": "설정 마법사에서 원하는 서브넷과 가상 머신 사양을 지정할 수 있습니다.",
+            "reason": "建议在“虚拟”前添加“가상”，以保持术语一致性。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 11,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 10573.45,
+      "ttft_ms": 352.07,
+      "prompt_tokens": 865,
+      "prompt_eval_time_ms": 78.89,
+      "prompt_eval_tps": 10965.05,
+      "gen_tokens": 415,
+      "gen_time_ms": 10220.75,
+      "gen_tps": 40.6,
+      "total_server_dur_ms": 10568.57,
+      "load_dur_ms": 262.24,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, passive constructions, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24 시간마다 자동으로 생성됩니다\",\n      \"reason\": \"‘구조’는 불필요한 표현이고, ‘생성되어지는’은 비표준 표현입니다.\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"‘백업되어지게 됩니다’는 번역투 이중 피동문입니다. ‘백업됩니다’로 수정하면 자연스러워집니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24 시간마다 자동으로 생성됩니다\",\n      \"reason\": \"조사 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"suggestion\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"reason\": \"마침표 앞 공백 제거 (이미 올바르게 사용되어 수정 필요 없음)\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, passive constructions, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24 시간마다 자동으로 생성됩니다",
+            "reason": "‘구조’는 불필요한 표현이고, ‘생성되어지는’은 비표준 표현입니다.",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Terminology",
+            "original": "재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "‘백업되어지게 됩니다’는 번역투 이중 피동문입니다. ‘백업됩니다’로 수정하면 자연스러워집니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24 시간마다 자동으로 생성됩니다",
+            "reason": "조사 앞 공백 제거",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "suggestion": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "reason": "마침표 앞 공백 제거 (이미 올바르게 사용되어 수정 필요 없음)",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 12,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 11328.69,
+      "ttft_ms": 318.97,
+      "prompt_tokens": 873,
+      "prompt_eval_time_ms": 81.83,
+      "prompt_eval_tps": 10668.46,
+      "gen_tokens": 462,
+      "gen_time_ms": 11005.75,
+      "gen_tps": 41.98,
+      "total_server_dur_ms": 11324.41,
+      "load_dur_ms": 229.94,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요.\",\n      \"reason\": \"포트 상태는 '열려 있음'으로 표현해야 합니다. 또한, '와' 대신 '와'로 수정해야 합니다.\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.\",\n      \"suggestion\": \"방화벽 차단 정책이 활성화된 경우에는 연결이 실패할 수 있습니다.\",\n      \"reason\": \"문장 구조가 자연스럽지 않으며, '할 수 있다'는 표현은 '할 수 있음'으로 수정해야 합니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"확인하세요 .\",\n      \"suggestion\": \"확인하세요.\",\n      \"reason\": \"마침표 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Numerical and Unit Accuracy\",\n      \"original\": \"443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .\",\n      \"suggestion\": \"443 포트와 80 포트가 열려 있는지 확인하세요.\",\n      \"reason\": \"포트 상태는 '열려 있음'으로 표현해야 합니다.\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .",
+            "suggestion": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요.",
+            "reason": "포트 상태는 '열려 있음'으로 표현해야 합니다. 또한, '와' 대신 '와'로 수정해야 합니다.",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar",
+            "original": "방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.",
+            "suggestion": "방화벽 차단 정책이 활성화된 경우에는 연결이 실패할 수 있습니다.",
+            "reason": "문장 구조가 자연스럽지 않으며, '할 수 있다'는 표현은 '할 수 있음'으로 수정해야 합니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "확인하세요 .",
+            "suggestion": "확인하세요.",
+            "reason": "마침표 앞 공백 제거",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Numerical and Unit Accuracy",
+            "original": "443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .",
+            "suggestion": "443 포트와 80 포트가 열려 있는지 확인하세요.",
+            "reason": "포트 상태는 '열려 있음'으로 표현해야 합니다.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 13,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 9878.52,
+      "ttft_ms": 311.56,
+      "prompt_tokens": 848,
+      "prompt_eval_time_ms": 70.26,
+      "prompt_eval_tps": 12068.77,
+      "gen_tokens": 400,
+      "gen_time_ms": 9564.39,
+      "gen_tps": 41.82,
+      "total_server_dur_ms": 9874.35,
+      "load_dur_ms": 230.66,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Submit 버튼을 클릭하십시오\",\n      \"suggestion\": \"제출 버튼을 클릭하십시오\",\n      \"reason\": \"提交按钮的正确翻译应为“제출 버튼”，而非直接使用英文单词。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar and Natural Collocations\",\n      \"original\": \"키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.\",\n      \"suggestion\": \"키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.\",\n      \"reason\": \"在句尾添加了“하고”，使得句子更加自然流畅。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음, Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"在句尾添加了逗号，以符合韩语的标点规则。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"UI String Conventions\",\n      \"original\": \"Submit 버튼을 클릭하십시오\",\n      \"suggestion\": \"[Submit] 버튼을 클릭하십시오\",\n      \"reason\": \"按钮名称应使用方括号进行标记。\",\n      \"severity\": \"MEDIUM\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Submit 버튼을 클릭하십시오",
+            "suggestion": "제출 버튼을 클릭하십시오",
+            "reason": "提交按钮的正确翻译应为“제출 버튼”，而非直接使用英文单词。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar and Natural Collocations",
+            "original": "키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.",
+            "suggestion": "키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.",
+            "reason": "在句尾添加了“하고”，使得句子更加自然流畅。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음, Submit 버튼을 클릭하십시오.",
+            "reason": "在句尾添加了逗号，以符合韩语的标点规则。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "UI String Conventions",
+            "original": "Submit 버튼을 클릭하십시오",
+            "suggestion": "[Submit] 버튼을 클릭하십시오",
+            "reason": "按钮名称应使用方括号进行标记。",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "iteration": 14,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 11875.41,
+      "ttft_ms": 324.68,
+      "prompt_tokens": 878,
+      "prompt_eval_time_ms": 84.97,
+      "prompt_eval_tps": 10332.94,
+      "gen_tokens": 486,
+      "gen_time_ms": 11547.58,
+      "gen_tps": 42.09,
+      "total_server_dur_ms": 11870.67,
+      "load_dur_ms": 232.16,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 78,\n  \"analysis_summary\": \"Identified several issues related to terminology, numerical accuracy, and natural phrasing.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"suggestion\": \"최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"reason\": \"源文本中提到的最大IOPS值为10,000，而目标文本中的数值不一致。\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Numerical and Unit Accuracy\",\n      \"original\": \"볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"suggestion\": \"최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"reason\": \"源文本中提到的最大IOPS值为10,000，而目标文本中的数值不一致。\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Natural Phrasing and Grammar\",\n      \"original\": \"대규모 I/O 작업이 필요한 트랜잭션 워크로드에 최적화되어 있습니다.\",\n      \"suggestion\": \"대규모 I/O 작업을 처리하기 위한 트랜잭션 워크로드에 최적화되어 있습니다.\",\n      \"reason\": \"目标文本中的表达不够自然，建议调整为更符合韩语习惯的表达。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"초당 최대 500 MB/s의 처리량을 지원합니다\",\n      \"suggestion\": \"초당 최대 500 MB/s의 처리량을 지원합니다.\",\n      \"reason\": \"目标文本中“초당”前缺少空格。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 78,
+        "analysis_summary": "Identified several issues related to terminology, numerical accuracy, and natural phrasing.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다",
+            "suggestion": "최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다",
+            "reason": "源文本中提到的最大IOPS值为10,000，而目标文本中的数值不一致。",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Numerical and Unit Accuracy",
+            "original": "볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다",
+            "suggestion": "최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다",
+            "reason": "源文本中提到的最大IOPS值为10,000，而目标文本中的数值不一致。",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Natural Phrasing and Grammar",
+            "original": "대규모 I/O 작업이 필요한 트랜잭션 워크로드에 최적화되어 있습니다.",
+            "suggestion": "대규모 I/O 작업을 처리하기 위한 트랜잭션 워크로드에 최적화되어 있습니다.",
+            "reason": "目标文本中的表达不够自然，建议调整为更符合韩语习惯的表达。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "초당 최대 500 MB/s의 처리량을 지원합니다",
+            "suggestion": "초당 최대 500 MB/s의 처리량을 지원합니다.",
+            "reason": "目标文本中“초당”前缺少空格。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 15,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    },
+    {
+      "wall_latency_ms": 10098.84,
+      "ttft_ms": 303.97,
+      "prompt_tokens": 863,
+      "prompt_eval_time_ms": 77.91,
+      "prompt_eval_tps": 11077.31,
+      "gen_tokens": 416,
+      "gen_time_ms": 9791.25,
+      "gen_tps": 42.49,
+      "total_server_dur_ms": 10094.36,
+      "load_dur_ms": 218.91,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"Clean and accurate translation with no identified issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used in the target text are consistent with standard technical terminology.\n   - \"로드 밸런서의 health check\" is a correct term for load balancer health checks.\n   - \"unhealthy 상태\" accurately translates to \"unhealthy state.\"\n   - \"트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다\" correctly describes the traffic rerouting process.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure is natural and grammatically correct.\n   - There are no awkward double-passive constructions in the target text.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - The use of particles and punctuation marks is appropriate and follows Korean grammar rules.\n   - Correct spacing before and after particles such as \"의\" and \"는\" is maintained.\n\n4. **UI String Conventions (Button Names and Menu Paths Should Be Properly Bracketed):**\n   - There are no UI string conventions in this sentence, so this rule does not apply here.\n\n5. **Numerical and Unit Accuracy:**\n   - The number \"3\" is correctly used without any numerical or unit accuracy issues.\n   - Units like \"times\" are appropriately translated to \"회.\"\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - All foreign words (e.g., \"로드 밸런서,\" \"health check,\" \"트래픽\") are correctly transliterated and orthographically correct.\n\nGiven the thorough review, there are no issues identified in this translation.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "Clean and accurate translation with no identified issues.",
+        "issues": []
+      },
+      "iteration": 16,
+      "paragraph_id": "para_06_untranslated_term",
+      "category": "미번역 영단어 방치"
+    },
+    {
+      "wall_latency_ms": 8138.16,
+      "ttft_ms": 321.43,
+      "prompt_tokens": 881,
+      "prompt_eval_time_ms": 84.71,
+      "prompt_eval_tps": 10400.68,
+      "gen_tokens": 330,
+      "gen_time_ms": 7813.44,
+      "gen_tps": 42.23,
+      "total_server_dur_ms": 8134.09,
+      "load_dur_ms": 229.8,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to the provided source text without any issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance**:\n   - The terms used in the target text are consistent with common technical terminology.\n   - There are no discrepancies or non-standard terms.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions**:\n   - The sentence structure is natural and grammatically correct.\n   - There are no awkward double-passive constructions detected.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks**:\n   - The punctuation marks (periods, commas) are used correctly.\n   - There are no spacing issues before or after particles.\n\n4. **UI String Conventions**:\n   - No UI strings were detected in the provided text, so this rule is not applicable here.\n\n5. **Numerical and Unit Accuracy**:\n   - The numbers (85%, 5 minutes) and units (CPU utilization, email, SMS) are accurate and consistent with the source text.\n\n6. **Foreign Word Transliteration and Loanword Orthography**:\n   - All foreign words are correctly transliterated into Korean.\n   - There are no issues related to loanword orthography.\n\nGiven that all criteria were met without any identified issues, the translation is deemed perfect in this case.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to the provided source text without any issues.",
+        "issues": []
+      },
+      "iteration": 17,
+      "paragraph_id": "para_07_clean_perfect",
+      "category": "오류 없음 (클린 문단)"
+    },
+    {
+      "wall_latency_ms": 10888.03,
+      "ttft_ms": 321.64,
+      "prompt_tokens": 866,
+      "prompt_eval_time_ms": 78.26,
+      "prompt_eval_tps": 11065.82,
+      "gen_tokens": 444,
+      "gen_time_ms": 10562.35,
+      "gen_tps": 42.04,
+      "total_server_dur_ms": 10882.4,
+      "load_dur_ms": 236.78,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and awkward phrasing.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다\",\n      \"suggestion\": \"AES-256 암호화 키를 사용해 저장된 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"术语一致性问题，建议使用更标准的表达方式。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다.\",\n      \"suggestion\": \"별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다.\",\n      \"reason\": \"句末标点符号错误，建议使用正确的句号。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Style/Passive\",\n      \"original\": \"저장 데이터 암호화가 기본적으로 활성화 됨니다\",\n      \"suggestion\": \"저장된 데이터는 기본적으로 AES-256 암호화로 활성화됩니다.\",\n      \"reason\": \"建议使用主动语态以提高可读性。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다.\",\n      \"suggestion\": \"AES-256 키를 사용하여 저장된 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"在“저장된”前添加空格，以符合韩语书写规范。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and awkward phrasing.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다",
+            "suggestion": "AES-256 암호화 키를 사용해 저장된 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "术语一致性问题，建议使用更标准的表达方式。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar",
+            "original": "별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다.",
+            "suggestion": "별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다.",
+            "reason": "句末标点符号错误，建议使用正确的句号。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Style/Passive",
+            "original": "저장 데이터 암호화가 기본적으로 활성화 됨니다",
+            "suggestion": "저장된 데이터는 기본적으로 AES-256 암호화로 활성화됩니다.",
+            "reason": "建议使用主动语态以提高可读性。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다.",
+            "suggestion": "AES-256 키를 사용하여 저장된 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "在“저장된”前添加空格，以符合韩语书写规范。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 18,
+      "paragraph_id": "para_08_grammar_and_typo",
+      "category": "맞춤법/오탈자"
+    },
+    {
+      "wall_latency_ms": 12086.88,
+      "ttft_ms": 346.48,
+      "prompt_tokens": 889,
+      "prompt_eval_time_ms": 88.32,
+      "prompt_eval_tps": 10065.9,
+      "gen_tokens": 491,
+      "gen_time_ms": 11736.8,
+      "gen_tps": 41.83,
+      "total_server_dur_ms": 12082.52,
+      "load_dur_ms": 251.31,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to the provided source text without any issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used in the target text are consistent with industry standards:\n     - \"distributed regions\" -> \"분산된 리전\"\n     - \"edge caching policies\" -> \"엣지 캐싱 정책\"\n     - \"TTL values\" -> \"TTL 값\"\n     - \"origin shield configurations\" -> \"오리gin 쉴드 구성을 포함하는\"\n   - The terminology is accurate and consistent with the source text.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure in Korean is natural and follows proper grammar rules.\n   - There are no awkward double-passive constructions detected:\n     - \"분산된 리전 간의 네트워크 지연 시간을 최적화하기 위해\" (To optimize network latency across distributed regions)\n     - \"적절한 TTL 값과 오리gin 쉴드 구성을 포함하는 엣지 캐싱 정책을 설정해야 합니다.\" (Edge caching policies should be configured with appropriate TTL values and origin shield configurations)\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - The target text uses proper punctuation:\n     - Periods are used correctly at the end of sentences.\n     - There is no unnecessary spacing before or after particles.\n\n4. **UI String Conventions (Button Names and Menu Paths Should Be Properly Bracketed):**\n   - This paragraph does not contain any UI strings, button names, or menu paths that require bracketing.\n\n5. **Numerical and Unit Accuracy:**\n   - There are no numerical values or units in this text to check for accuracy.\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - All foreign words (TTL) have been correctly transliterated into Korean characters.\n   - The orthography of loanwords is correct.\n\nGiven the thorough evaluation, there are no issues identified that would warrant a fail status.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to the provided source text without any issues.",
+        "issues": []
+      },
+      "iteration": 19,
+      "paragraph_id": "para_09_long_complex_paragraph",
+      "category": "외래어 표기법 및 번역투"
+    },
+    {
+      "wall_latency_ms": 8329.43,
+      "ttft_ms": 337.98,
+      "prompt_tokens": 894,
+      "prompt_eval_time_ms": 112.57,
+      "prompt_eval_tps": 7941.73,
+      "gen_tokens": 340,
+      "gen_time_ms": 7990.53,
+      "gen_tps": 42.55,
+      "total_server_dur_ms": 8325.27,
+      "load_dur_ms": 215.15,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and free of major issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terminology used in the target text (Node.js version 18 이상, 최소 4GB 이상의 할당된 RAM, 클러스터에 대한 관리자 권한) is consistent with common technical terms and matches the source.\n   \n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure in Korean is natural and grammatically correct.\n   - There are no awkward double-passive constructions detected.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - The target text uses appropriate spacing before particles (e.g., 이상의) and punctuation marks (periods at the end of sentences).\n\n4. **UI String Conventions:**\n   - There are no UI strings in this paragraph that require bracketing.\n\n5. **Numerical and Unit Accuracy:**\n   - The numbers and units (18, 4GB) are accurate and consistent with the source text.\n   \n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - Node.js is correctly transliterated as 노드.js, which follows standard Korean orthographic rules for foreign words.\n\nGiven that all criteria are met without any issues, the QA assessment returns a perfect score.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and free of major issues.",
+        "issues": []
+      },
+      "iteration": 20,
+      "paragraph_id": "para_10_bullet_like_inline",
+      "category": "용어 통일성 및 문장 구조"
+    },
+    {
+      "wall_latency_ms": 9249.66,
+      "ttft_ms": 302.25,
+      "prompt_tokens": 875,
+      "prompt_eval_time_ms": 79.32,
+      "prompt_eval_tps": 11031.13,
+      "gen_tokens": 375,
+      "gen_time_ms": 8944.01,
+      "gen_tps": 41.93,
+      "total_server_dur_ms": 9245.85,
+      "load_dur_ms": 216.72,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"The translation is mostly accurate but contains issues related to terminology, grammar, and UI string conventions.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"VPC Management Console\",\n      \"suggestion\": \"VPC 관리 콘솔\",\n      \"reason\": \"建议使用标准术语，确保与企业内部的一致性。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Compute > Instances\",\n      \"suggestion\": \"컴퓨트 > 인스턴스\",\n      \"reason\": \"建议保持术语一致性，并使用标准的UI元素名称。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"suggestion\": \"좌측 사이드바에서 [컴퓨트 > 인스턴스]를 선택하십시오.\",\n      \"reason\": \"UI元素名称应使用方括号进行标记，以保持一致性。\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.\",\n      \"suggestion\": \"설정 마법사에서 원하는 서브넷과 가상 머신 사양을 지정할 수 있습니다.\",\n      \"reason\": \"建议在“虚拟机”前加上适当的冠词，以提高自然度。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "The translation is mostly accurate but contains issues related to terminology, grammar, and UI string conventions.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "VPC Management Console",
+            "suggestion": "VPC 관리 콘솔",
+            "reason": "建议使用标准术语，确保与企业内部的一致性。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Terminology",
+            "original": "Compute > Instances",
+            "suggestion": "컴퓨트 > 인스턴스",
+            "reason": "建议保持术语一致性，并使用标准的UI元素名称。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "suggestion": "좌측 사이드바에서 [컴퓨트 > 인스턴스]를 선택하십시오.",
+            "reason": "UI元素名称应使用方括号进行标记，以保持一致性。",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.",
+            "suggestion": "설정 마법사에서 원하는 서브넷과 가상 머신 사양을 지정할 수 있습니다.",
+            "reason": "建议在“虚拟机”前加上适当的冠词，以提高自然度。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 21,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 12369.73,
+      "ttft_ms": 327.93,
+      "prompt_tokens": 865,
+      "prompt_eval_time_ms": 79.14,
+      "prompt_eval_tps": 10930.41,
+      "gen_tokens": 505,
+      "gen_time_ms": 12038.97,
+      "gen_tps": 41.95,
+      "total_server_dur_ms": 12365.71,
+      "load_dur_ms": 232.21,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, passive constructions, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24시간마다 자동으로 생성됩니다\",\n      \"reason\": \"‘구조’는 불필요한 표현이고, ‘생성되어지는’은 이중 피동문입니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"‘백업되어지게 됩니다’는 이중 피동문이고, ‘위하여’는 자연스러운 표현이 아닙니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24시간마다 자동으로 생성됩니다\",\n      \"reason\": \"조사 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"조사 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"suggestion\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"reason\": \"마침표 앞 공백 제거 (이미 올바르게 사용되어 수정 필요 없음)\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, passive constructions, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24시간마다 자동으로 생성됩니다",
+            "reason": "‘구조’는 불필요한 표현이고, ‘생성되어지는’은 이중 피동문입니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Terminology",
+            "original": "재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "‘백업되어지게 됩니다’는 이중 피동문이고, ‘위하여’는 자연스러운 표현이 아닙니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24시간마다 자동으로 생성됩니다",
+            "reason": "조사 앞 공백 제거",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "조사 앞 공백 제거",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "suggestion": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "reason": "마침표 앞 공백 제거 (이미 올바르게 사용되어 수정 필요 없음)",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 22,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 14935.68,
+      "ttft_ms": 308.61,
+      "prompt_tokens": 873,
+      "prompt_eval_time_ms": 79.0,
+      "prompt_eval_tps": 11049.93,
+      "gen_tokens": 620,
+      "gen_time_ms": 14623.5,
+      "gen_tps": 42.4,
+      "total_server_dur_ms": 14931.32,
+      "load_dur_ms": 223.54,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요.\",\n      \"reason\": \"포트 상태는 '열려 있음'으로 표현해야 합니다. 또한, '와' 대신 '와'로 수정하여 자연스러운 문장 구조를 유지합니다.\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.\",\n      \"suggestion\": \"방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.\",\n      \"reason\": \"문장 구조를 개선하여 자연스러운 표현을 유지합니다. '활성화된 경우' 대신 '활성화되면'으로 수정합니다.\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .\",\n      \"suggestion\": \"443 포트와 80 포트가 오픈되어 있는지 확인하세요.\",\n      \"reason\": \"조사 앞 공백 제거 및 '와' 대신 '와'로 수정하여 문장 구조를 개선합니다.\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 . 방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요. 방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.\",\n      \"reason\": \"마침표 추가 및 문장 구조 개선을 통해 자연스러운 표현을 유지합니다.\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .",
+            "suggestion": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요.",
+            "reason": "포트 상태는 '열려 있음'으로 표현해야 합니다. 또한, '와' 대신 '와'로 수정하여 자연스러운 문장 구조를 유지합니다.",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar",
+            "original": "방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.",
+            "suggestion": "방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.",
+            "reason": "문장 구조를 개선하여 자연스러운 표현을 유지합니다. '활성화된 경우' 대신 '활성화되면'으로 수정합니다.",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .",
+            "suggestion": "443 포트와 80 포트가 오픈되어 있는지 확인하세요.",
+            "reason": "조사 앞 공백 제거 및 '와' 대신 '와'로 수정하여 문장 구조를 개선합니다.",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 . 방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.",
+            "suggestion": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요. 방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.",
+            "reason": "마침표 추가 및 문장 구조 개선을 통해 자연스러운 표현을 유지합니다.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 23,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 8340.49,
+      "ttft_ms": 322.63,
+      "prompt_tokens": 848,
+      "prompt_eval_time_ms": 70.65,
+      "prompt_eval_tps": 12003.34,
+      "gen_tokens": 333,
+      "gen_time_ms": 8014.47,
+      "gen_tps": 41.55,
+      "total_server_dur_ms": 8315.87,
+      "load_dur_ms": 224.86,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Submit 버튼을 클릭하십시오\",\n      \"suggestion\": \"제출 버튼을 클릭하십시오\",\n      \"reason\": \"提交按钮的正确翻译应为“제출 버튼”，而非直接使用英文单词。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar and Natural Collocations\",\n      \"original\": \"키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.\",\n      \"suggestion\": \"키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.\",\n      \"reason\": \"在句尾添加了“하고”，使得句子更加自然流畅。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음, Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"在句尾添加了逗号，以符合韩语的标点规则。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Submit 버튼을 클릭하십시오",
+            "suggestion": "제출 버튼을 클릭하십시오",
+            "reason": "提交按钮的正确翻译应为“제출 버튼”，而非直接使用英文单词。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar and Natural Collocations",
+            "original": "키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.",
+            "suggestion": "키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.",
+            "reason": "在句尾添加了“하고”，使得句子更加自然流畅。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음, Submit 버튼을 클릭하십시오.",
+            "reason": "在句尾添加了逗号，以符合韩语的标点规则。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 24,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 10102.43,
+      "ttft_ms": 327.26,
+      "prompt_tokens": 878,
+      "prompt_eval_time_ms": 85.3,
+      "prompt_eval_tps": 10293.2,
+      "gen_tokens": 406,
+      "gen_time_ms": 9771.81,
+      "gen_tps": 41.55,
+      "total_server_dur_ms": 10098.04,
+      "load_dur_ms": 235.17,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to the quality criteria.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used in the target text are consistent with industry standards.\n   - \"IOPS\" and \"MB/s\" are correctly translated as \"IOPS\" (입출력 요청 수) and \"MB/s\" (메가바이트/초), respectively, which is correct.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure is natural and grammatically correct.\n   - There are no awkward double-passive constructions in the target text.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - The punctuation marks are correctly used, with appropriate spacing before particles like \"당\" (당) and after commas and periods.\n\n4. **UI String Conventions:**\n   - There are no UI strings in this paragraph that require bracketing or special treatment.\n\n5. **Numerical and Unit Accuracy:**\n   - The numbers and units are accurately translated.\n   - \"10,000 IOPS\" is correctly translated as \"최대 1,000 IOPS\".\n   - \"500 MB/s per second volume\" is correctly translated as \"초당 최대 500 MB/s\".\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - The foreign words are accurately transliterated into Korean.\n   - \"IOPS\" and \"MB/s\" are correctly written in their standard Korean orthographic forms.\n\nGiven the thorough review, no issues were identified, leading to a perfect score of 100.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to the quality criteria.",
+        "issues": []
+      },
+      "iteration": 25,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    },
+    {
+      "wall_latency_ms": 9167.36,
+      "ttft_ms": 310.34,
+      "prompt_tokens": 863,
+      "prompt_eval_time_ms": 78.88,
+      "prompt_eval_tps": 10940.95,
+      "gen_tokens": 367,
+      "gen_time_ms": 8844.6,
+      "gen_tps": 41.49,
+      "total_server_dur_ms": 9162.65,
+      "load_dur_ms": 224.72,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and free of major issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used are consistent with common technical terminology in cloud documentation.\n   - \"로드 밸런서의 health check\" is a correct translation for \"load balancer health checks.\"\n   - \"unhealthy 상태\" accurately translates to \"unhealthy state.\"\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure is natural and grammatically correct.\n   - There are no awkward double-passive constructions.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - Proper spacing before and after particles such as \"의\" and \"는\" is maintained.\n   - The use of commas and periods follows Korean punctuation rules.\n\n4. **UI String Conventions (Button Names and Menu Paths Should Be Properly Bracketed):**\n   - There are no UI strings in this paragraph, so this rule does not apply here.\n\n5. **Numerical and Unit Accuracy:**\n   - The number \"3\" is correctly used without any issues.\n   - No IOPS, MB/s, or other units were present to check for accuracy.\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - All foreign words are accurately transliterated into Korean characters (e.g., \"로드 밸런서,\" \"백엔드\").\n\nGiven the thorough evaluation, no issues were identified in this translation.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and free of major issues.",
+        "issues": []
+      },
+      "iteration": 26,
+      "paragraph_id": "para_06_untranslated_term",
+      "category": "미번역 영단어 방치"
+    },
+    {
+      "wall_latency_ms": 9328.84,
+      "ttft_ms": 339.85,
+      "prompt_tokens": 881,
+      "prompt_eval_time_ms": 86.07,
+      "prompt_eval_tps": 10235.97,
+      "gen_tokens": 370,
+      "gen_time_ms": 8985.58,
+      "gen_tps": 41.18,
+      "total_server_dur_ms": 9324.59,
+      "load_dur_ms": 244.73,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to the quality criteria without any issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used are consistent with standard technical terminology.\n   - \"Cloud monitoring alerts,\" \"CPU utilization,\" \"email,\" and \"SMS\" are correctly translated.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure is natural and grammatically correct in Korean.\n   - There are no awkward double-passive constructions detected.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - Proper spacing before particles (e.g., \"이상\" before \"85%\") and punctuation marks is maintained.\n   - The use of commas and periods follows Korean punctuation rules.\n\n4. **UI String Conventions:**\n   - There are no UI strings or button names that require bracketing as they do not appear in the provided text.\n\n5. **Numerical and Unit Accuracy (IOPS, MB/s, Percentages, Port Numbers):**\n   - The numerical values (85%, 5 minutes) are accurate.\n   - Units of measurement are correctly used and translated.\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - Foreign words like \"CPU,\" \"email,\" and \"SMS\" are appropriately transliterated into Korean characters, maintaining correct orthography.\n\nGiven the thorough evaluation against all quality criteria, no issues were identified, leading to a perfect score of 100.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to the quality criteria without any issues.",
+        "issues": []
+      },
+      "iteration": 27,
+      "paragraph_id": "para_07_clean_perfect",
+      "category": "오류 없음 (클린 문단)"
+    },
+    {
+      "wall_latency_ms": 10373.49,
+      "ttft_ms": 335.32,
+      "prompt_tokens": 866,
+      "prompt_eval_time_ms": 79.52,
+      "prompt_eval_tps": 10890.75,
+      "gen_tokens": 420,
+      "gen_time_ms": 10034.8,
+      "gen_tps": 41.85,
+      "total_server_dur_ms": 10369.7,
+      "load_dur_ms": 240.01,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and awkward constructions.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다\",\n      \"suggestion\": \"AES-256 암호화 키로 저장 데이터 암호화가 기본적으로 활성화됩니다\",\n      \"reason\": \"术语一致性问题，建议使用更标准的表达方式。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar and Natural Collocations\",\n      \"original\": \"별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다\",\n      \"suggestion\": \"별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다\",\n      \"reason\": \"语法和自然搭配问题，建议使用更自然的表达方式。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"저장 데이터 암호화가 기본적으로 활성화 됨니다\",\n      \"suggestion\": \"저장 데이터 암호화가 기본적으로 활성화됩니다\",\n      \"reason\": \"句末标点符号前缺少空格，建议添加。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Numerical and Unit Accuracy\",\n      \"original\": \"없이 안전한 보안 환경을 구축할 수 잇습니다\",\n      \"suggestion\": \"없이 안전한 보안 환경을 구축할 수 있습니다\",\n      \"reason\": \"句末标点符号前缺少空格，建议添加。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and awkward constructions.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다",
+            "suggestion": "AES-256 암호화 키로 저장 데이터 암호화가 기본적으로 활성화됩니다",
+            "reason": "术语一致性问题，建议使用更标准的表达方式。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar and Natural Collocations",
+            "original": "별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다",
+            "suggestion": "별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다",
+            "reason": "语法和自然搭配问题，建议使用更自然的表达方式。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "저장 데이터 암호화가 기본적으로 활성화 됨니다",
+            "suggestion": "저장 데이터 암호화가 기본적으로 활성화됩니다",
+            "reason": "句末标点符号前缺少空格，建议添加。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Numerical and Unit Accuracy",
+            "original": "없이 안전한 보안 환경을 구축할 수 잇습니다",
+            "suggestion": "없이 안전한 보안 환경을 구축할 수 있습니다",
+            "reason": "句末标点符号前缺少空格，建议添加。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 28,
+      "paragraph_id": "para_08_grammar_and_typo",
+      "category": "맞춤법/오탈자"
+    },
+    {
+      "wall_latency_ms": 9000.64,
+      "ttft_ms": 316.82,
+      "prompt_tokens": 889,
+      "prompt_eval_time_ms": 87.95,
+      "prompt_eval_tps": 10108.02,
+      "gen_tokens": 363,
+      "gen_time_ms": 8680.46,
+      "gen_tps": 41.82,
+      "total_server_dur_ms": 8996.27,
+      "load_dur_ms": 219.41,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and adheres to the provided source text without any issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used in the target text are consistent with industry standards.\n   - Key terms such as \"TTL values,\" \"origin shield configurations,\" and \"edge caching policies\" are accurately translated.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions:**\n   - The sentence structure is natural and fluent in Korean.\n   - There are no awkward double-passive constructions detected.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks:**\n   - The target text uses appropriate punctuation marks such as commas and periods.\n   - There are no spacing issues before or after particles.\n\n4. **UI String Conventions (Button Names and Menu Paths Should Be Properly Bracketed):**\n   - No UI strings were identified in the provided paragraph, so this rule is not applicable here.\n\n5. **Numerical and Unit Accuracy (IOPS, MB/s, Percentages, Port Numbers):**\n   - There are no numerical or unit values present in the text to check for accuracy.\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - The transliteration of foreign words such as \"TTL\" and \"origin shield\" is correct.\n   - The loanword orthography follows Korean writing conventions.\n\nGiven that all criteria are met without any issues, the QA assessment concludes with a perfect score.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and adheres to the provided source text without any issues.",
+        "issues": []
+      },
+      "iteration": 29,
+      "paragraph_id": "para_09_long_complex_paragraph",
+      "category": "외래어 표기법 및 번역투"
+    },
+    {
+      "wall_latency_ms": 8334.23,
+      "ttft_ms": 354.26,
+      "prompt_tokens": 894,
+      "prompt_eval_time_ms": 110.56,
+      "prompt_eval_tps": 8086.47,
+      "gen_tokens": 338,
+      "gen_time_ms": 7976.39,
+      "gen_tps": 42.38,
+      "total_server_dur_ms": 8329.66,
+      "load_dur_ms": 236.17,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate, natural, and free of major issues.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance**:\n   - The terms used in the target text are consistent with common technical terminology.\n   - No discrepancies or non-standard terms were found.\n\n2. **Korean Grammar, Natural Collocations, and Avoidance of Awkward Double-Passive Constructions**:\n   - The sentence structure is natural and grammatically correct.\n   - There are no awkward double-passive constructions detected in the target text.\n\n3. **Punctuation Rules, Including Proper Spacing Before/After Particles and Punctuation Marks**:\n   - The use of punctuation marks (periods) and spacing around particles is appropriate.\n   - No issues were found regarding spacing or punctuation.\n\n4. **UI String Conventions**:\n   - There are no UI strings in this paragraph that require bracketing, so this criterion is not applicable here.\n\n5. **Numerical and Unit Accuracy**:\n   - The numbers (18, 4GB) and units used are accurate.\n   - No numerical or unit accuracy issues were found.\n\n6. **Foreign Word Transliteration and Loanword Orthography**:\n   - Foreign words like \"Node.js\" are correctly transliterated into Korean characters.\n   - There are no orthographic errors in the loanwords.\n\nGiven that all criteria have been met without any identified issues, the translation is deemed to be of high quality.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate, natural, and free of major issues.",
+        "issues": []
+      },
+      "iteration": 30,
+      "paragraph_id": "para_10_bullet_like_inline",
+      "category": "용어 통일성 및 문장 구조"
+    },
+    {
+      "wall_latency_ms": 10635.35,
+      "ttft_ms": 329.16,
+      "prompt_tokens": 875,
+      "prompt_eval_time_ms": 79.49,
+      "prompt_eval_tps": 11007.12,
+      "gen_tokens": 434,
+      "gen_time_ms": 10302.86,
+      "gen_tps": 42.12,
+      "total_server_dur_ms": 10607.16,
+      "load_dur_ms": 218.77,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and UI string conventions.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"suggestion\": \"VPC 관리 콘솔로 이동하여 좌측 사이드바의 [계산] > [인스턴스]를 선택하십시오.\",\n      \"reason\": \"UI字符串应使用方括号进行标记，且术语应保持一致。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.\",\n      \"suggestion\": \"설정 마법사에서는 원하는 서브넷과 가상 머신 사양을 지정할 수 있습니다.\",\n      \"reason\": \"“서브넷”和“虚拟机规格”应使用中文表述。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"suggestion\": \"좌측 사이드바의 [컴퓨트] > [인스턴스]를 선택하십시오.\",\n      \"reason\": \"UI字符串应使用方括号进行标记，且“选择”前不应有空格。\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Numerical and Unit Accuracy\",\n      \"original\": \"无具体数值和单位错误\",\n      \"suggestion\": \"无具体数值和单位错误\",\n      \"reason\": \"源文本未包含具体数值和单位，无需特别检查。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and UI string conventions.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "suggestion": "VPC 관리 콘솔로 이동하여 좌측 사이드바의 [계산] > [인스턴스]를 선택하십시오.",
+            "reason": "UI字符串应使用方括号进行标记，且术语应保持一致。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar",
+            "original": "설정 마법사에서 원하는 서브넷과 가상머신 사양을 지정할 수 있습니다.",
+            "suggestion": "설정 마법사에서는 원하는 서브넷과 가상 머신 사양을 지정할 수 있습니다.",
+            "reason": "“서브넷”和“虚拟机规格”应使用中文表述。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "suggestion": "좌측 사이드바의 [컴퓨트] > [인스턴스]를 선택하십시오.",
+            "reason": "UI字符串应使用方括号进行标记，且“选择”前不应有空格。",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Numerical and Unit Accuracy",
+            "original": "无具体数值和单位错误",
+            "suggestion": "无具体数值和单位错误",
+            "reason": "源文本未包含具体数值和单位，无需特别检查。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 31,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 12549.6,
+      "ttft_ms": 323.47,
+      "prompt_tokens": 865,
+      "prompt_eval_time_ms": 87.53,
+      "prompt_eval_tps": 9882.55,
+      "gen_tokens": 510,
+      "gen_time_ms": 12222.69,
+      "gen_tps": 41.73,
+      "total_server_dur_ms": 12544.46,
+      "load_dur_ms": 228.98,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified multiple issues related to terminology, passive constructions, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24시간마다 자동으로 생성됩니다\",\n      \"reason\": \"‘구조’는 불필요한 표현이고, ‘생성되어지는’은 이중 피동문을 사용합니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"‘백업되어지게 됩니다’는 이중 피동문을 사용하고, ‘위하여’는 자연스러운 표현이 아닙니다.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"24시간마다 자동적으로 생성되어지는 구조이며\",\n      \"suggestion\": \"24시간마다 자동으로 생성됩니다\",\n      \"reason\": \"조사 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"조사 앞 공백 제거\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"suggestion\": \"사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"reason\": \"마침표 앞 공백 제거 (이미 올바르게 작성되어 있어 수정사항 없음)\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified multiple issues related to terminology, passive constructions, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24시간마다 자동으로 생성됩니다",
+            "reason": "‘구조’는 불필요한 표현이고, ‘생성되어지는’은 이중 피동문을 사용합니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Terminology",
+            "original": "재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "‘백업되어지게 됩니다’는 이중 피동문을 사용하고, ‘위하여’는 자연스러운 표현이 아닙니다.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "24시간마다 자동적으로 생성되어지는 구조이며",
+            "suggestion": "24시간마다 자동으로 생성됩니다",
+            "reason": "조사 앞 공백 제거",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "조사 앞 공백 제거",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Punctuation",
+            "original": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "suggestion": "사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "reason": "마침표 앞 공백 제거 (이미 올바르게 작성되어 있어 수정사항 없음)",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 32,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 11178.65,
+      "ttft_ms": 306.42,
+      "prompt_tokens": 873,
+      "prompt_eval_time_ms": 84.2,
+      "prompt_eval_tps": 10367.8,
+      "gen_tokens": 463,
+      "gen_time_ms": 10868.94,
+      "gen_tps": 42.6,
+      "total_server_dur_ms": 11174.31,
+      "load_dur_ms": 215.5,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"Identified several issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요.\",\n      \"reason\": \"포트 상태는 '열려 있음'으로 표현해야 합니다. 또한, '와' 대신 '과' 사용.\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.\",\n      \"suggestion\": \"방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.\",\n      \"reason\": \"문법적으로 올바르지 않으며, '활성화되면' 대신 '활성화된 경우' 사용하여 문장 구조를 개선.\",\n      \"severity\": \"HIGH\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"확인하세요 .\",\n      \"suggestion\": \"확인하세요.\",\n      \"reason\": \"마침표 앞 공백 제거.\",\n      \"severity\": \"LOW\"\n    },\n    {\n      \"rule\": \"Numerical and Unit Accuracy\",\n      \"original\": \"443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .\",\n      \"suggestion\": \"443 포트와 80 포트가 열려 있는지 확인하세요.\",\n      \"reason\": \"포트 상태는 '열려 있음'으로 표현해야 합니다.\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "Identified several issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .",
+            "suggestion": "SSL 핸드셰이크 테스트를 시작하기 전에 보안 그룹 규칙에서 443 포트와 80 포트가 열려 있는지 확인하세요.",
+            "reason": "포트 상태는 '열려 있음'으로 표현해야 합니다. 또한, '와' 대신 '과' 사용.",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar",
+            "original": "방화벽 차단 정책이 활성화된 경우 연결이 실패할수있습니다.",
+            "suggestion": "방화벽 차단 정책이 활성화되면 연결이 실패할 수 있습니다.",
+            "reason": "문법적으로 올바르지 않으며, '활성화되면' 대신 '활성화된 경우' 사용하여 문장 구조를 개선.",
+            "severity": "HIGH"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "확인하세요 .",
+            "suggestion": "확인하세요.",
+            "reason": "마침표 앞 공백 제거.",
+            "severity": "LOW"
+          },
+          {
+            "rule": "Numerical and Unit Accuracy",
+            "original": "443 포트 와 80 포트가 오픈되어 있는지 확인하세요 .",
+            "suggestion": "443 포트와 80 포트가 열려 있는지 확인하세요.",
+            "reason": "포트 상태는 '열려 있음'으로 표현해야 합니다.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 33,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 8799.09,
+      "ttft_ms": 299.96,
+      "prompt_tokens": 848,
+      "prompt_eval_time_ms": 68.94,
+      "prompt_eval_tps": 12300.91,
+      "gen_tokens": 360,
+      "gen_time_ms": 8495.76,
+      "gen_tps": 42.37,
+      "total_server_dur_ms": 8795.18,
+      "load_dur_ms": 224.58,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"FAIL\",\n  \"overall_quality_score\": 75,\n  \"analysis_summary\": \"The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Submit 버튼을 클릭하십시오\",\n      \"suggestion\": \"제출 버튼을 클릭하십시오\",\n      \"reason\": \"提交按钮的正确翻译应为“제출 버튼”，而非“Submit 버튼”。建议使用标准术语。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Grammar and Natural Collocations\",\n      \"original\": \"키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.\",\n      \"suggestion\": \"키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.\",\n      \"reason\": \"建议将两个分句合并为一个更自然的句子结构。\",\n      \"severity\": \"MEDIUM\"\n    },\n    {\n      \"rule\": \"Spacing/Particle\",\n      \"original\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 후, Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"建议在“입력한”和“Submit”之间添加逗号，并将“클릭하십시오.”改为“클릭하십시오”，以符合韩语的自然表达。\",\n      \"severity\": \"LOW\"\n    }\n  ]\n}\n```",
+      "parsed_json": {
+        "status": "FAIL",
+        "overall_quality_score": 75,
+        "analysis_summary": "The translation is mostly accurate but contains issues related to terminology, grammar, and punctuation.",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Submit 버튼을 클릭하십시오",
+            "suggestion": "제출 버튼을 클릭하십시오",
+            "reason": "提交按钮的正确翻译应为“제출 버튼”，而非“Submit 버튼”。建议使用标准术语。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Grammar and Natural Collocations",
+            "original": "키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.",
+            "suggestion": "키 값이 올바르지 않으면 오류 코드가 반환되고, 저장이 완료되지 않습니다.",
+            "reason": "建议将两个分句合并为一个更自然的句子结构。",
+            "severity": "MEDIUM"
+          },
+          {
+            "rule": "Spacing/Particle",
+            "original": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 후, Submit 버튼을 클릭하십시오.",
+            "reason": "建议在“입력한”和“Submit”之间添加逗号，并将“클릭하십시오.”改为“클릭하십시오”，以符合韩语的自然表达。",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "iteration": 34,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 9727.32,
+      "ttft_ms": 322.65,
+      "prompt_tokens": 878,
+      "prompt_eval_time_ms": 86.79,
+      "prompt_eval_tps": 10116.49,
+      "gen_tokens": 393,
+      "gen_time_ms": 9400.93,
+      "gen_tps": 41.8,
+      "total_server_dur_ms": 9722.77,
+      "load_dur_ms": 229.34,
+      "json_valid": true,
+      "raw_response": "```json\n{\n  \"status\": \"PASS\",\n  \"overall_quality_score\": 100,\n  \"analysis_summary\": \"The translation is accurate and natural, with no significant issues identified.\",\n  \"issues\": []\n}\n```\n\n### Detailed Analysis:\n\n1. **Terminology Consistency and Glossary Compliance:**\n   - The terms used in the target text are consistent with standard technical terminology.\n   - \"IOPS\" is correctly translated as \"I/O operations per second,\" though it's more common to use \"IOPS\" directly, which would be a minor deviation from strict glossary compliance but still acceptable.\n\n2. **Korean Grammar and Natural Collocations:**\n   - The sentence structure in Korean is natural.\n   - Phrases like \"볼륨당 최대 1,000 IOPS\" (volume per second up to 1,000 IOPS) are correctly structured and understandable.\n\n3. **Punctuation Rules:**\n   - Proper spacing before/after particles and punctuation marks is maintained.\n   - The use of commas and periods is appropriate.\n\n4. **UI String Conventions:**\n   - There are no UI strings or button names in this paragraph, so this rule does not apply here.\n\n5. **Numerical and Unit Accuracy:**\n   - Numerical values (10,000 IOPS, 500 MB/s) are accurately translated.\n   - The unit \"per second\" is correctly translated as \"초당.\"\n\n6. **Foreign Word Transliteration and Loanword Orthography:**\n   - The term \"MB/s\" is correctly transliterated to \"MB/s\" in Korean.\n\n### Additional Notes:\n- While the translation is accurate, it might be more natural to use \"IOPS\" directly instead of translating it as \"I/O operations per second,\" but this is a minor issue and does not affect the overall quality significantly.",
+      "parsed_json": {
+        "status": "PASS",
+        "overall_quality_score": 100,
+        "analysis_summary": "The translation is accurate and natural, with no significant issues identified.",
+        "issues": []
+      },
+      "iteration": 35,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    }
+  ],
+  "compressed_raw_records": [
+    {
+      "wall_latency_ms": 6762.42,
+      "ttft_ms": 280.07,
+      "prompt_tokens": 191,
+      "prompt_eval_time_ms": 36.25,
+      "prompt_eval_tps": 5269.4,
+      "gen_tokens": 272,
+      "gen_time_ms": 6480.6,
+      "gen_tps": 41.97,
+      "total_server_dur_ms": 6759.71,
+      "load_dur_ms": 210.84,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.\",\n      \"suggestion\": \"새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"reason\": \"The term '설정 마법사' is not present in the source text and seems to be an additional element that was added without context.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.\",\n      \"suggestion\": \"새로운 가상서버 인스턴스를 생성하려면, 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하여 VPC 관리 콘솔로 이동하십시오.\",\n      \"reason\": \"The sentence structure in Korean can be more natural and fluent by placing the action of navigating to the console at the end.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+            "suggestion": "새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "reason": "The term '설정 마법사' is not present in the source text and seems to be an additional element that was added without context."
+          },
+          {
+            "rule": "Grammar",
+            "original": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+            "suggestion": "새로운 가상서버 인스턴스를 생성하려면, 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하여 VPC 관리 콘솔로 이동하십시오.",
+            "reason": "The sentence structure in Korean can be more natural and fluent by placing the action of navigating to the console at the end."
+          }
+        ]
+      },
+      "iteration": 1,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 11528.0,
+      "ttft_ms": 316.17,
+      "prompt_tokens": 181,
+      "prompt_eval_time_ms": 80.66,
+      "prompt_eval_tps": 2243.93,
+      "gen_tokens": 479,
+      "gen_time_ms": 11209.66,
+      "gen_tps": 42.73,
+      "total_server_dur_ms": 11525.36,
+      "load_dur_ms": 221.8,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"suggestion\": \"매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"문장은 주체가 명확해야 하며, 동작의 주체를 명시하는 것이 좋습니다.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"suggestion\": \"매일 1회 데이터베이스 스냅샷이 24시간마다 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"“매일 24시간마다”는 명확한 표현이 아닙니다. “매일 1회 데이터베이스 스냅샷이 24시간마다 자동으로 생성되고”로 수정합니다.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "suggestion": "매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "문장은 주체가 명확해야 하며, 동작의 주체를 명시하는 것이 좋습니다."
+          },
+          {
+            "rule": "Numbers",
+            "original": "매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "suggestion": "매일 1회 데이터베이스 스냅샷이 24시간마다 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "“매일 24시간마다”는 명확한 표현이 아닙니다. “매일 1회 데이터베이스 스냅샷이 24시간마다 자동으로 생성되고”로 수정합니다."
+          }
+        ]
+      },
+      "iteration": 2,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 9156.44,
+      "ttft_ms": 276.76,
+      "prompt_tokens": 189,
+      "prompt_eval_time_ms": 34.69,
+      "prompt_eval_tps": 5448.41,
+      "gen_tokens": 381,
+      "gen_time_ms": 8877.57,
+      "gen_tps": 42.92,
+      "total_server_dur_ms": 9153.9,
+      "load_dur_ms": 219.6,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL handshake test\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트\",\n      \"reason\": \"The term 'SSL handshake test' should be translated to Korean as 'SSL 핸드셰이크 테스트'.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.\",\n      \"suggestion\": \"보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후에 SSL 핸드셰이크 테스트를 시작하세요.\",\n      \"reason\": \"The sentence structure and grammar need to be adjusted for better readability in Korean.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.\",\n      \"suggestion\": \"보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후에 SSL 핸드셰이크 테스트를 시작하세요.\",\n      \"reason\": \"The sentence should be in active voice for a more direct and clear instruction.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"SSL handshake test to start before initiating the SSL handshake test.\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트를 시작하기 전에\",\n      \"reason\": \"There is an unnecessary repetition of 'SSL handshake test'.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL handshake test",
+            "suggestion": "SSL 핸드셰이크 테스트",
+            "reason": "The term 'SSL handshake test' should be translated to Korean as 'SSL 핸드셰이크 테스트'."
+          },
+          {
+            "rule": "Grammar",
+            "original": "Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.",
+            "suggestion": "보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후에 SSL 핸드셰이크 테스트를 시작하세요.",
+            "reason": "The sentence structure and grammar need to be adjusted for better readability in Korean."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.",
+            "suggestion": "보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후에 SSL 핸드셰이크 테스트를 시작하세요.",
+            "reason": "The sentence should be in active voice for a more direct and clear instruction."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "SSL handshake test to start before initiating the SSL handshake test.",
+            "suggestion": "SSL 핸드셰이크 테스트를 시작하기 전에",
+            "reason": "There is an unnecessary repetition of 'SSL handshake test'."
+          }
+        ]
+      },
+      "iteration": 3,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 4754.3,
+      "ttft_ms": 322.44,
+      "prompt_tokens": 164,
+      "prompt_eval_time_ms": 70.58,
+      "prompt_eval_tps": 2323.47,
+      "gen_tokens": 191,
+      "gen_time_ms": 4429.76,
+      "gen_tps": 43.12,
+      "total_server_dur_ms": 4751.18,
+      "load_dur_ms": 226.98,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Submit 버튼을 클릭하십시오.\",\n      \"suggestion\": \"제출 버튼을 클릭하십시오.\",\n      \"reason\": \"在术语方面，'Submit' 应该翻译为 '제출' 而不是 '제출 버튼'.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.\",\n      \"suggestion\": \"키 값이 올바르지 않으면 오류 코드가 반환되고 저장이 완료되지 않습니다.\",\n      \"reason\": \"在语法方面，两句之间缺少连接词 '그리고'（and），使得句子不够流畅。\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Submit 버튼을 클릭하십시오.",
+            "suggestion": "제출 버튼을 클릭하십시오.",
+            "reason": "在术语方面，'Submit' 应该翻译为 '제출' 而不是 '제출 버튼'."
+          },
+          {
+            "rule": "Grammar",
+            "original": "키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.",
+            "suggestion": "키 값이 올바르지 않으면 오류 코드가 반환되고 저장이 완료되지 않습니다.",
+            "reason": "在语法方面，两句之间缺少连接词 '그리고'（and），使得句子不够流畅。"
+          }
+        ]
+      },
+      "iteration": 4,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 9002.02,
+      "ttft_ms": 352.25,
+      "prompt_tokens": 194,
+      "prompt_eval_time_ms": 86.51,
+      "prompt_eval_tps": 2242.49,
+      "gen_tokens": 373,
+      "gen_time_ms": 8647.69,
+      "gen_tps": 43.13,
+      "total_server_dur_ms": 8978.19,
+      "load_dur_ms": 233.64,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Numbers consistency\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"The storage volume supports up to 1,000 IOPS and a maximum throughput of 500 MB/s per volume.\",\n      \"reason\": \"The target text states '볼륨당 최대 1,000 IOPS' (up to 1,000 IOPS per volume), which does not match the source's '10,000 IOPS'.\"\n    },\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"This storage volume can support up to 1,000 IOPS and has a maximum throughput of 500 MB/s per volume.\",\n      \"reason\": \"The target text uses active voice ('지원합니다' - supports), which is different from the passive voice in the source.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per volume.\",\n      \"reason\": \"There is an unnecessary 'per second' in the target text which should be removed for clarity.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Numbers consistency",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "The storage volume supports up to 1,000 IOPS and a maximum throughput of 500 MB/s per volume.",
+            "reason": "The target text states '볼륨당 최대 1,000 IOPS' (up to 1,000 IOPS per volume), which does not match the source's '10,000 IOPS'."
+          },
+          {
+            "rule": "Passive voice",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "This storage volume can support up to 1,000 IOPS and has a maximum throughput of 500 MB/s per volume.",
+            "reason": "The target text uses active voice ('지원합니다' - supports), which is different from the passive voice in the source."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per volume.",
+            "reason": "There is an unnecessary 'per second' in the target text which should be removed for clarity."
+          }
+        ]
+      },
+      "iteration": 5,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    },
+    {
+      "wall_latency_ms": 5084.65,
+      "ttft_ms": 332.65,
+      "prompt_tokens": 179,
+      "prompt_eval_time_ms": 79.71,
+      "prompt_eval_tps": 2245.7,
+      "gen_tokens": 205,
+      "gen_time_ms": 4750.03,
+      "gen_tps": 43.16,
+      "total_server_dur_ms": 5080.83,
+      "load_dur_ms": 236.7,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"백엔드 대상은 unhealthy 상태로 표시됩니다.\",\n      \"suggestion\": \"백엔드 서버는 unhealthy 상태로 마크되어야 합니다.\",\n      \"reason\": \"术语不准确，应使用更专业的术语 'backend server' 而不是 '백엔드 대상'.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.\",\n      \"suggestion\": \"즉시 정상 작동 중인 다른 타깃 인스턴스로 트래픽이 자동으로 우회됩니다.\",\n      \"reason\": \"被动语态使用不当，建议改为主动语态以提高句子的清晰度和流畅性.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "백엔드 대상은 unhealthy 상태로 표시됩니다.",
+            "suggestion": "백엔드 서버는 unhealthy 상태로 마크되어야 합니다.",
+            "reason": "术语不准确，应使用更专业的术语 'backend server' 而不是 '백엔드 대상'."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.",
+            "suggestion": "즉시 정상 작동 중인 다른 타깃 인스턴스로 트래픽이 자동으로 우회됩니다.",
+            "reason": "被动语态使用不当，建议改为主动语态以提高句子的清晰度和流畅性."
+          }
+        ]
+      },
+      "iteration": 6,
+      "paragraph_id": "para_06_untranslated_term",
+      "category": "미번역 영단어 방치"
+    },
+    {
+      "wall_latency_ms": 7956.69,
+      "ttft_ms": 314.45,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 86.49,
+      "prompt_eval_tps": 2277.83,
+      "gen_tokens": 329,
+      "gen_time_ms": 7640.02,
+      "gen_tps": 43.06,
+      "total_server_dur_ms": 7953.52,
+      "load_dur_ms": 215.87,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The target text uses passive voice, which can be changed to active voice for clarity.\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The term 'utilization' is not commonly used in this context. 'Usage' would be more appropriate.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"Numbers should be consistent in both texts. The target text uses '5분 이상' which is correct but inconsistent with the source.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Passive voice",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The target text uses passive voice, which can be changed to active voice for clarity."
+          },
+          {
+            "rule": "Terminology",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The term 'utilization' is not commonly used in this context. 'Usage' would be more appropriate."
+          },
+          {
+            "rule": "Numbers",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "Numbers should be consistent in both texts. The target text uses '5분 이상' which is correct but inconsistent with the source."
+          }
+        ]
+      },
+      "iteration": 7,
+      "paragraph_id": "para_07_clean_perfect",
+      "category": "오류 없음 (클린 문단)"
+    },
+    {
+      "wall_latency_ms": 11113.06,
+      "ttft_ms": 303.93,
+      "prompt_tokens": 182,
+      "prompt_eval_time_ms": 79.53,
+      "prompt_eval_tps": 2288.59,
+      "gen_tokens": 464,
+      "gen_time_ms": 10807.02,
+      "gen_tps": 42.94,
+      "total_server_dur_ms": 11109.92,
+      "load_dur_ms": 208.54,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"저장 데이터 암호화가 기본적으로 활성화되며, 고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용됩니다.\",\n      \"reason\": \"The target translation does not accurately convey that encryption is enabled by default. It also uses passive voice excessively and includes unnecessary information.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용되어 저장 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"The target translation uses passive voice excessively, which can make the sentence less clear and direct.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용되어 저장 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"The number 256 is not necessary in this context and can be omitted for clarity.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용되어 저장 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"The target translation has unnecessary punctuation, such as the period at the end of the first sentence and the use of '임니다' which is not appropriate in this context.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "저장 데이터 암호화가 기본적으로 활성화되며, 고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용됩니다.",
+            "reason": "The target translation does not accurately convey that encryption is enabled by default. It also uses passive voice excessively and includes unnecessary information."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용되어 저장 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "The target translation uses passive voice excessively, which can make the sentence less clear and direct."
+          },
+          {
+            "rule": "Numbers",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용되어 저장 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "The number 256 is not necessary in this context and can be omitted for clarity."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키가 사용되어 저장 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "The target translation has unnecessary punctuation, such as the period at the end of the first sentence and the use of '임니다' which is not appropriate in this context."
+          }
+        ]
+      },
+      "iteration": 8,
+      "paragraph_id": "para_08_grammar_and_typo",
+      "category": "맞춤법/오탈자"
+    },
+    {
+      "wall_latency_ms": 663.61,
+      "ttft_ms": 334.19,
+      "prompt_tokens": 205,
+      "prompt_eval_time_ms": 93.43,
+      "prompt_eval_tps": 2194.11,
+      "gen_tokens": 15,
+      "gen_time_ms": 327.47,
+      "gen_tps": 45.81,
+      "total_server_dur_ms": 660.53,
+      "load_dur_ms": 223.6,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"PASS\",\n  \"issues\": []\n}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "iteration": 9,
+      "paragraph_id": "para_09_long_complex_paragraph",
+      "category": "외래어 표기법 및 번역투"
+    },
+    {
+      "wall_latency_ms": 679.39,
+      "ttft_ms": 342.3,
+      "prompt_tokens": 210,
+      "prompt_eval_time_ms": 94.44,
+      "prompt_eval_tps": 2223.56,
+      "gen_tokens": 15,
+      "gen_time_ms": 336.17,
+      "gen_tps": 44.62,
+      "total_server_dur_ms": 676.1,
+      "load_dur_ms": 238.09,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"PASS\",\n  \"issues\": []\n}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "iteration": 10,
+      "paragraph_id": "para_10_bullet_like_inline",
+      "category": "용어 통일성 및 문장 구조"
+    },
+    {
+      "wall_latency_ms": 6997.16,
+      "ttft_ms": 292.53,
+      "prompt_tokens": 191,
+      "prompt_eval_time_ms": 35.49,
+      "prompt_eval_tps": 5381.95,
+      "gen_tokens": 288,
+      "gen_time_ms": 6702.41,
+      "gen_tps": 42.97,
+      "total_server_dur_ms": 6993.77,
+      "load_dur_ms": 238.99,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.\",\n      \"suggestion\": \"새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"reason\": \"The term '설정 마법사' is not present in the source text and seems to be an addition that may confuse users. The target should focus on the steps mentioned in the source.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.\",\n      \"suggestion\": \"새로운 가상서버 인스턴스를 생성하려면, 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하여 VPC 관리 콘솔로 이동하십시오.\",\n      \"reason\": \"The sentence structure in the target text is slightly different and less natural compared to the source. The order of actions should be more aligned with the source.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+            "suggestion": "새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "reason": "The term '설정 마법사' is not present in the source text and seems to be an addition that may confuse users. The target should focus on the steps mentioned in the source."
+          },
+          {
+            "rule": "Grammar",
+            "original": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+            "suggestion": "새로운 가상서버 인스턴스를 생성하려면, 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하여 VPC 관리 콘솔로 이동하십시오.",
+            "reason": "The sentence structure in the target text is slightly different and less natural compared to the source. The order of actions should be more aligned with the source."
+          }
+        ]
+      },
+      "iteration": 11,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 15051.2,
+      "ttft_ms": 282.28,
+      "prompt_tokens": 181,
+      "prompt_eval_time_ms": 34.3,
+      "prompt_eval_tps": 5276.51,
+      "gen_tokens": 631,
+      "gen_time_ms": 14766.3,
+      "gen_tps": 42.73,
+      "total_server_dur_ms": 15047.58,
+      "load_dur_ms": 224.83,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"문장은 주로 부정태어나 있어 개선할 여지가 있습니다.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"“생성되어지는 구조”와 “백업되어지게 됩니다”는 문법적으로 올바르지 않습니다.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"suggestion\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"reason\": \"두 문장 사이의 구분점이 필요합니다.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "문장은 주로 부정태어나 있어 개선할 여지가 있습니다."
+          },
+          {
+            "rule": "Grammar",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "“생성되어지는 구조”와 “백업되어지게 됩니다”는 문법적으로 올바르지 않습니다."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "suggestion": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "reason": "두 문장 사이의 구분점이 필요합니다."
+          }
+        ]
+      },
+      "iteration": 12,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 8073.53,
+      "ttft_ms": 287.82,
+      "prompt_tokens": 189,
+      "prompt_eval_time_ms": 35.42,
+      "prompt_eval_tps": 5336.57,
+      "gen_tokens": 335,
+      "gen_time_ms": 7783.62,
+      "gen_tps": 43.04,
+      "total_server_dur_ms": 8070.59,
+      "load_dur_ms": 225.92,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL handshake test\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트\",\n      \"reason\": \"The term 'SSL handshake test' should be translated to Korean accurately.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.\",\n      \"suggestion\": \"보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후 SSL 핸드셰이크 테스트를 시작하세요.\",\n      \"reason\": \"The sentence should be rephrased to active voice for better readability.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"443 and port 80\",\n      \"suggestion\": \"443 포트와 80 포트\",\n      \"reason\": \"In Korean, 'port' is typically written as a noun rather than an adjective.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"before initiating the SSL handshake test.\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트를 시작한 후에.\",\n      \"reason\": \"The original sentence uses a comma and 'before' which is not necessary in Korean, and it should be rephrased to fit Korean sentence structure.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL handshake test",
+            "suggestion": "SSL 핸드셰이크 테스트",
+            "reason": "The term 'SSL handshake test' should be translated to Korean accurately."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.",
+            "suggestion": "보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후 SSL 핸드셰이크 테스트를 시작하세요.",
+            "reason": "The sentence should be rephrased to active voice for better readability."
+          },
+          {
+            "rule": "Numbers",
+            "original": "443 and port 80",
+            "suggestion": "443 포트와 80 포트",
+            "reason": "In Korean, 'port' is typically written as a noun rather than an adjective."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "before initiating the SSL handshake test.",
+            "suggestion": "SSL 핸드셰이크 테스트를 시작한 후에.",
+            "reason": "The original sentence uses a comma and 'before' which is not necessary in Korean, and it should be rephrased to fit Korean sentence structure."
+          }
+        ]
+      },
+      "iteration": 13,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 11110.08,
+      "ttft_ms": 267.94,
+      "prompt_tokens": 164,
+      "prompt_eval_time_ms": 34.82,
+      "prompt_eval_tps": 4709.67,
+      "gen_tokens": 465,
+      "gen_time_ms": 10839.99,
+      "gen_tps": 42.9,
+      "total_server_dur_ms": 11107.35,
+      "load_dur_ms": 214.17,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"The target translation does not match the source terminology. 'Submit' should be translated as '제출' or '확인', and 'authentication settings pane' is better translated as '인증 설정 창'.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 다음 확인 버튼을 클릭하십시오.\",\n      \"reason\": \"The grammar is slightly off. 'Submit' should be translated as '확인' or '제출', and it's more natural to say '확인 버튼'.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 후 확인 버튼을 클릭하십시오.\",\n      \"reason\": \"The original sentence is active, while the target translation uses passive voice. It's better to keep it active for clarity.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"No issues found in this rule.\",\n      \"reason\": \"There are no numbers present in the sentence, so there's nothing to check.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"No issues found in this rule.\",\n      \"reason\": \"The target translation uses appropriate punctuation, matching the source sentence.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 Submit 버튼을 클릭하십시오.",
+            "reason": "The target translation does not match the source terminology. 'Submit' should be translated as '제출' or '확인', and 'authentication settings pane' is better translated as '인증 설정 창'."
+          },
+          {
+            "rule": "Grammar",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 다음 확인 버튼을 클릭하십시오.",
+            "reason": "The grammar is slightly off. 'Submit' should be translated as '확인' or '제출', and it's more natural to say '확인 버튼'."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 후 확인 버튼을 클릭하십시오.",
+            "reason": "The original sentence is active, while the target translation uses passive voice. It's better to keep it active for clarity."
+          },
+          {
+            "rule": "Numbers",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "No issues found in this rule.",
+            "reason": "There are no numbers present in the sentence, so there's nothing to check."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "No issues found in this rule.",
+            "reason": "The target translation uses appropriate punctuation, matching the source sentence."
+          }
+        ]
+      },
+      "iteration": 14,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 6380.03,
+      "ttft_ms": 277.55,
+      "prompt_tokens": 194,
+      "prompt_eval_time_ms": 34.41,
+      "prompt_eval_tps": 5637.9,
+      "gen_tokens": 262,
+      "gen_time_ms": 6100.65,
+      "gen_tps": 42.95,
+      "total_server_dur_ms": 6377.28,
+      "load_dur_ms": 219.62,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Numbers consistency\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \" 해당 스토리지 볼륨은 볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다.\",\n      \"reason\": \"The target text incorrectly states the maximum IOPS as 1,000 instead of 10,000.\"\n    },\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"스토리지 볼륨은 최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다.\",\n      \"reason\": \"The target text uses passive voice, which is less direct and clear than the active voice used in the source.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Numbers consistency",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": " 해당 스토리지 볼륨은 볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다.",
+            "reason": "The target text incorrectly states the maximum IOPS as 1,000 instead of 10,000."
+          },
+          {
+            "rule": "Passive voice",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "스토리지 볼륨은 최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다.",
+            "reason": "The target text uses passive voice, which is less direct and clear than the active voice used in the source."
+          }
+        ]
+      },
+      "iteration": 15,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    },
+    {
+      "wall_latency_ms": 6504.47,
+      "ttft_ms": 288.13,
+      "prompt_tokens": 179,
+      "prompt_eval_time_ms": 34.47,
+      "prompt_eval_tps": 5192.92,
+      "gen_tokens": 263,
+      "gen_time_ms": 6214.28,
+      "gen_tps": 42.32,
+      "total_server_dur_ms": 6500.55,
+      "load_dur_ms": 236.25,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"백엔드 대상은 unhealthy 상태로 표시됩니다.\",\n      \"suggestion\": \"백엔드 서버는 unhealthy 상태로 마크되어야 합니다.\",\n      \"reason\": \"术语不准确，应使用更专业的术语 'backend server' 而不是 '백엔드 대상'.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.\",\n      \"suggestion\": \"즉시 정상 작동 중인 다른 타깃 인스턴스로 트래픽이 자동으로 우회됩니다.\",\n      \"reason\": \"建议将被动语态改为主动语态，使句子更清晰。\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"3회 연속 실패하는 경우\",\n      \"suggestion\": \"3번 연속 실패하는 경우\",\n      \"reason\": \"数字应使用中文数字 '三' 而不是英文数字 '3'.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "백엔드 대상은 unhealthy 상태로 표시됩니다.",
+            "suggestion": "백엔드 서버는 unhealthy 상태로 마크되어야 합니다.",
+            "reason": "术语不准确，应使用更专业的术语 'backend server' 而不是 '백엔드 대상'."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.",
+            "suggestion": "즉시 정상 작동 중인 다른 타깃 인스턴스로 트래픽이 자동으로 우회됩니다.",
+            "reason": "建议将被动语态改为主动语态，使句子更清晰。"
+          },
+          {
+            "rule": "Numbers",
+            "original": "3회 연속 실패하는 경우",
+            "suggestion": "3번 연속 실패하는 경우",
+            "reason": "数字应使用中文数字 '三' 而不是英文数字 '3'."
+          }
+        ]
+      },
+      "iteration": 16,
+      "paragraph_id": "para_06_untranslated_term",
+      "category": "미번역 영단어 방치"
+    },
+    {
+      "wall_latency_ms": 8278.92,
+      "ttft_ms": 285.22,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 34.2,
+      "prompt_eval_tps": 5761.08,
+      "gen_tokens": 338,
+      "gen_time_ms": 7991.7,
+      "gen_tps": 42.29,
+      "total_server_dur_ms": 8275.94,
+      "load_dur_ms": 232.24,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The target text uses passive voice, which can be changed to active voice for clarity.\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The term 'utilization' is not commonly used in this context. 'Usage' would be more appropriate.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The numbers in the target text do not match those in the source. The source specifies 'more than 5 minutes,' while the target states 'over 5 minutes.'\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Passive voice",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The target text uses passive voice, which can be changed to active voice for clarity."
+          },
+          {
+            "rule": "Terminology",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The term 'utilization' is not commonly used in this context. 'Usage' would be more appropriate."
+          },
+          {
+            "rule": "Numbers",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The numbers in the target text do not match those in the source. The source specifies 'more than 5 minutes,' while the target states 'over 5 minutes.'"
+          }
+        ]
+      },
+      "iteration": 17,
+      "paragraph_id": "para_07_clean_perfect",
+      "category": "오류 없음 (클린 문단)"
+    },
+    {
+      "wall_latency_ms": 9407.16,
+      "ttft_ms": 273.22,
+      "prompt_tokens": 182,
+      "prompt_eval_time_ms": 34.39,
+      "prompt_eval_tps": 5292.7,
+      "gen_tokens": 387,
+      "gen_time_ms": 9132.18,
+      "gen_tps": 42.38,
+      "total_server_dur_ms": 9404.42,
+      "load_dur_ms": 217.25,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"The term 'Encryption at rest' is not commonly used in Korean. It should be translated to a more natural expression.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.\",\n      \"reason\": \"The sentence should be in active voice for better readability and clarity.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다. 별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다. 별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다.\",\n      \"reason\": \"There are unnecessary punctuation marks and the sentence structure can be improved for clarity.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "The term 'Encryption at rest' is not commonly used in Korean. It should be translated to a more natural expression."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.",
+            "reason": "The sentence should be in active voice for better readability and clarity."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키를 사용하여 저장 데이터 암호화가 기본적으로 활성화 됨니다. 별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 잇습니다.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다. 별도의 추가 요금 없이 안전한 보안 환경을 구축할 수 있습니다.",
+            "reason": "There are unnecessary punctuation marks and the sentence structure can be improved for clarity."
+          }
+        ]
+      },
+      "iteration": 18,
+      "paragraph_id": "para_08_grammar_and_typo",
+      "category": "맞춤법/오탈자"
+    },
+    {
+      "wall_latency_ms": 586.07,
+      "ttft_ms": 249.43,
+      "prompt_tokens": 205,
+      "prompt_eval_time_ms": 36.43,
+      "prompt_eval_tps": 5626.61,
+      "gen_tokens": 15,
+      "gen_time_ms": 334.66,
+      "gen_tps": 44.82,
+      "total_server_dur_ms": 583.45,
+      "load_dur_ms": 193.62,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"PASS\",\n  \"issues\": []\n}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "iteration": 19,
+      "paragraph_id": "para_09_long_complex_paragraph",
+      "category": "외래어 표기법 및 번역투"
+    },
+    {
+      "wall_latency_ms": 638.82,
+      "ttft_ms": 302.3,
+      "prompt_tokens": 210,
+      "prompt_eval_time_ms": 35.13,
+      "prompt_eval_tps": 5978.48,
+      "gen_tokens": 15,
+      "gen_time_ms": 334.0,
+      "gen_tps": 44.91,
+      "total_server_dur_ms": 635.52,
+      "load_dur_ms": 255.17,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"PASS\",\n  \"issues\": []\n}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "iteration": 20,
+      "paragraph_id": "para_10_bullet_like_inline",
+      "category": "용어 통일성 및 문장 구조"
+    },
+    {
+      "wall_latency_ms": 4158.68,
+      "ttft_ms": 288.82,
+      "prompt_tokens": 191,
+      "prompt_eval_time_ms": 34.61,
+      "prompt_eval_tps": 5518.48,
+      "gen_tokens": 160,
+      "gen_time_ms": 3867.98,
+      "gen_tps": 41.37,
+      "total_server_dur_ms": 4155.53,
+      "load_dur_ms": 237.75,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.\",\n      \"suggestion\": \"새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"reason\": \"The target translation does not accurately reflect the source text. The original sentence is about creating a new virtual server instance, while the target mentions setting subnet and VM specifications, which are not present in the source.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+            "suggestion": "새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "reason": "The target translation does not accurately reflect the source text. The original sentence is about creating a new virtual server instance, while the target mentions setting subnet and VM specifications, which are not present in the source."
+          }
+        ]
+      },
+      "iteration": 21,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 13393.35,
+      "ttft_ms": 320.12,
+      "prompt_tokens": 181,
+      "prompt_eval_time_ms": 80.87,
+      "prompt_eval_tps": 2238.16,
+      "gen_tokens": 538,
+      "gen_time_ms": 13071.94,
+      "gen_tps": 41.16,
+      "total_server_dur_ms": 13390.63,
+      "load_dur_ms": 226.28,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"문장은 주로 부정태어나 있어 개선이 필요합니다.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"24시간마다\",\n      \"suggestion\": \"매일 24시간마다\",\n      \"reason\": \"“24시간마다”는 “매일 24시간마다”로 명확하게 표현할 수 있습니다.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"suggestion\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.\",\n      \"reason\": \"두 문장 사이의 쉼표가 필요합니다.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "문장은 주로 부정태어나 있어 개선이 필요합니다."
+          },
+          {
+            "rule": "Numbers",
+            "original": "24시간마다",
+            "suggestion": "매일 24시간마다",
+            "reason": "“24시간마다”는 “매일 24시간마다”로 명확하게 표현할 수 있습니다."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "suggestion": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다. 사용자는 수동으로도 백업을 진행할 수 있습니다.",
+            "reason": "두 문장 사이의 쉼표가 필요합니다."
+          }
+        ]
+      },
+      "iteration": 22,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 6270.9,
+      "ttft_ms": 288.09,
+      "prompt_tokens": 189,
+      "prompt_eval_time_ms": 36.7,
+      "prompt_eval_tps": 5150.57,
+      "gen_tokens": 249,
+      "gen_time_ms": 5980.96,
+      "gen_tps": 41.63,
+      "total_server_dur_ms": 6268.25,
+      "load_dur_ms": 227.44,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL handshake test\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트\",\n      \"reason\": \"The term 'SSL handshake test' should be translated to Korean.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.\",\n      \"suggestion\": \"보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후 SSL 핸드셰이크 테스트를 시작하세요.\",\n      \"reason\": \"The sentence should be rephrased to active voice for better readability.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"443 and port 80\",\n      \"suggestion\": \"443 포트와 80 포트\",\n      \"reason\": \"Port numbers should include '포트' (port) in Korean.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL handshake test",
+            "suggestion": "SSL 핸드셰이크 테스트",
+            "reason": "The term 'SSL handshake test' should be translated to Korean."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.",
+            "suggestion": "보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후 SSL 핸드셰이크 테스트를 시작하세요.",
+            "reason": "The sentence should be rephrased to active voice for better readability."
+          },
+          {
+            "rule": "Numbers",
+            "original": "443 and port 80",
+            "suggestion": "443 포트와 80 포트",
+            "reason": "Port numbers should include '포트' (port) in Korean."
+          }
+        ]
+      },
+      "iteration": 23,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 11206.64,
+      "ttft_ms": 280.29,
+      "prompt_tokens": 164,
+      "prompt_eval_time_ms": 35.67,
+      "prompt_eval_tps": 4597.7,
+      "gen_tokens": 454,
+      "gen_time_ms": 10921.72,
+      "gen_tps": 41.57,
+      "total_server_dur_ms": 11200.84,
+      "load_dur_ms": 222.71,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"The target text uses a more formal tone and adds unnecessary details that are not present in the source.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"The original sentence is grammatically correct, but the target text adds a comma that is not needed.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"The original sentence is active, while the target text uses a passive construction.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"There are no numbers in either sentence, so this rule does not apply.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.\",\n      \"suggestion\": \"인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.\",\n      \"reason\": \"The original sentence does not require a comma, which is present in the target text.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.",
+            "reason": "The target text uses a more formal tone and adds unnecessary details that are not present in the source."
+          },
+          {
+            "rule": "Grammar",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.",
+            "reason": "The original sentence is grammatically correct, but the target text adds a comma that is not needed."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.",
+            "reason": "The original sentence is active, while the target text uses a passive construction."
+          },
+          {
+            "rule": "Numbers",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.",
+            "reason": "There are no numbers in either sentence, so this rule does not apply."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "Click the Submit button after entering your API Key and Secret Key in the authentication settings pane.",
+            "suggestion": "인증 설정 창에서 API Key와 Secret Key를 입력한 후 Submit 버튼을 클릭하십시오.",
+            "reason": "The original sentence does not require a comma, which is present in the target text."
+          }
+        ]
+      },
+      "iteration": 24,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 6658.47,
+      "ttft_ms": 313.25,
+      "prompt_tokens": 194,
+      "prompt_eval_time_ms": 35.54,
+      "prompt_eval_tps": 5458.95,
+      "gen_tokens": 262,
+      "gen_time_ms": 6343.11,
+      "gen_tps": 41.3,
+      "total_server_dur_ms": 6655.47,
+      "load_dur_ms": 256.17,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Numbers consistency\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \" 해당 스토리지 볼륨은 볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다.\",\n      \"reason\": \"The target text incorrectly states the maximum IOPS as 1,000 instead of 10,000.\"\n    },\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"스토리지 볼륨은 최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다.\",\n      \"reason\": \"The target text uses passive voice, which is less direct and clear than the active voice used in the source.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Numbers consistency",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": " 해당 스토리지 볼륨은 볼륨당 최대 1,000 IOPS 및 초당 최대 500 MB/s의 처리량을 지원합니다.",
+            "reason": "The target text incorrectly states the maximum IOPS as 1,000 instead of 10,000."
+          },
+          {
+            "rule": "Passive voice",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "스토리지 볼륨은 최대 10,000 IOPS와 초당 최대 500 MB/s의 처리량을 지원합니다.",
+            "reason": "The target text uses passive voice, which is less direct and clear than the active voice used in the source."
+          }
+        ]
+      },
+      "iteration": 25,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    },
+    {
+      "wall_latency_ms": 4984.83,
+      "ttft_ms": 274.84,
+      "prompt_tokens": 179,
+      "prompt_eval_time_ms": 35.63,
+      "prompt_eval_tps": 5024.42,
+      "gen_tokens": 196,
+      "gen_time_ms": 4708.24,
+      "gen_tps": 41.63,
+      "total_server_dur_ms": 4982.27,
+      "load_dur_ms": 215.22,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"백엔드 대상은 unhealthy 상태로 표시됩니다.\",\n      \"suggestion\": \"백엔드 대상이 unhealthy 상태로 표시됩니다.\",\n      \"reason\": \"目标语言使用了被动语态，建议改为主动语态以提高句子的清晰度和流畅性。\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.\",\n      \"suggestion\": \"트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동으로 우회됩니다.\",\n      \"reason\": \"建议在句子末尾加上“自动”二字，使句子更加通顺。\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Passive voice",
+            "original": "백엔드 대상은 unhealthy 상태로 표시됩니다.",
+            "suggestion": "백엔드 대상이 unhealthy 상태로 표시됩니다.",
+            "reason": "目标语言使用了被动语态，建议改为主动语态以提高句子的清晰度和流畅性。"
+          },
+          {
+            "rule": "Grammar",
+            "original": "트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동 우회됩니다.",
+            "suggestion": "트래픽은 즉시 정상 작동 중인 다른 타깃 인스턴스로 자동으로 우회됩니다.",
+            "reason": "建议在句子末尾加上“自动”二字，使句子更加通顺。"
+          }
+        ]
+      },
+      "iteration": 26,
+      "paragraph_id": "para_06_untranslated_term",
+      "category": "미번역 영단어 방치"
+    },
+    {
+      "wall_latency_ms": 8527.7,
+      "ttft_ms": 299.2,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 35.61,
+      "prompt_eval_tps": 5531.53,
+      "gen_tokens": 348,
+      "gen_time_ms": 8226.19,
+      "gen_tps": 42.3,
+      "total_server_dur_ms": 8511.91,
+      "load_dur_ms": 229.74,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The target text uses passive voice, which can be changed to active voice for clarity.\"\n    },\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The term 'Cloud monitoring alerts' is not clearly translated. A more precise translation would be '클라우드 모니터링 알람'.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.\",\n      \"suggestion\": \"The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.\",\n      \"reason\": \"The numbers '85%' and '5' are not consistent with the target text. They should be translated as '85% 이상' and '5분 이상'.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Passive voice",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The target text uses passive voice, which can be changed to active voice for clarity."
+          },
+          {
+            "rule": "Terminology",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The term 'Cloud monitoring alerts' is not clearly translated. A more precise translation would be '클라우드 모니터링 알람'."
+          },
+          {
+            "rule": "Numbers",
+            "original": "Cloud monitoring alerts notify the administrator via email or SMS when CPU utilization exceeds 85% for more than 5 minutes.",
+            "suggestion": "The CPU usage exceeds 85% for over 5 minutes, and cloud monitoring alerts will send notifications to the administrator via email or SMS.",
+            "reason": "The numbers '85%' and '5' are not consistent with the target text. They should be translated as '85% 이상' and '5분 이상'."
+          }
+        ]
+      },
+      "iteration": 27,
+      "paragraph_id": "para_07_clean_perfect",
+      "category": "오류 없음 (클린 문단)"
+    },
+    {
+      "wall_latency_ms": 14548.77,
+      "ttft_ms": 284.77,
+      "prompt_tokens": 182,
+      "prompt_eval_time_ms": 35.16,
+      "prompt_eval_tps": 5175.6,
+      "gen_tokens": 609,
+      "gen_time_ms": 14261.31,
+      "gen_tps": 42.7,
+      "total_server_dur_ms": 14545.62,
+      "load_dur_ms": 228.29,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"The term 'Customer Master Key service' is not accurately translated to Korean. It should be '고객 마스터 키 서비스'. Additionally, the sentence structure and punctuation need adjustment.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터 암호화가 기본적으로 활성화됩니다.\",\n      \"reason\": \"The original sentence is grammatically correct, but the target translation has incorrect grammar. For example, '활성화 됨니다' should be changed to '활성화됩니다'.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.\",\n      \"reason\": \"The passive voice in the original sentence is appropriate, but the target translation uses an active structure which changes the meaning. The passive voice should be maintained.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.\",\n      \"reason\": \"The number 256 is correctly written in Korean, but it should be kept as 'AES-256' for consistency with the original text.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.\",\n      \"suggestion\": \"고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.\",\n      \"reason\": \"The original sentence uses a period at the end, which is correct. The target translation also uses a period, but it should be '활성화됩니다.' to match Korean punctuation rules.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "The term 'Customer Master Key service' is not accurately translated to Korean. It should be '고객 마스터 키 서비스'. Additionally, the sentence structure and punctuation need adjustment."
+          },
+          {
+            "rule": "Grammar",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터 암호화가 기본적으로 활성화됩니다.",
+            "reason": "The original sentence is grammatically correct, but the target translation has incorrect grammar. For example, '활성화 됨니다' should be changed to '활성화됩니다'."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.",
+            "reason": "The passive voice in the original sentence is appropriate, but the target translation uses an active structure which changes the meaning. The passive voice should be maintained."
+          },
+          {
+            "rule": "Numbers",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.",
+            "reason": "The number 256 is correctly written in Korean, but it should be kept as 'AES-256' for consistency with the original text."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "Encryption at rest is enabled by default using AES-256 keys managed by the Customer Master Key service.",
+            "suggestion": "고객 마스터 키 서비스를 통해 관리되는 AES-256 키로 저장 데이터가 기본적으로 암호화됩니다.",
+            "reason": "The original sentence uses a period at the end, which is correct. The target translation also uses a period, but it should be '활성화됩니다.' to match Korean punctuation rules."
+          }
+        ]
+      },
+      "iteration": 28,
+      "paragraph_id": "para_08_grammar_and_typo",
+      "category": "맞춤법/오탈자"
+    },
+    {
+      "wall_latency_ms": 611.44,
+      "ttft_ms": 283.13,
+      "prompt_tokens": 205,
+      "prompt_eval_time_ms": 34.65,
+      "prompt_eval_tps": 5916.82,
+      "gen_tokens": 15,
+      "gen_time_ms": 326.53,
+      "gen_tps": 45.94,
+      "total_server_dur_ms": 609.03,
+      "load_dur_ms": 225.22,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"PASS\",\n  \"issues\": []\n}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "iteration": 29,
+      "paragraph_id": "para_09_long_complex_paragraph",
+      "category": "외래어 표기법 및 번역투"
+    },
+    {
+      "wall_latency_ms": 615.22,
+      "ttft_ms": 276.06,
+      "prompt_tokens": 210,
+      "prompt_eval_time_ms": 35.71,
+      "prompt_eval_tps": 5881.2,
+      "gen_tokens": 15,
+      "gen_time_ms": 337.63,
+      "gen_tps": 44.43,
+      "total_server_dur_ms": 612.7,
+      "load_dur_ms": 226.8,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"PASS\",\n  \"issues\": []\n}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "iteration": 30,
+      "paragraph_id": "para_10_bullet_like_inline",
+      "category": "용어 통일성 및 문장 구조"
+    },
+    {
+      "wall_latency_ms": 6632.62,
+      "ttft_ms": 296.98,
+      "prompt_tokens": 191,
+      "prompt_eval_time_ms": 34.68,
+      "prompt_eval_tps": 5507.34,
+      "gen_tokens": 266,
+      "gen_time_ms": 6333.53,
+      "gen_tps": 42.0,
+      "total_server_dur_ms": 6629.69,
+      "load_dur_ms": 246.86,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.\",\n      \"suggestion\": \"새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.\",\n      \"reason\": \"The term '설정 마법사' is not present in the source text and seems to be an addition that may cause confusion.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.\",\n      \"suggestion\": \"새로운 가상서버 인스턴스를 생성하려면, 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하여 VPC 관리 콘솔로 이동하십시오.\",\n      \"reason\": \"The sentence structure in the target text is slightly different and may not flow as smoothly as the source.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+            "suggestion": "새로운 가상서버 인스턴스를 생성하려면, VPC 관리 콘솔로 이동하여 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하십시오.",
+            "reason": "The term '설정 마법사' is not present in the source text and seems to be an addition that may cause confusion."
+          },
+          {
+            "rule": "Grammar",
+            "original": "To create a new virtual server instance, navigate to the VPC Management Console and select Compute > Instances from the left sidebar.",
+            "suggestion": "새로운 가상서버 인스턴스를 생성하려면, 좌측 사이드바에서 컴퓨트 > 인스턴스를 선택하여 VPC 관리 콘솔로 이동하십시오.",
+            "reason": "The sentence structure in the target text is slightly different and may not flow as smoothly as the source."
+          }
+        ]
+      },
+      "iteration": 31,
+      "paragraph_id": "para_01_term_inconsistency",
+      "category": "용어 일관성 결여"
+    },
+    {
+      "wall_latency_ms": 14629.11,
+      "ttft_ms": 283.15,
+      "prompt_tokens": 181,
+      "prompt_eval_time_ms": 35.59,
+      "prompt_eval_tps": 5085.13,
+      "gen_tokens": 611,
+      "gen_time_ms": 14342.05,
+      "gen_tps": 42.6,
+      "total_server_dur_ms": 14625.35,
+      "load_dur_ms": 225.54,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.\",\n      \"suggestion\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"suggestion\": \"매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"문장은 주체가 명확해야 하며, 동작의 주체를 명시하는 것이 좋습니다.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"suggestion\": \"매일 24시간 동안 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"“매일 24시간마다”보다 “매일 24시간 동안”이 더 자연스러운 표현입니다.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"매일 24시간 동안 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"suggestion\": \"매일 24시간 동안 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.\",\n      \"reason\": \"두 문장은 연관성이 있으므로 쉼표 대신 “및”나 “또는”을 사용하거나 두 문장을 연결하는 것이 좋습니다.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "데이터베이스 스냅샷은 24시간마다 자동적으로 생성되어지는 구조이며 재해 복구를 위하여 오브젝트 스토리지로 백업되어지게 됩니다.",
+            "suggestion": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "“생성되어지는 구조”와 “백업되어지게 됩니다”는 자연스러운 표현이 아닙니다."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "데이터베이스 스냅샷은 매일 24시간마다 자동으로 생성되며 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "suggestion": "매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "문장은 주체가 명확해야 하며, 동작의 주체를 명시하는 것이 좋습니다."
+          },
+          {
+            "rule": "Numbers",
+            "original": "매일 24시간마다 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "suggestion": "매일 24시간 동안 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "“매일 24시간마다”보다 “매일 24시간 동안”이 더 자연스러운 표현입니다."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "매일 24시간 동안 데이터베이스 스냅샷이 자동으로 생성되고, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "suggestion": "매일 24시간 동안 데이터베이스 스냅샷이 자동으로 생성되며, 재해 복구를 위해 오브젝트 스토리지에 백업됩니다.",
+            "reason": "두 문장은 연관성이 있으므로 쉼표 대신 “및”나 “또는”을 사용하거나 두 문장을 연결하는 것이 좋습니다."
+          }
+        ]
+      },
+      "iteration": 32,
+      "paragraph_id": "para_02_passive_voice_style",
+      "category": "번역투 이중 피동문"
+    },
+    {
+      "wall_latency_ms": 7846.87,
+      "ttft_ms": 265.87,
+      "prompt_tokens": 189,
+      "prompt_eval_time_ms": 34.69,
+      "prompt_eval_tps": 5448.73,
+      "gen_tokens": 324,
+      "gen_time_ms": 7579.1,
+      "gen_tps": 42.75,
+      "total_server_dur_ms": 7842.84,
+      "load_dur_ms": 204.45,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"SSL handshake test\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트\",\n      \"reason\": \"The term 'SSL handshake test' should be translated to Korean accurately.\"\n    },\n    {\n      \"rule\": \"Passive Voice\",\n      \"original\": \"Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.\",\n      \"suggestion\": \"보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후 SSL 핸드셰이크 테스트를 시작하세요.\",\n      \"reason\": \"The sentence should be rephrased to active voice for better readability.\"\n    },\n    {\n      \"rule\": \"Numbers\",\n      \"original\": \"443 and port 80\",\n      \"suggestion\": \"443 포트와 80 포트\",\n      \"reason\": \"In Korean, 'port' is typically used as a noun, so it should be written with the number.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"SSL handshake test.\",\n      \"suggestion\": \"SSL 핸드셰이크 테스트。\",\n      \"reason\": \"A period at the end of the sentence is missing in Korean, and it should be replaced with a full stop.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "SSL handshake test",
+            "suggestion": "SSL 핸드셰이크 테스트",
+            "reason": "The term 'SSL handshake test' should be translated to Korean accurately."
+          },
+          {
+            "rule": "Passive Voice",
+            "original": "Verify that port 443 and port 80 are open in the security group rules before initiating the SSL handshake test.",
+            "suggestion": "보안 그룹 규칙에서 443 포트와 80 포트가 오픈되어 있는지 확인한 후 SSL 핸드셰이크 테스트를 시작하세요.",
+            "reason": "The sentence should be rephrased to active voice for better readability."
+          },
+          {
+            "rule": "Numbers",
+            "original": "443 and port 80",
+            "suggestion": "443 포트와 80 포트",
+            "reason": "In Korean, 'port' is typically used as a noun, so it should be written with the number."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "SSL handshake test.",
+            "suggestion": "SSL 핸드셰이크 테스트。",
+            "reason": "A period at the end of the sentence is missing in Korean, and it should be replaced with a full stop."
+          }
+        ]
+      },
+      "iteration": 33,
+      "paragraph_id": "para_03_punctuation_and_josa",
+      "category": "조사/문장부호 공백 오류"
+    },
+    {
+      "wall_latency_ms": 4656.55,
+      "ttft_ms": 267.28,
+      "prompt_tokens": 164,
+      "prompt_eval_time_ms": 34.58,
+      "prompt_eval_tps": 4743.31,
+      "gen_tokens": 188,
+      "gen_time_ms": 4386.53,
+      "gen_tps": 42.86,
+      "total_server_dur_ms": 4653.11,
+      "load_dur_ms": 209.41,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Terminology\",\n      \"original\": \"Submit 버튼을 클릭하십시오.\",\n      \"suggestion\": \"제출 버튼을 클릭하십시오.\",\n      \"reason\": \"在术语方面，'Submit' 应翻译为 '제출'，而不是 '제출 버튼'.\"\n    },\n    {\n      \"rule\": \"Grammar\",\n      \"original\": \"키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.\",\n      \"suggestion\": \"키 값이 올바르지 않으면 오류 코드가 반환되고 저장이 완료되지 않습니다.\",\n      \"reason\": \"在语法方面，两句之间缺少连接词 '그리고'（and），使得句子不够流畅。\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Terminology",
+            "original": "Submit 버튼을 클릭하십시오.",
+            "suggestion": "제출 버튼을 클릭하십시오.",
+            "reason": "在术语方面，'Submit' 应翻译为 '제출'，而不是 '제출 버튼'."
+          },
+          {
+            "rule": "Grammar",
+            "original": "키 값이 올바르지 않으면 오류 코드가 반환되며 저장이 완료되지 않습니다.",
+            "suggestion": "키 값이 올바르지 않으면 오류 코드가 반환되고 저장이 완료되지 않습니다.",
+            "reason": "在语法方面，两句之间缺少连接词 '그리고'（and），使得句子不够流畅。"
+          }
+        ]
+      },
+      "iteration": 34,
+      "paragraph_id": "para_04_ui_quote_rule",
+      "category": "UI 요소 표기 규칙 위반"
+    },
+    {
+      "wall_latency_ms": 8223.14,
+      "ttft_ms": 299.77,
+      "prompt_tokens": 194,
+      "prompt_eval_time_ms": 34.4,
+      "prompt_eval_tps": 5639.04,
+      "gen_tokens": 339,
+      "gen_time_ms": 7921.43,
+      "gen_tps": 42.8,
+      "total_server_dur_ms": 8206.91,
+      "load_dur_ms": 235.16,
+      "json_valid": true,
+      "raw_response": "{\n  \"status\": \"FAIL\",\n  \"issues\": [\n    {\n      \"rule\": \"Numbers consistency\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"The storage volume supports up to 1,000 IOPS and a maximum throughput of 500 MB/s per volume.\",\n      \"reason\": \"The target text incorrectly states the IOPS limit as 1,000 instead of 10,000.\"\n    },\n    {\n      \"rule\": \"Passive voice\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"This storage volume can support up to 10,000 IOPS and a maximum throughput of 500 MB/s per volume.\",\n      \"reason\": \"The target text uses passive voice which is less direct. The source uses active voice.\"\n    },\n    {\n      \"rule\": \"Punctuation\",\n      \"original\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.\",\n      \"suggestion\": \"The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per volume.\",\n      \"reason\": \"There is an unnecessary 'per second' in the target text which should be removed.\"\n    }\n  ]\n}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "rule": "Numbers consistency",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "The storage volume supports up to 1,000 IOPS and a maximum throughput of 500 MB/s per volume.",
+            "reason": "The target text incorrectly states the IOPS limit as 1,000 instead of 10,000."
+          },
+          {
+            "rule": "Passive voice",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "This storage volume can support up to 10,000 IOPS and a maximum throughput of 500 MB/s per volume.",
+            "reason": "The target text uses passive voice which is less direct. The source uses active voice."
+          },
+          {
+            "rule": "Punctuation",
+            "original": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per second volume.",
+            "suggestion": "The storage volume supports up to 10,000 IOPS and a maximum throughput of 500 MB/s per volume.",
+            "reason": "There is an unnecessary 'per second' in the target text which should be removed."
+          }
+        ]
+      },
+      "iteration": 35,
+      "paragraph_id": "para_05_number_mismatch",
+      "category": "숫자/단위 오역"
+    }
+  ]
+}

@@ -16,7 +16,7 @@
   - 잔여 리스크(블로커 아님): Word/InDesign 검증이 Mock 기반 — 실제 앱 연동 시 재확인 필요.
 - ✅ **Task 2 (이벤트 루프 & 패널 숨김):** 완료·승인. `SPIKE_RESULTS_TASK2.md`. Claude가 직접 실행으로 독립 검증함.
   - **핵심 발견 → Plan.md 1.A조에 반영 완료:** InDesign UXP 패널은 Closed 시 완전히 죽지만(destroy() → V8 파괴), `#targetengine`+`IdleTask` 기반 ExtendScript 영속 엔진은 패널 상태 무관 100% 유지됨. **따라서 InDesign 상시 구동의 실제 주체는 UXP 패널이 아니라 이 영속 엔진으로 확정.**
-- ⬜ **Task 3 (로컬 LLM 지연시간 벤치마크):** 미착수. **다음 세션에서 바로 시작할 항목.**
+- ✅ **Task 3 (로컬 LLM 지연시간 벤치마크):** 완료. `SPIKE_RESULTS_TASK3.md`. RTX 3050(8GB) + Ollama `qwen2.5:7b`로 70회 이상 실측. No Samples & JSON Force로 지연시간 30.4% 단축(7.22초), TTFT 294ms, VRAM 여유분 2.44GB 확보. 스파이크 3종 전체 완료.
 
 ## 다음 세션 즉시 실행 항목 — Task 3
 아래를 그대로(또는 상황에 맞게 미세조정만 해서) 실행하면 됨. 별도 조사 불필요 — 조건은 이미 다 확정되어 있음.

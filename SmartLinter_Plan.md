@@ -78,5 +78,7 @@
 2.  **이벤트 루프 & Task Pane 공식 숨김 Spike — ✅ 완료 (2026-08-21):** 
     *   **[Word]** `Office.addin.hide()` + `Shared Runtime (lifetime: "long")` 조합 검증 → PASS (10분간 100% 유지).
     *   **[InDesign]** UXP 패널을 숨기거나 닫은 상태에서도 백그라운드 이벤트 루프가 유지되는지 검증 → Hidden은 유지되나 Closed는 중단됨을 확인. 대안으로 ExtendScript `#targetengine`+`IdleTask` 영속 엔진이 상태 무관 100% 유지됨을 발견, 이를 기본 채택 (상세: 위 1.A조 참조, [SPIKE_RESULTS_TASK2.md](./SPIKE_RESULTS_TASK2.md)).
-3.  **로컬 LLM 지연시간(Latency) 벤치마크 Spike:** 
-    *   실제 배포 대상 하드웨어 사양(작업자 PC)에서 로컬 모델을 구동했을 때, 문단 단위 QA 응답 속도가 UX를 해치지 않는지 실측 벤치마크.
+3.  **로컬 LLM 지연시간(Latency) 벤치마크 Spike — ✅ 완료 (2026-08-24):** 
+    *   실제 배포 대상 PC (RTX 3050 8GB VRAM)에서 Ollama `qwen2.5:7b` (Q4_K_M) 구동 후 70회 이상 실측 벤치마크.
+    *   `No Samples & JSON Force` 적용 시 평균 지연시간 **7.22초 (30.4% 단축)**, TTFT **294ms**, 프롬프트 토큰 **78.4% 절감**, JSON 유효율 **100%** 달성.
+    *   모델 적재 후에도 **2.44GB의 여유 VRAM**이 확보되어 에디터/Tauri 대시보드와의 안정적 공존 실증. 상세: [SPIKE_RESULTS_TASK3.md](./SPIKE_RESULTS_TASK3.md).
