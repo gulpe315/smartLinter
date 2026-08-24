@@ -10,6 +10,8 @@ import {
   type ParagraphPayload,
   type ReplacementCommand,
   type ReplacementResult,
+  type QaReport,
+  type QaIssue,
 } from '../../shared/protocol/types.ts';
 import {
   type ModelInfo,
@@ -58,6 +60,14 @@ export interface BatchScanProgressPayload {
   isAborted: boolean;
 }
 
+/** QA analysis report event payload */
+export interface QaReportPayload {
+  paragraphId: string;
+  paragraphText: string;
+  paragraphHash: string;
+  report: QaReport;
+}
+
 /** Supported Bridge Event Map */
 export interface BridgeEventMap {
   'bridge-status-changed': BridgeStatusPayload;
@@ -66,6 +76,7 @@ export interface BridgeEventMap {
   'llm-status-changed': LlmStatusPayload;
   'tm-status-changed': TmStatusPayload;
   'batch-scan-progress': BatchScanProgressPayload;
+  'qa-report-received': QaReportPayload;
 }
 
 export type BridgeEventName = keyof BridgeEventMap;
@@ -87,8 +98,12 @@ export interface IBridgeService {
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
 
+  /** Analyzes paragraph text with LLM and returns structured QaReport */
+  analyzeParagraph(paragraph: ParagraphPayload): Promise<QaReport>;
+
   /** Fetches installed Ollama models via GET /api/tags or Tauri backend */
   fetchOllamaModels(host?: string): Promise<ModelInfo[]>;
+
 
   /** Sets the active Ollama model */
   setOllamaModel(modelName: string): Promise<boolean>;
@@ -197,6 +212,68 @@ export const DEFAULT_MOCK_MODELS: ModelInfo[] = [
 ];
 
 /**
+ * Mock QA Issue Analyzer for testing and development
+ */
+export function generateMockQaReport(text: string): QaReport {
+  const issues: QaIssue[] = [];
+
+  if (text.includes('레플리카 카운트')) {
+    issues.push({
+      category: '용어 혼용',
+      originalSegment: '레플리카 카운트',
+      suggestedSegment: '복제본 수',
+      reason: '표준 클라우드 용어 지침에 따라 "레플리카 카운트" 대신 "복제본 수"로 표준화합니다.',
+      severity: 'HIGH',
+    });
+  }
+
+  if (text.includes('업데이트되어지게 됩니다')) {
+    issues.push({
+      category: '번역투',
+      originalSegment: '업데이트되어지게 됩니다',
+      suggestedSegment: '업데이트됩니다',
+      reason: '이중 피동("되어지게") 표현을 지양하고 명확하고 간결한 능동형 문장으로 교정합니다.',
+      severity: 'MEDIUM',
+    });
+  }
+
+  if (text.includes('3 으로')) {
+    issues.push({
+      category: '맞춤법',
+      originalSegment: '3 으로',
+      suggestedSegment: '3으로',
+      reason: '숫자와 조사 사이에는 공백을 두지 않는 것이 한글 맞춤법 표준입니다.',
+      severity: 'LOW',
+    });
+  }
+
+  if (text.includes('설정 하세요 .')) {
+    issues.push({
+      category: '맞춤법',
+      originalSegment: '설정 하세요 .',
+      suggestedSegment: '설정하세요.',
+      reason: '마침표 앞의 불필요한 공백을 제거하고 본용언과 보조용언의 붙여쓰기 규칙을 적용합니다.',
+      severity: 'LOW',
+    });
+  }
+
+  if (text.includes('오역 샘플')) {
+    issues.push({
+      category: '오역',
+      originalSegment: '오역 샘플',
+      suggestedSegment: '정확한 번역',
+      reason: '원문의 의미와 상반되게 번역된 오역을 교정합니다.',
+      severity: 'HIGH',
+    });
+  }
+
+  return {
+    status: issues.length > 0 ? 'FAIL' : 'PASS',
+    issues,
+  };
+}
+
+/**
  * In-memory / Mock Bridge Service for browser development and unit testing
  */
 export class MockBridgeService implements IBridgeService {
@@ -229,6 +306,32 @@ export class MockBridgeService implements IBridgeService {
         }
       });
     }
+
+    if (event === 'new-paragraph-detected') {
+      const paragraph = payload as ParagraphPayload;
+      const report = generateMockQaReport(paragraph.text);
+      if (report.issues.length > 0) {
+        setTimeout(() => {
+          this.emit('qa-report-received', {
+            paragraphId: paragraph.paragraphId,
+            paragraphText: paragraph.text,
+            paragraphHash: paragraph.hash,
+            report,
+          });
+        }, 0);
+      }
+    }
+  }
+
+  async analyzeParagraph(paragraph: ParagraphPayload): Promise<QaReport> {
+    const report = generateMockQaReport(paragraph.text);
+    this.emit('qa-report-received', {
+      paragraphId: paragraph.paragraphId,
+      paragraphText: paragraph.text,
+      paragraphHash: paragraph.hash,
+      report,
+    });
+    return report;
   }
 
   async sendReplacementCommand(command: ReplacementCommand): Promise<ReplacementResult> {
@@ -463,6 +566,24 @@ export class TauriBridgeService implements IBridgeService {
 
     return this.fallbackService.fetchBridgeHealth();
   }
+
+  async analyzeParagraph(paragraph: ParagraphPayload): Promise<QaReport> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.analyzeParagraph(paragraph);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('analyze_paragraph', { paragraph });
+      }
+    } catch (e) {
+      console.warn('Tauri invoke analyze_paragraph failed, using fallback:', e);
+    }
+
+    return this.fallbackService.analyzeParagraph(paragraph);
+  }
+
 
   async fetchOllamaModels(host?: string): Promise<ModelInfo[]> {
     if (!this.isTauriAvailable()) {

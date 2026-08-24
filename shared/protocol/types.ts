@@ -231,3 +231,67 @@ export function isBridgeMessage(val: unknown): val is BridgeMessage {
             return false;
     }
 }
+
+// --- QA Report & Issue Domain Models (Task 5 & Task 13) ---
+
+/** Severity classification for detected QA violations */
+export type QaSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'INFO';
+
+/** Status of the QA linting outcome for a paragraph */
+export type QaStatus = 'PASS' | 'FAIL';
+
+/** Single structured QA violation issue */
+export interface QaIssue {
+    /** Category or rule name (e.g. "Terminology", "Passive Voice", "Spacing", "용어 혼용", "맞춤법") */
+    category: string;
+    /** Original text segment in the target paragraph that contains the issue */
+    originalSegment: string;
+    /** Proposed correction or replacement text segment */
+    suggestedSegment: string;
+    /** Human-readable explanation or rationale for the proposed change */
+    reason: string;
+    /** Severity level */
+    severity: QaSeverity;
+}
+
+/** Complete QA lint report containing status and list of detected issues */
+export interface QaReport {
+    /** Overall PASS or FAIL status */
+    status: QaStatus;
+    /** List of detected issues */
+    issues: QaIssue[];
+    /** Optional raw LLM completion text retained for diagnostics */
+    rawResponse?: string;
+}
+
+export function isQaSeverity(val: unknown): val is QaSeverity {
+    return val === 'LOW' || val === 'MEDIUM' || val === 'HIGH' || val === 'INFO';
+}
+
+export function isQaStatus(val: unknown): val is QaStatus {
+    return val === 'PASS' || val === 'FAIL';
+}
+
+export function isQaIssue(val: unknown): val is QaIssue {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return (
+        typeof obj.category === 'string' &&
+        typeof obj.originalSegment === 'string' &&
+        typeof obj.suggestedSegment === 'string' &&
+        typeof obj.reason === 'string' &&
+        typeof obj.severity === 'string'
+    );
+}
+
+export function isQaReport(val: unknown): val is QaReport {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return (
+        isQaStatus(obj.status) &&
+        Array.isArray(obj.issues) &&
+        obj.issues.every(isQaIssue) &&
+        (obj.rawResponse === undefined || typeof obj.rawResponse === 'string')
+    );
+}
+

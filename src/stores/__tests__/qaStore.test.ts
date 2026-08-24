@@ -1,0 +1,259 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useQaStore } from '../qaStore.ts';
+import { MockBridgeService, setBridgeService } from '../../services/tauriBridge.ts';
+import { type QaReport } from '../../../shared/protocol/types.ts';
+
+describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
+  let mockBridge: MockBridgeService;
+
+  beforeEach(() => {
+    useQaStore.getState().reset();
+    mockBridge = new MockBridgeService();
+    setBridgeService(mockBridge);
+  });
+
+  it('initializes with empty card lists and default filter state', () => {
+    const state = useQaStore.getState();
+    expect(state.cards).toEqual([]);
+    expect(state.dismissedCards).toEqual([]);
+    expect(state.appliedCards).toEqual([]);
+    expect(state.filter).toEqual({
+      severity: 'ALL',
+      category: 'ALL',
+      searchQuery: '',
+    });
+    expect(state.activeCardId).toBeNull();
+  });
+
+  it('adds individual QA cards and computes unique IDs', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-001',
+      paragraphText: '클라우드 레플리카 카운트를 3 으로 설정 하세요 .',
+      category: '용어 혼용',
+      originalSegment: '레플리카 카운트',
+      suggestedSegment: '복제본 수',
+      reason: '표준 클라우드 용어 지침에 따라 표준화합니다.',
+      severity: 'HIGH',
+    });
+
+    expect(cardId).toBeDefined();
+    const cards = useQaStore.getState().cards;
+    expect(cards.length).toBe(1);
+    expect(cards[0].id).toBe(cardId);
+    expect(cards[0].category).toBe('용어 혼용');
+    expect(cards[0].severity).toBe('HIGH');
+    expect(cards[0].status).toBe('pending');
+  });
+
+  it('adds multiple issues from a QaReport payload without duplicates', () => {
+    const report: QaReport = {
+      status: 'FAIL',
+      issues: [
+        {
+          category: '용어 혼용',
+          originalSegment: '레플리카 카운트',
+          suggestedSegment: '복제본 수',
+          reason: '표준 용어 준수',
+          severity: 'HIGH',
+        },
+        {
+          category: '맞춤법',
+          originalSegment: '3 으로',
+          suggestedSegment: '3으로',
+          reason: '조사 앞 공백 제거',
+          severity: 'LOW',
+        },
+      ],
+    };
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-002',
+      paragraphText: '레플리카 카운트를 3 으로 설정합니다.',
+      paragraphHash: 'hash-12345',
+      report,
+    });
+
+    expect(useQaStore.getState().cards.length).toBe(2);
+
+    // Adding same report again should not create duplicate entries
+    useQaStore.getState().addReport({
+      paragraphId: 'para-002',
+      paragraphText: '레플리카 카운트를 3 으로 설정합니다.',
+      paragraphHash: 'hash-12345',
+      report,
+    });
+
+    expect(useQaStore.getState().cards.length).toBe(2);
+  });
+
+  it('dismisses a card from active list and archives it in dismissedCards', () => {
+    const id1 = useQaStore.getState().addCard({
+      category: '맞춤법',
+      originalSegment: '3 으로',
+      suggestedSegment: '3으로',
+      reason: '공백 제거',
+      severity: 'LOW',
+    });
+    const id2 = useQaStore.getState().addCard({
+      category: '용어 혼용',
+      originalSegment: '레플리카 카운트',
+      suggestedSegment: '복제본 수',
+      reason: '표준어',
+      severity: 'HIGH',
+    });
+
+    expect(useQaStore.getState().cards.length).toBe(2);
+
+    useQaStore.getState().dismissCard(id1);
+
+    const state = useQaStore.getState();
+    expect(state.cards.length).toBe(1);
+    expect(state.cards[0].id).toBe(id2);
+    expect(state.dismissedCards.length).toBe(1);
+    expect(state.dismissedCards[0].id).toBe(id1);
+    expect(state.dismissedCards[0].status).toBe('dismissed');
+  });
+
+  it('accepts a card, calculates diff hunks, sends ReplacementCommand, and archives applied card', async () => {
+    const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-replace-1',
+      paragraphText: '클라우드 레플리카 카운트를 설정합니다.',
+      paragraphHash: 'base-hash-111',
+      category: '용어 혼용',
+      originalSegment: '레플리카 카운트',
+      suggestedSegment: '복제본 수',
+      reason: '표준 용어',
+      severity: 'HIGH',
+    });
+
+    const result = await useQaStore.getState().acceptCard(cardId, mockBridge);
+
+    expect(result).not.toBeNull();
+    expect(result?.status).toBe('SUCCESS');
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+
+    const sentCommand = sendSpy.mock.calls[0][0];
+    expect(sentCommand.paragraphId).toBe('para-replace-1');
+    expect(sentCommand.hunks.length).toBeGreaterThan(0);
+    expect(sentCommand.hunks[0].oldText).toContain('레플리카 카운트');
+    expect(sentCommand.hunks[0].newText).toContain('복제본 수');
+
+
+    // Card should be moved from cards to appliedCards
+    const state = useQaStore.getState();
+    expect(state.cards.find((c) => c.id === cardId)).toBeUndefined();
+    expect(state.appliedCards.length).toBe(1);
+    expect(state.appliedCards[0].id).toBe(cardId);
+    expect(state.appliedCards[0].status).toBe('applied');
+  });
+
+  it('handles bridge replacement rejection or error properly', async () => {
+    vi.spyOn(mockBridge, 'sendReplacementCommand').mockResolvedValueOnce({
+      commandId: 'cmd-stale',
+      status: 'STALE_REJECTED',
+      currentHash: 'stale-hash-999',
+      message: 'Paragraph was modified by user before replacement',
+    });
+
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-stale-1',
+      paragraphText: '원본 텍스트',
+      category: '번역투',
+      originalSegment: '원본 텍스트',
+      suggestedSegment: '수정 텍스트',
+      reason: '번역투 교정',
+      severity: 'MEDIUM',
+    });
+
+    const result = await useQaStore.getState().acceptCard(cardId, mockBridge);
+
+    expect(result?.status).toBe('STALE_REJECTED');
+    const card = useQaStore.getState().cards.find((c) => c.id === cardId);
+    expect(card?.status).toBe('failed');
+    expect(card?.errorMessage).toContain('Paragraph was modified');
+  });
+
+  it('filters cards by severity, category, and search query', () => {
+    useQaStore.getState().addCard({
+      category: '용어 혼용',
+      originalSegment: '레플리카 카운트',
+      suggestedSegment: '복제본 수',
+      reason: '표준 용어',
+      severity: 'HIGH',
+    });
+    useQaStore.getState().addCard({
+      category: '번역투',
+      originalSegment: '업데이트되어지게 됩니다',
+      suggestedSegment: '업데이트됩니다',
+      reason: '피동 표현',
+      severity: 'MEDIUM',
+    });
+    useQaStore.getState().addCard({
+      category: '맞춤법',
+      originalSegment: '3 으로',
+      suggestedSegment: '3으로',
+      reason: '공백 교정',
+      severity: 'LOW',
+    });
+
+    // Default ALL filter
+    expect(useQaStore.getState().getFilteredCards().length).toBe(3);
+
+    // Filter by HIGH severity
+    useQaStore.getState().setSeverityFilter('HIGH');
+    let filtered = useQaStore.getState().getFilteredCards();
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].category).toBe('용어 혼용');
+
+    // Filter by MEDIUM severity
+    useQaStore.getState().setSeverityFilter('MEDIUM');
+    filtered = useQaStore.getState().getFilteredCards();
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].category).toBe('번역투');
+
+    // Filter by category
+    useQaStore.getState().setSeverityFilter('ALL');
+    useQaStore.getState().setCategoryFilter('맞춤법');
+    filtered = useQaStore.getState().getFilteredCards();
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].category).toBe('맞춤법');
+
+    // Search query
+    useQaStore.getState().setCategoryFilter('ALL');
+    useQaStore.getState().setSearchQuery('피동');
+    filtered = useQaStore.getState().getFilteredCards();
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].originalSegment).toBe('업데이트되어지게 됩니다');
+  });
+
+  it('subscribes to bridge qa-report-received event and adds cards asynchronously', () => {
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('qa-report-received', {
+      paragraphId: 'para-live-1',
+      paragraphText: '레플리카 카운트를 설정합니다.',
+      paragraphHash: 'hash-live-1',
+      report: {
+        status: 'FAIL',
+        issues: [
+          {
+            category: '용어 혼용',
+            originalSegment: '레플리카 카운트',
+            suggestedSegment: '복제본 수',
+            reason: '표준화',
+            severity: 'HIGH',
+          },
+        ],
+      },
+    });
+
+    const cards = useQaStore.getState().cards;
+    expect(cards.length).toBe(1);
+    expect(cards[0].originalSegment).toBe('레플리카 카운트');
+    expect(cards[0].suggestedSegment).toBe('복제본 수');
+
+    unlisten();
+  });
+});
