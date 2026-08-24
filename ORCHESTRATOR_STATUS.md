@@ -94,8 +94,24 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
   2. **하트비트가 5초 뒤부터 전부 조용히 실패 (커밋 `0e62b9b`).** 원인: `bridge_socket.jsx`의 `sendHeartbeat()`가 `POST /telemetry`로 `{type:"HEARTBEAT", payload:{...}}` 래핑된 바디를 보냈는데, 그 라우트는 `ParagraphPayload`(paragraphId/hash 필수)로 역직렬화를 시도해서 매번 422로 거부됨. curl로 422 직접 재현. 이미 정의만 되어있던 `HeartbeatPayload` 타입을 실제로 받는 `POST /heartbeat` 라우트를 신설하고 `sendHeartbeat`가 거기로 올바른 바디를 보내도록 수정. 하트비트 타임아웃도 5초(데몬 하트비트 주기와 동일해서 여유 없음) → 15초(3배 여유)로 상향.
   3. **세션이 한 번 죽으면 InDesign 재시작 전까지 절대 자가복구 안 됨 (커밋 `de318fc`).** 원인: 위 2번 수정 시 "활성 세션 없으면 그냥 200 OK로 무시"로 스코프를 최소화했는데, 이러면 `sendHeartbeat`가 항상 성공으로 착각해 `bridgeSocket.status`를 CONNECTED로 유지 → `onIdleTick`의 재핸드셰이크 트리거 조건(`status !== CONNECTED`)이 영원히 발동 안 함. curl로 "죽은 세션에 하트비트 200 OK, 그런데도 health는 계속 false"를 직접 재현해서 확정. `/heartbeat`가 세션 없으면 404를 반환하도록, `sendHeartbeat`가 실패 시 `status`를 ERROR로 내리도록 수정 — 기존에 이미 있던 재연결 로직이 이제 정상 작동함.
   - 세 건 모두 Rust `cargo test`(97개)와 InDesign JS `npm run test:indesign`(51개), `npm test`(142개) 전체 Claude가 직접 재실행해 회귀 없음 독립 검증. `git diff`로 매번 범위 이탈 없음 확인.
-  - **교훈 (2026-08-24):** 이 3건은 전부 짧은 연결 확인(핸드셰이크 성공 여부)만으로는 못 잡고, InDesign을 몇 분 이상 실제로 붙여둬야(하트비트 사이클이 여러 번 돌아야) 드러나는 종류였음 — "페어링됨" 확인만으로 "실사용 가능"을 판단하면 안 됨. 또한 Claude가 3라운드 연속 혼자 진단한 것에 대해 사용자가 지적 → [[feedback_agy_consult_when_stuck]]에 "라운드 수를 실제로 세면서 진행" 지침 보강.
-- **다음 세션 재검증 필요:** InDesign을 포커스한 채로(idleTask가 백그라운드 포커스 상실로 멈추는 걸 피하려고) 몇 분간 그대로 두고 대시보드 연결 배지가 계속 "연결됨"으로 유지되는지 확인 → 그 다음에야 QA 카드 생성/적용, TM 매칭, 롤백 등 Task 19의 4개 시나리오 실검증으로 진행.
+  - **교훈 (2026-08-24):** 이 3건은 전부 짧은 연결 확인(핸드셰이크 성공 여부)만으로는 못 잡고, InDesign을 몇 분 이상 실제로 붙여둬야(하트비트 사이클이 여러 번 돌아야) 드러나는 종류였음 — "페어링됨" 확인만으로 "실사용 가능"을 판단하면 안 됨.
+
+**네 번째 이슈 발견 — 아직 미수정, 원인 진단만 완료 (2026-08-24 세션 종료 시점):**
+
+InDesign 창이 OS 포커스를 잃으면(사용자가 다른 창을 보는 동안) 몇 분 안에 세션이 죽고, **포커스를 되찾아도 자동 재연결이 즉시 되지 않음**(10초 넘게 기다려도 `/health`가 계속 `connected:false`). 사용자가 직접 focus-click 테스트로 재현 확인함.
+
+**원인 (agy 자문 + Claude 코드 교차검증, 둘 다 일치):**
+1. **InDesign 엔진 자체 특성(추정, 공식 문서로 재확인은 안 됨):** 창이 비활성화되면 InDesign이 CPU 절약을 위해 메인 이벤트 루프를 멈춰서 `app.idleTasks`의 `onIdle` 콜백 자체가 정지함. 포커스가 돌아와도 마우스/키보드 조작 중에는 "바쁨" 상태로 간주돼 `onIdle`이 즉시 재개되지 않음(수 초의 유휴 상태가 필요).
+2. **코드 레벨 결함(확정, `smartlinter_daemon.jsx`/`bridge_socket.jsx` 직접 확인):** 재연결 로직이 오직 `onIdleTick`(1초 주기 유휴 타이머)에만 있고, 이미 등록돼 있는 즉시성 이벤트(`onSelectionChanged`, 즉 `afterSelectionChanged` — 사용자가 클릭하는 순간 즉시 발생)에는 재연결 체크가 전혀 없음. 게다가 `onIdleTick` 안에서도 "하트비트 실패 감지(status→ERROR)"와 "재연결 시도"가 같은 틱에 안 일어나고 최소 2틱(약 1~2초)이 걸리는 구조.
+
+**agy 제안 수정안 (검토 완료, 합리적으로 판단 — 아직 적용 안 함):**
+1. (최우선) `onSelectionChanged`/`onAttributeChanged` 핸들러에도 `bridgeSocket.status !== 'CONNECTED'`면 즉시 `attemptConnection()` 호출 추가 — 사용자가 InDesign을 클릭하는 순간 지연 없이 재연결.
+2. `onIdleTick` 안에서 하트비트 실패(404) 감지 시 다음 틱을 기다리지 않고 그 자리에서 바로 `attemptConnection()` 호출(2틱 지연 제거).
+3. (부차) `afterActivate`(창 활성화) 이벤트 리스너 추가 — 존재 여부/정확한 API명은 구현 시 확인 필요.
+4. (부차) `onIdleTick` 핸들러 종료 시 `event.idleTime = this.sleepMs` 명시.
+- 상세 분석 원본: agy가 별도 파일로 작성함(`C:\Users\user\.gemini\antigravity-cli\brain\bf4d66a6-4398-4893-930c-6a5b6feec3a6\indesign_heartbeat_reconnect_analysis.md` — agy 측 경로라 다음 세션에서 접근 안 될 수 있음, 위 요약이 사실상 전체 내용).
+
+- **다음 세션 재개 지점:** 위 agy 제안(특히 1, 2번)을 agy에게 구현 위임 → cargo test/npm test 독립 검증 → 실제 InDesign에서 "포커스 잃었다가 클릭으로 즉시 재연결되는지" 재확인 → 확인되면 QA 카드 생성/적용, TM 매칭, 롤백 등 Task 19의 4개 시나리오 실검증으로 진행.
 
 Task 20(패키징)은 Task 19 전체(헤드리스+Word+InDesign 실제 환경) 완료가 선행조건 — 아직 멀었음.
 
@@ -110,8 +126,8 @@ Task 18 이후 순서: Task 19(E2E 통합 — 헤드리스 하네스 완료·승
 
 ## 세션 재개 시 체크리스트
 1. 이 파일만 읽으면 충분 (Plan.md·IMPLEMENTATION_TASKS_FROM_AGY.md는 필요한 태스크 섹션만 참조, 처음부터 재검토 금지).
-2. `git log --oneline`으로 마지막 커밋 확인 — 마지막 커밋은 `de318fc`(좀비 세션 자가복구 불능 버그 수정, 하트비트 관련 3건 연쇄 수정의 마지막).
-3. 다음 할 일: ① ~~Task 18.5 테스트 격리~~·~~`/health` connected 버그~~·~~하트비트 와이어포맷 버그~~·~~좀비 세션 자가복구 버그~~ 모두 완료 → ② InDesign을 포커스한 채로 몇 분 이상 그대로 두고 연결이 실제로 유지되는지부터 재확인(아직 미검증) → ③ 유지 확인되면 QA 카드/TM 매칭/롤백 시나리오 실검증 → ④ Word taskpane 인프라 구축 후 Word 실검증.
+2. `git log --oneline`으로 마지막 커밋 확인 — 마지막 커밋은 `e926ede`(상태 문서 갱신). 코드 커밋 기준으론 `de318fc`(좀비 세션 자가복구 불능 버그 수정)가 최신.
+3. **다음 할 일 (바로 이어서 진행):** ① ~~Task 18.5 테스트 격리~~·~~`/health` connected 버그~~·~~하트비트 와이어포맷 버그~~·~~좀비 세션 자가복구 버그~~ 모두 완료 → ② **포커스 복귀 시 재연결 안 되는 네 번째 버그 — 원인 진단 완료(agy 자문 받음, 위 "네 번째 이슈" 절 참고), 수정은 아직 미착수.** agy 제안 1·2번(즉시성 이벤트에 재연결 체크 추가, 2틱 지연 제거)을 agy에게 구현 지시하는 것부터 시작할 것 — 이미 원인/해법 분석은 끝났으므로 재진단 불필요, 바로 구현 위임 단계로 진입. → ③ cargo test/npm test 독립 검증 → ④ 실제 InDesign에서 "포커스 잃었다가 클릭 시 즉시 재연결되는지" 재확인 → ⑤ 확인되면 QA 카드/TM 매칭/롤백 시나리오 실검증 → ⑥ Word taskpane 인프라 구축 후 Word 실검증.
 4. InDesign 재검증 시 Scripts 패널 경로(`C:\Users\user\AppData\Roaming\Adobe\InDesign\Version 21.0-J\ko_KR\Scripts\Scripts Panel\SmartLinter\`)에 최신 `bridge_socket.jsx`가 동기화됐는지 먼저 확인할 것 — 소스가 바뀔 때마다 이 폴더에도 복사해야 하고, ExtendScript `#targetengine`은 InDesign을 완전히 재시작해야 새 코드가 반영됨(스크립트만 재실행하면 기존 인스턴스를 재사용해서 코드 변경이 반영 안 됨).
-4. agy 산출물 검토 시 `git status`/`git diff`로 지시받지 않은 파일이 함께 변경되지 않았는지 반드시 확인 (Task 14에서 무관한 테스트 파일이 몰래 약화된 전례, Task 19에서 `commands.rs`에 무관한 `#[ignore]`가 몰래 추가됐다가 되돌린 전례, `test_bridge_server_with_token_store`가 실제 페어링 토큰 파일을 반복 오염시킨 전례 있음). agy 프롬프트에 "범위 밖 파일 건드리지 말 것, 버그 발견 시 직접 고치지 말고 보고만" 문구를 넣는 게 효과적이었음(Task 15·15.5부터 적용) — 계속 유지할 것.
-5. **InDesign 실기기 디버깅 시:** Claude는 GUI 클릭을 직접 못 하므로 사용자가 매번 더블클릭해줘야 함 — 왕복 비용이 실재함. 가설 하나씩 순차 검증하지 말고, [[feedback_agy_consult_when_stuck]] 참고해서 가능한 원인을 먼저 폭넓게 나열하고 한 번의 스크립트에 여러 진단을 몰아넣어 왕복을 최소화할 것. 막히면 agy에게도 의견을 구할 것.
+5. agy 산출물 검토 시 `git status`/`git diff`로 지시받지 않은 파일이 함께 변경되지 않았는지 반드시 확인 (Task 14에서 무관한 테스트 파일이 몰래 약화된 전례, Task 19에서 `commands.rs`에 무관한 `#[ignore]`가 몰래 추가됐다가 되돌린 전례, `test_bridge_server_with_token_store`가 실제 페어링 토큰 파일을 반복 오염시킨 전례 있음). agy 프롬프트에 "범위 밖 파일 건드리지 말 것, 버그 발견 시 직접 고치지 말고 보고만" 문구를 넣는 게 효과적이었음(Task 15·15.5부터 적용) — 계속 유지할 것.
+6. **중요 — 협업 방식 변경 (2026-08-24 세션 말미, 사용자 강한 지적으로 확정):** 원인 불명의 현상이 생기면 Claude가 먼저 스스로 진단 라운드를 돌리지 말고, **즉시(1회차부터) agy에게 현상을 설명하고 자문을 구하는 것을 첫 액션으로 할 것.** "몇 라운드 막히면 물어본다"가 아니라 "현상 발생 즉시 먼저 물어본다"로 기준이 바뀜 — 상세 배경은 [[feedback_agy_consult_when_stuck]] 참고. InDesign 실기기 디버깅은 Claude가 GUI 클릭을 직접 못 해서 사용자가 매번 조작해줘야 하는 왕복 비용도 여전히 실재하므로, 가설을 폭넓게 나열해 한 번에 검증하는 습관과 함께 병행할 것.
