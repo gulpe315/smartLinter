@@ -89,8 +89,36 @@ describe('SmartLinter Paragraph Hash & Normalization Engine', () => {
 
         it('should match Node.js standard crypto sha256 output for known baseline string', () => {
             const raw = 'Hello SmartLinter';
-            const expectedHash = crypto.createHash('sha256').update(raw).digest('hex');
+            const expectedHash = crypto.createHash('sha256').update(raw, 'utf8').digest('hex');
             assert.equal(computeParagraphHash(raw, false), expectedHash);
+        });
+
+        it('should match standard NIST SHA-256 test vectors (empty string and "abc")', () => {
+            // NIST SHA-256 vector for empty string
+            const emptyHash = computeParagraphHash('', false);
+            assert.equal(emptyHash, 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+
+            // NIST SHA-256 vector for "abc"
+            const abcHash = computeParagraphHash('abc', false);
+            assert.equal(abcHash, 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+        });
+
+        it('should match Node.js crypto for complex multilingual, Korean, and emoji texts', () => {
+            const testStrings = [
+                '안녕하세요 SmartLinter 번역 검수 시스템입니다.',
+                'Multi-byte characters: 日本語, 繁體中文, العربية, עברית',
+                'Surrogate pairs & emojis: 🚀✨🔒📝🎯 12345!?',
+                'Long text paragraph: '.repeat(50) + 'End of paragraph.',
+                'Exactly 55 bytes string: 123456789012345678901234567890',
+                'Boundary 56 bytes: 1234567890123456789012345678901234567',
+                'Boundary 64 bytes: 123456789012345678901234567890123456789012345',
+            ];
+
+            for (const str of testStrings) {
+                const nodeHash = crypto.createHash('sha256').update(str, 'utf8').digest('hex');
+                const jsHash = computeParagraphHash(str, false);
+                assert.equal(jsHash, nodeHash, `Mismatch for string: "${str.substring(0, 30)}..."`);
+            }
         });
 
         it('should produce distinct hashes for different paragraph contents', () => {
