@@ -1,0 +1,22 @@
+{
+  "name": "smartlinter",
+  "version": "0.1.0",
+  "description": "SmartLinter AI Linter & TQA Dashboard with Native Editor Bridge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts tests/unit/protocol_serialization_test.ts",
+    "test:shared": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts",
+    "test:unit": "node --test --experimental-strip-types tests/unit/protocol_serialization_test.ts"
+  },
+  "keywords": [
+    "linter",
+    "qa",
+    "translation-memory",
+    "office-js",
+    "indesign",
+    "tauri"
+  ],
+  "author": "SmartLinter Team",
+  "license": "MIT"
+}

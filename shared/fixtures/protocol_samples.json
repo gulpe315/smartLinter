@@ -1,0 +1,107 @@
+{
+  "paragraphPayloadWord": {
+    "paragraphId": "para-word-001",
+    "text": "According to SmartLinter specs, the native format must be preserved.",
+    "hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "source": "Document1.docx",
+    "target": "ko-KR",
+    "timestamp": 1724490000000,
+    "editorType": "Word"
+  },
+  "paragraphPayloadInDesign": {
+    "paragraphId": "para-id-042",
+    "text": "InDesign layout story text with complex typography.",
+    "hash": "b2c3d4e5f6a10718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f91",
+    "source": "Brochure_v2.indd",
+    "timestamp": 1724490001000,
+    "editorType": "InDesign"
+  },
+  "replacementCommand": {
+    "commandId": "cmd-tx-789",
+    "paragraphId": "para-word-001",
+    "baseHash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "expectedHash": "c3d4e5f6a1b20718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f92",
+    "hunks": [
+      {
+        "start": 51,
+        "end": 56,
+        "oldText": "sunny",
+        "newText": "bright"
+      },
+      {
+        "start": 35,
+        "end": 39,
+        "oldText": "lazy",
+        "newText": "extremely sleepy"
+      },
+      {
+        "start": 10,
+        "end": 15,
+        "oldText": "brown",
+        "newText": "dark reddish-brown"
+      }
+    ]
+  },
+  "replacementResultSuccess": {
+    "commandId": "cmd-tx-789",
+    "status": "SUCCESS",
+    "currentHash": "c3d4e5f6a1b20718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f92"
+  },
+  "replacementResultStale": {
+    "commandId": "cmd-tx-789",
+    "status": "STALE_REJECTED",
+    "currentHash": "d4e5f6a1b2c30718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f93",
+    "message": "Paragraph hash mismatch: user edited content before replacement"
+  },
+  "replacementResultRolledBack": {
+    "commandId": "cmd-tx-790",
+    "status": "ROLLED_BACK",
+    "currentHash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "message": "Formatting error encountered during hunk 2; compensating transaction rolled back"
+  },
+  "replacementResultFailed": {
+    "commandId": "cmd-tx-791",
+    "status": "FAILED",
+    "currentHash": "e5f6a1b2c3d40718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f94",
+    "message": "Target paragraph DOM node no longer exists"
+  },
+  "authHandshakeWord": {
+    "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "editorType": "Word",
+    "version": "0.1.0",
+    "clientNonce": "nonce-word-uuid-v4-client-xyz"
+  },
+  "authHandshakeInDesign": {
+    "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "editorType": "InDesign",
+    "version": "0.1.0",
+    "clientNonce": "nonce-indesign-uuid-v4-client-abc"
+  },
+  "authResponseSuccess": {
+    "success": true,
+    "sessionToken": "session-jwt-token-example-12345",
+    "serverNonce": "server-nonce-random-bytes-67890",
+    "message": "Authentication successful"
+  },
+  "authResponseFailure": {
+    "success": false,
+    "message": "Unauthorized: Invalid pairing token"
+  },
+  "heartbeatPayload": {
+    "editorType": "Word",
+    "timestamp": 1724490005000,
+    "activeDocument": "Annual_Report_Final.docx"
+  },
+  "bridgeMessageParagraph": {
+    "type": "PARAGRAPH_PAYLOAD",
+    "payload": {
+      "paragraphId": "para-word-001",
+      "text": "According to SmartLinter specs, the native format must be preserved.",
+      "hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "source": "Document1.docx",
+      "target": "ko-KR",
+      "timestamp": 1724490000000,
+      "editorType": "Word"
+    }
+  }
+}

@@ -1,0 +1,224 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SmartLinterProtocol",
+  "description": "JSON Schema specification for SmartLinter bridge protocol and data models",
+  "definitions": {
+    "EditorType": {
+      "type": "string",
+      "enum": ["Word", "InDesign"],
+      "description": "Supported native host editor platform"
+    },
+    "ReplacementStatus": {
+      "type": "string",
+      "enum": ["SUCCESS", "STALE_REJECTED", "FAILED", "ROLLED_BACK"],
+      "description": "Status outcome of a replacement operation"
+    },
+    "TextHunk": {
+      "type": "object",
+      "description": "Individual slice of text diff for multi-hunk replacement",
+      "required": ["start", "end", "oldText", "newText"],
+      "properties": {
+        "start": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0-based character start offset"
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0-based character end offset (exclusive)"
+        },
+        "oldText": {
+          "type": "string",
+          "description": "Original text segment to replace"
+        },
+        "newText": {
+          "type": "string",
+          "description": "New replacement text segment"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ParagraphPayload": {
+      "type": "object",
+      "description": "Paragraph capture telemetry payload",
+      "required": ["paragraphId", "text", "hash", "source", "timestamp", "editorType"],
+      "properties": {
+        "paragraphId": {
+          "type": "string",
+          "description": "Unique identifier for the paragraph"
+        },
+        "text": {
+          "type": "string",
+          "description": "Paragraph raw text content"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$",
+          "description": "SHA-256 normalized hash of the paragraph text"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source context identifier or document path/name"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target language code or context"
+        },
+        "timestamp": {
+          "type": "integer",
+          "description": "Millisecond Unix epoch timestamp"
+        },
+        "editorType": {
+          "$ref": "#/definitions/EditorType"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReplacementCommand": {
+      "type": "object",
+      "description": "Text replacement command sent to an editor plugin",
+      "required": ["commandId", "paragraphId", "baseHash", "expectedHash", "hunks"],
+      "properties": {
+        "commandId": {
+          "type": "string",
+          "description": "Unique identifier for this replacement transaction"
+        },
+        "paragraphId": {
+          "type": "string",
+          "description": "Target paragraph identifier"
+        },
+        "baseHash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$",
+          "description": "Expected paragraph hash before replacement"
+        },
+        "expectedHash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$",
+          "description": "Expected paragraph hash after replacement"
+        },
+        "hunks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TextHunk"
+          },
+          "description": "Ordered list of diff hunks"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReplacementResult": {
+      "type": "object",
+      "description": "Result returned after replacement execution",
+      "required": ["commandId", "status", "currentHash"],
+      "properties": {
+        "commandId": {
+          "type": "string",
+          "description": "Associated command ID"
+        },
+        "status": {
+          "$ref": "#/definitions/ReplacementStatus"
+        },
+        "currentHash": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$",
+          "description": "Actual paragraph hash after replacement"
+        },
+        "message": {
+          "type": "string",
+          "description": "Optional diagnostic message"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AuthHandshake": {
+      "type": "object",
+      "description": "Initial handshake sent by an editor plugin to bridge server",
+      "required": ["token", "editorType", "version", "clientNonce"],
+      "properties": {
+        "token": {
+          "type": "string",
+          "description": "32-byte secret pairing token"
+        },
+        "editorType": {
+          "$ref": "#/definitions/EditorType"
+        },
+        "version": {
+          "type": "string",
+          "description": "Plugin version string"
+        },
+        "clientNonce": {
+          "type": "string",
+          "description": "Cryptographic client nonce"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AuthResponse": {
+      "type": "object",
+      "description": "Bridge server response to authentication handshake",
+      "required": ["success"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "description": "Whether authentication succeeded"
+        },
+        "sessionToken": {
+          "type": "string",
+          "description": "Assigned session token"
+        },
+        "serverNonce": {
+          "type": "string",
+          "description": "Server-generated nonce"
+        },
+        "message": {
+          "type": "string",
+          "description": "Optional status message"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HeartbeatPayload": {
+      "type": "object",
+      "description": "Periodic editor heartbeat payload",
+      "required": ["editorType", "timestamp"],
+      "properties": {
+        "editorType": {
+          "$ref": "#/definitions/EditorType"
+        },
+        "timestamp": {
+          "type": "integer",
+          "description": "Current timestamp in milliseconds"
+        },
+        "activeDocument": {
+          "type": "string",
+          "description": "Currently active document title or identifier"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BridgeMessage": {
+      "type": "object",
+      "description": "Multiplexed envelope message",
+      "required": ["type", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "AUTH_HANDSHAKE",
+            "AUTH_RESPONSE",
+            "PARAGRAPH_PAYLOAD",
+            "REPLACEMENT_COMMAND",
+            "REPLACEMENT_RESULT",
+            "HEARTBEAT"
+          ]
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
