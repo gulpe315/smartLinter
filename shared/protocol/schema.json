@@ -10,7 +10,7 @@
     },
     "ReplacementStatus": {
       "type": "string",
-      "enum": ["SUCCESS", "STALE_REJECTED", "FAILED", "ROLLED_BACK"],
+      "enum": ["SUCCESS", "STALE_REJECTED", "FAILED", "ROLLED_BACK", "ROLLBACK_ABORTED"],
       "description": "Status outcome of a replacement operation"
     },
     "TextHunk": {

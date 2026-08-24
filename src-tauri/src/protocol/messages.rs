@@ -31,6 +31,7 @@ pub enum ReplacementStatus {
     StaleRejected,
     Failed,
     RolledBack,
+    RollbackAborted,
 }
 
 impl std::fmt::Display for ReplacementStatus {
@@ -40,6 +41,7 @@ impl std::fmt::Display for ReplacementStatus {
             ReplacementStatus::StaleRejected => write!(f, "STALE_REJECTED"),
             ReplacementStatus::Failed => write!(f, "FAILED"),
             ReplacementStatus::RolledBack => write!(f, "ROLLED_BACK"),
+            ReplacementStatus::RollbackAborted => write!(f, "ROLLBACK_ABORTED"),
         }
     }
 }

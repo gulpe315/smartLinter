@@ -11,6 +11,9 @@ import { WordDocumentListener, type DocumentListenerConfig } from './document_li
 export * from './runtime_manager.ts';
 export * from './bridge_client.ts';
 export * from './document_listener.ts';
+export * from './compensating_journal.ts';
+export * from './hash_verifier.ts';
+export * from './replacement_executor.ts';
 
 export interface WordAddinOptions {
     runtimeConfig?: RuntimeManagerConfig;

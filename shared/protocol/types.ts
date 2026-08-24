@@ -9,7 +9,7 @@
 export type EditorType = 'Word' | 'InDesign';
 
 /** Text replacement execution outcomes */
-export type ReplacementStatus = 'SUCCESS' | 'STALE_REJECTED' | 'FAILED' | 'ROLLED_BACK';
+export type ReplacementStatus = 'SUCCESS' | 'STALE_REJECTED' | 'FAILED' | 'ROLLED_BACK' | 'ROLLBACK_ABORTED';
 
 /** Individual slice of text diff for multi-hunk replacement */
 export interface TextHunk {
@@ -121,7 +121,8 @@ export function isReplacementStatus(val: unknown): val is ReplacementStatus {
         val === 'SUCCESS' ||
         val === 'STALE_REJECTED' ||
         val === 'FAILED' ||
-        val === 'ROLLED_BACK'
+        val === 'ROLLED_BACK' ||
+        val === 'ROLLBACK_ABORTED'
     );
 }
 

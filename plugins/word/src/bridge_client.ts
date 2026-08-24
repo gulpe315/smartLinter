@@ -211,6 +211,45 @@ export class WordBridgeClient {
         return false;
     }
 
+    /**
+     * Sends replacement execution result back to the bridge server.
+     */
+    public async sendReplacementResult(result: ReplacementResult): Promise<boolean> {
+        if (!result || typeof result.commandId !== 'string') {
+            throw new Error('Invalid ReplacementResult structure');
+        }
+
+        if (this.ws && this.ws.readyState === WebSocket.OPEN && this.status === 'CONNECTED') {
+            try {
+                const message: BridgeMessage = {
+                    type: 'REPLACEMENT_RESULT',
+                    payload: result,
+                };
+                this.ws.send(JSON.stringify(message));
+                return true;
+            } catch {
+                // Fall back to REST if WS send fails
+            }
+        }
+
+        try {
+            const token = await this.resolveToken();
+            const response = await fetch(`${this.getHttpUrl()}/replacement/result`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'x-bridge-token': token,
+                },
+                body: JSON.stringify(result),
+                signal: AbortSignal.timeout(3000),
+            });
+            return response.ok;
+        } catch {
+            return false;
+        }
+    }
+
     // --- Internal Connection Logic ---
 
     private connectWebSocket(token: string): Promise<boolean> {
