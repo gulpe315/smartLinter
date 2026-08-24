@@ -5,6 +5,7 @@
 
 pub mod auth_manager;
 pub mod conflict_dispatcher;
+pub mod keyring_store;
 pub mod router;
 pub mod session;
 pub mod ws_handler;
@@ -22,6 +23,10 @@ pub use auth_manager::{
     AuthError, AuthManager,
 };
 pub use conflict_dispatcher::{ConflictDispatcher, StaleConflictEvent};
+pub use keyring_store::{
+    DEFAULT_KEYRING_SERVICE, DEFAULT_KEYRING_USER, InMemoryTokenStore, KeyringStore,
+    KeyringStoreError, SecureTokenStore,
+};
 pub use router::{create_router, ApiResponse, HealthResponse};
 pub use session::{
     BridgeEventSink, BridgeStatusEvent, BroadcastEventSink, ConnectionState, EditorSession,

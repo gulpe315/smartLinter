@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Header } from './components/layout/Header.tsx';
+import { ConnectionBanner } from './components/layout/ConnectionBanner.tsx';
 import { MainLayout } from './components/layout/MainLayout.tsx';
 import { StatusBar } from './components/layout/StatusBar.tsx';
 import { QACardList } from './components/qa/QACardList.tsx';
@@ -41,6 +42,9 @@ export const App: React.FC = () => {
     >
       {/* Top Header & Telemetry Badges */}
       <Header />
+
+      {/* Reconnecting Alert Banner (Yellow / Amber) */}
+      <ConnectionBanner />
 
       {/* Main Responsive Split QA & TM Viewport with real-time QA Card List and TM Match Panel */}
       <MainLayout qaSlot={<QACardList />} tmSlot={<TMMatchPanel />} />

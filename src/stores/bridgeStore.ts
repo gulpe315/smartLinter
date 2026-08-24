@@ -29,6 +29,9 @@ export interface BridgeState {
   activeDocument: string | null;
   sessionId: string | null;
   lastHeartbeat: number | null;
+  isReconnecting: boolean;
+  reconnectAttempt: number;
+  nextRetryDelayMs: number;
 
   // --- LLM Status ---
   llmAlive: boolean;
@@ -79,6 +82,7 @@ export interface BridgeState {
   setLastReplacementResult: (result: ReplacementResult | null) => void;
   setCommandInput: (input: string) => void;
   setIsAiProcessing: (processing: boolean) => void;
+  setReconnecting: (reconnecting: boolean, attempt?: number, delayMs?: number) => void;
   initEventListener: (service?: IBridgeService) => () => void;
   reset: () => void;
 }
@@ -89,6 +93,9 @@ const initialState = {
   activeDocument: null as string | null,
   sessionId: null as string | null,
   lastHeartbeat: null as number | null,
+  isReconnecting: false,
+  reconnectAttempt: 0,
+  nextRetryDelayMs: 0,
 
   llmAlive: false,
   llmProvider: 'ollama',
@@ -123,13 +130,28 @@ export const useBridgeStore = create<BridgeState>((set, get) => ({
   ...initialState,
 
   setEditorStatus: (status) =>
-    set((state) => ({
-      editorConnected: status.connected ?? state.editorConnected,
-      editorType: status.editorType !== undefined ? status.editorType : state.editorType,
-      activeDocument: status.activeDocument !== undefined ? status.activeDocument : state.activeDocument,
-      sessionId: status.sessionId !== undefined ? status.sessionId : state.sessionId,
-      lastHeartbeat: Date.now(),
-    })),
+    set((state) => {
+      const nextConnected = status.connected ?? state.editorConnected;
+      return {
+        editorConnected: nextConnected,
+        editorType: status.editorType !== undefined ? status.editorType : state.editorType,
+        activeDocument: status.activeDocument !== undefined ? status.activeDocument : state.activeDocument,
+        sessionId: status.sessionId !== undefined ? status.sessionId : state.sessionId,
+        lastHeartbeat: Date.now(),
+        // If connected is explicitly true, reset reconnecting state
+        ...(nextConnected
+          ? { isReconnecting: false, reconnectAttempt: 0, nextRetryDelayMs: 0 }
+          : {}),
+      };
+    }),
+
+  setReconnecting: (reconnecting, attempt = 0, delayMs = 0) =>
+    set({
+      isReconnecting: reconnecting,
+      reconnectAttempt: attempt,
+      nextRetryDelayMs: delayMs,
+      ...(reconnecting ? { editorConnected: false } : {}),
+    }),
 
   setLlmStatus: (status) =>
     set((state) => ({
