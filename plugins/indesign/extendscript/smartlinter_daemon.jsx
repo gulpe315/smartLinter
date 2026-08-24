@@ -12,6 +12,7 @@
  * - Extracts and dispatches TextFrame/Story active paragraph text and SHA-256 hashes.
  */
 
+#include "json2_polyfill.jsx"
 #include "bridge_socket.jsx"
 #include "text_observer.jsx"
 #include "transaction_runner.jsx"
