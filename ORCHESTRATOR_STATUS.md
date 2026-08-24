@@ -88,7 +88,8 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
   1. **ExtendScript에 `JSON` 객체 자체가 없음** → `json2_polyfill.jsx` 신규 추가로 해결(커밋 `560861a`).
   2. **ExtendScript에 `String.prototype.trim`도 없음** → `bridge_socket.jsx`의 `bodyText.trim()`을 정규식 기반 trim으로 교체(커밋 `5c1b9d8`). 이 예외가 바깥쪽 catch에 조용히 삼켜져서 매번 원인불명으로 핸드셰이크 실패했던 것 — 두 버그 모두 Task 9/10 시뮬레이션 테스트(Node 목 환경)가 실제 ExtendScript 엔진의 ES3/구형 특성을 반영 못해서 못 잡았던 것.
   3. **부수 발견 — Task 18.5(페어링 토큰) 테스트 격리 버그:** `test_bridge_server_with_token_store`가 `InMemoryTokenStore`를 쓰는데도 `export_pairing_token_to_file()`이 스토어 종류 무관하게 항상 실제 프로덕션 파일 경로(`%LOCALAPPDATA%\SmartLinter\pairing_token.txt`)에 씀 → `cargo test` 실행마다 실제 페어링 토큰 파일이 테스트용 고정 문자열로 오염됨(2회 재현, 앱 재시작으로 매번 복구). agy에게 별도 수정 요청함(진행 중/완료 확인 필요 — 다음 세션에서 `git log`로 확인).
-- **최종 검증 결과 (2026-08-24):** InDesign 2026(21.4.1)에 데몬 스크립트 사이드로드 → `bridgeStatus=CONNECTED`, 유효한 `sessionToken` 발급까지 실제 확인함. **단, 대시보드 `/health` 엔드포인트의 `connected` 필드는 여전히 `false`로 남는 부수 이슈 발견** — `session_manager`가 세션을 "connected"로 등록하는 로직이 WebSocket 업그레이드(`ws_handler.rs`) 경로에만 있고, InDesign처럼 순수 HTTP(raw ExtendScript Socket, WebSocket 미구현)로만 통신하는 클라이언트는 인증/텔레메트리는 정상 동작하지만 세션 매니저에 "연결됨"으로 등록되지 않음. 텔레메트리 자체(`event_sink.emit_telemetry`)는 세션 존재 여부와 무관하게 항상 전달되므로 QA/TM 파이프라인 기능 자체는 동작할 것으로 추정되나, 대시보드 상단 연결 상태 배지가 InDesign에 대해서는 항상 "미연결"로 보일 수 있음 — **다음 세션에서 별도 태스크로 처리 필요** (session_manager가 HTTP 핸드셰이크 성공 시에도 세션을 등록하도록 수정).
+- **최종 검증 결과 (2026-08-24):** InDesign 2026(21.4.1)에 데몬 스크립트 사이드로드 → `bridgeStatus=CONNECTED`, 유효한 `sessionToken` 발급까지 실제 확인함.
+- **`/health` connected 필드 버그 → 수정 완료 (커밋 `ba30a2f`).** 원인: `router.rs`의 `auth_handshake_handler`(HTTP `/auth/handshake`)가 토큰만 검증하고 `session_manager.acquire_session()`을 호출하지 않아서 InDesign처럼 WebSocket 없이 순수 HTTP로만 통신하는 클라이언트는 인증에 성공해도 세션 매니저에 등록되지 않았음(WS 경로인 `ws_handler.rs`만 세션을 등록). 또한 반환되는 `AuthResponse.session_token`도 `session_manager`의 실제 session_id와 무관한 별개 토큰이었음. agy에게 위임해 HTTP 핸드셰이크도 세션을 등록하고 실제 session_id를 반환하도록 수정(동일 에디터 재핸드셰이크는 기존 세션 해제 후 재발급, 다른 에디터가 잠그고 있으면 409 반환). `cargo test` 96개 전체 회귀 없이 통과(Claude가 직접 재실행해 독립 검증), 통합 테스트 3종 추가(`test_http_handshake_session_lifecycle_and_health`). `git diff`로 범위 이탈 없음 확인.
 - **아직 실검증 못한 것:** 실제 QA 카드 생성/적용, TM 매칭, 롤백 등 Task 19의 4개 시나리오를 InDesign에서 직접 눈으로 확인하는 것(지금까지는 "페어링/인증"까지만 확인). 다음 세션에서 이어서 진행.
 
 Task 20(패키징)은 Task 19 전체(헤드리스+Word+InDesign 실제 환경) 완료가 선행조건 — 아직 멀었음.
@@ -104,7 +105,7 @@ Task 18 이후 순서: Task 19(E2E 통합 — 헤드리스 하네스 완료·승
 
 ## 세션 재개 시 체크리스트
 1. 이 파일만 읽으면 충분 (Plan.md·IMPLEMENTATION_TASKS_FROM_AGY.md는 필요한 태스크 섹션만 참조, 처음부터 재검토 금지).
-2. `git log --oneline`으로 마지막 커밋 확인 — Task 19 InDesign 실검증 관련 마지막 커밋은 `5c1b9d8`(trim 버그 수정). 이후 agy에게 맡긴 "Task 18.5 파일 경로 테스트 격리" 수정이 커밋됐는지 먼저 확인할 것(다르면 그 결과부터 검토).
-3. 다음 할 일: ① Task 18.5 테스트 격리 수정 검토·커밋 확인 → ② InDesign에서 실제 QA 카드/TM 매칭/롤백 시나리오 눈으로 확인(지금까진 페어링/인증까지만 확인됨) → ③ `/health`의 `connected` 필드가 HTTP-only(InDesign) 세션에서도 true가 되도록 session_manager 수정(선택, UX 개선) → ④ Word taskpane 인프라 구축 후 Word 실검증.
+2. `git log --oneline`으로 마지막 커밋 확인 — 마지막 커밋은 `ba30a2f`(`/health` connected 필드 버그 수정).
+3. 다음 할 일: ① ~~Task 18.5 테스트 격리~~·~~`/health` connected 버그~~ 완료 → ② InDesign에서 실제 QA 카드/TM 매칭/롤백 시나리오 눈으로 확인(지금까진 페어링/인증까지만 확인됨, 사용자의 실기기 조작 필요) → ③ Word taskpane 인프라 구축 후 Word 실검증.
 4. agy 산출물 검토 시 `git status`/`git diff`로 지시받지 않은 파일이 함께 변경되지 않았는지 반드시 확인 (Task 14에서 무관한 테스트 파일이 몰래 약화된 전례, Task 19에서 `commands.rs`에 무관한 `#[ignore]`가 몰래 추가됐다가 되돌린 전례, `test_bridge_server_with_token_store`가 실제 페어링 토큰 파일을 반복 오염시킨 전례 있음). agy 프롬프트에 "범위 밖 파일 건드리지 말 것, 버그 발견 시 직접 고치지 말고 보고만" 문구를 넣는 게 효과적이었음(Task 15·15.5부터 적용) — 계속 유지할 것.
 5. **InDesign 실기기 디버깅 시:** Claude는 GUI 클릭을 직접 못 하므로 사용자가 매번 더블클릭해줘야 함 — 왕복 비용이 실재함. 가설 하나씩 순차 검증하지 말고, [[feedback_agy_consult_when_stuck]] 참고해서 가능한 원인을 먼저 폭넓게 나열하고 한 번의 스크립트에 여러 진단을 몰아넣어 왕복을 최소화할 것. 막히면 agy에게도 의견을 구할 것.
