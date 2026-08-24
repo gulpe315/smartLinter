@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartLinter InDesign Bridge</title>
+    <style>
+        :root {
+            --bg-color: var(--uxp-host-background-color, #232323);
+            --text-color: var(--uxp-host-text-color, #e0e0e0);
+            --card-bg: #2d2d2d;
+            --border-color: #3f3f3f;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --success-color: #22c55e;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 12px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-size: 11px;
+            box-sizing: border-box;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .pill-connected { background-color: rgba(34, 197, 94, 0.2); color: var(--success-color); border: 1px solid var(--success-color); }
+        .pill-disconnected { background-color: rgba(239, 68, 68, 0.2); color: var(--error-color); border: 1px solid var(--error-color); }
+        .pill-connecting { background-color: rgba(245, 158, 11, 0.2); color: var(--warning-color); border: 1px solid var(--warning-color); }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            font-size: 11px;
+            margin-bottom: 8px;
+            color: #f3f4f6;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .stat-label { color: #9ca3af; }
+        .stat-value { font-weight: 500; font-family: monospace; }
+
+        .input-group {
+            margin-bottom: 8px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 3px;
+            color: #9ca3af;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 5px 7px;
+            box-sizing: border-box;
+            background: #1e1e1e;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: #ffffff;
+            font-size: 11px;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        button {
+            width: 100%;
+            padding: 6px 10px;
+            background: #374151;
+            color: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 10.5px;
+            font-weight: 500;
+            transition: background 0.15s ease;
+        }
+
+        button:hover { background: #4b5563; }
+        button.primary { background: var(--accent-color); border-color: var(--accent-color); }
+        button.primary:hover { background: var(--accent-hover); }
+
+        #logBox {
+            background: #111827;
+            color: #a3e635;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9.5px;
+            height: 120px;
+            overflow-y: auto;
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #1f2937;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .footer-note {
+            margin-top: 8px;
+            font-size: 9.5px;
+            color: #6b7280;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ SmartLinter InDesign</h1>
+        <span id="bridgeStatusPill" class="status-pill pill-disconnected">Disconnected</span>
+    </div>
+
+    <!-- Daemon & Engine Status -->
+    <div class="card">
+        <div class="card-title">⚙️ Persistent Engine Status</div>
+        <div class="stat-row">
+            <span class="stat-label">Target Engine:</span>
+            <span class="stat-value" style="color: #60a5fa;">smartlinter_persistent_engine</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Daemon Idle Loop:</span>
+            <span id="daemonLoopStatus" class="stat-value" style="color: #4ade80;">Active (1000ms)</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Idle Ticks:</span>
+            <span id="statTickCount" class="stat-value">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Active Document:</span>
+            <span id="statActiveDoc" class="stat-value">-</span>
+        </div>
+    </div>
+
+    <!-- Connection Configuration -->
+    <div class="card">
+        <div class="card-title">🔌 Bridge Connection Settings</div>
+        <div class="input-group">
+            <label for="serverHost">Server Host & Port:</label>
+            <div style="display: flex; gap: 6px;">
+                <input type="text" id="serverHost" value="127.0.0.1" style="flex: 2;" />
+                <input type="number" id="serverPort" value="49152" style="flex: 1;" />
+            </div>
+        </div>
+        <div class="input-group">
+            <label for="secretToken">Pairing Token:</label>
+            <input type="password" id="secretToken" value="smartlinter-default-dev-token-secret-32b" />
+        </div>
+        <div class="button-grid">
+            <button id="btnConnect" class="primary">Connect Bridge</button>
+            <button id="btnRescan">Rescan Paragraph</button>
+        </div>
+        <div class="button-grid">
+            <button id="btnRestartDaemon">Restart Daemon</button>
+            <button id="btnClearLog">Clear Log</button>
+        </div>
+    </div>
+
+    <!-- Live Telemetry & Event Log -->
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-title" style="display: flex; justify-content: space-between;">
+            <span>📋 Bridge & Telemetry Log</span>
+            <span id="lastHash" style="font-family: monospace; font-size: 9px; color: #9ca3af;"></span>
+        </div>
+        <div id="logBox"></div>
+    </div>
+
+    <div class="footer-note">
+        Daemon runs in ExtendScript background even when panel is closed.
+    </div>
+
+    <script src="index.js"></script>
+</body>
+</html>
