@@ -458,3 +458,131 @@ async fn test_heartbeat_timeout_watchdog() {
     let _ = ws_stream.close(None).await;
     handle.shutdown().await.unwrap();
 }
+
+#[tokio::test]
+async fn test_http_handshake_session_lifecycle_and_health() {
+    let (server, auth, _sink) = start_test_server(None, None, None).await;
+    let client = reqwest::Client::new();
+    let valid_token = auth.get_token().await;
+
+    // 1. Initial health check: connected: false
+    let initial_health: serde_json::Value = client
+        .get(format!("{}/health", server.http_url()))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(initial_health["connected"], false);
+    assert!(initial_health["activeEditor"].is_null());
+    assert!(initial_health["sessionId"].is_null());
+
+    // 2. HTTP-only Handshake (InDesign) -> 200 OK
+    let indesign_handshake = AuthHandshake {
+        token: valid_token.clone(),
+        editor_type: EditorType::InDesign,
+        version: "1.0.0".to_string(),
+        client_nonce: generate_nonce(),
+    };
+
+    let res = client
+        .post(format!("{}/auth/handshake", server.http_url()))
+        .json(&indesign_handshake)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let auth_res: AuthResponse = res.json().await.unwrap();
+    assert!(auth_res.success);
+    let indesign_session_id = auth_res.session_token.expect("session_token must be present");
+
+    // 3. Verify GET /health returns connected: true, activeEditor: InDesign, sessionId matching session_token
+    let health_after_handshake: serde_json::Value = client
+        .get(format!("{}/health", server.http_url()))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(health_after_handshake["connected"], true);
+    assert_eq!(health_after_handshake["activeEditor"], "InDesign");
+    assert_eq!(health_after_handshake["sessionId"], indesign_session_id);
+
+    // 4. Conflicting Handshake from different editor (Word) while InDesign session is active -> 409 Conflict
+    let word_handshake = AuthHandshake {
+        token: valid_token.clone(),
+        editor_type: EditorType::Word,
+        version: "1.0.0".to_string(),
+        client_nonce: generate_nonce(),
+    };
+
+    let conflict_res = client
+        .post(format!("{}/auth/handshake", server.http_url()))
+        .json(&word_handshake)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(conflict_res.status(), StatusCode::CONFLICT);
+    let conflict_auth_res: AuthResponse = conflict_res.json().await.unwrap();
+    assert!(!conflict_auth_res.success);
+    assert!(conflict_auth_res.session_token.is_none());
+    assert!(conflict_auth_res
+        .message
+        .unwrap()
+        .contains("Session is already locked by active InDesign connection"));
+
+    // Health check still reflects InDesign session
+    let health_during_lock: serde_json::Value = client
+        .get(format!("{}/health", server.http_url()))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(health_during_lock["connected"], true);
+    assert_eq!(health_during_lock["activeEditor"], "InDesign");
+    assert_eq!(health_during_lock["sessionId"], indesign_session_id);
+
+    // 5. Same editor re-handshake (InDesign restarting / re-authenticating) -> 200 OK with new session_id
+    let indesign_reauth = AuthHandshake {
+        token: valid_token.clone(),
+        editor_type: EditorType::InDesign,
+        version: "1.0.1".to_string(),
+        client_nonce: generate_nonce(),
+    };
+
+    let reauth_res = client
+        .post(format!("{}/auth/handshake", server.http_url()))
+        .json(&indesign_reauth)
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(reauth_res.status(), StatusCode::OK);
+    let reauth_auth_res: AuthResponse = reauth_res.json().await.unwrap();
+    assert!(reauth_auth_res.success);
+    let new_indesign_session_id = reauth_auth_res
+        .session_token
+        .expect("new session_token must be present");
+    assert_ne!(indesign_session_id, new_indesign_session_id);
+
+    // 6. Verify GET /health reflects updated new session_id
+    let health_after_reauth: serde_json::Value = client
+        .get(format!("{}/health", server.http_url()))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(health_after_reauth["connected"], true);
+    assert_eq!(health_after_reauth["activeEditor"], "InDesign");
+    assert_eq!(health_after_reauth["sessionId"], new_indesign_session_id);
+
+    server.shutdown().await.unwrap();
+}

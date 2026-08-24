@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::protocol::{AuthHandshake, AuthResponse, ParagraphPayload, ReplacementCommand};
-use crate::server::session::SessionSnapshot;
+use crate::server::session::{SessionError, SessionSnapshot};
 use crate::server::ws_handler::ws_upgrade_handler;
 use crate::server::ServerState;
 
@@ -91,14 +91,65 @@ pub async fn health_check_handler(State(state): State<Arc<ServerState>>) -> Json
 
 /// Authentication handshake endpoint (`POST /auth/handshake`).
 ///
-/// Verifies the 32-byte crypto token and returns an `AuthResponse`.
-/// If valid, returns 200 OK; if invalid, returns 401 Unauthorized.
+/// Verifies the 32-byte crypto token, acquires an active editor session, and returns an `AuthResponse`.
+/// If valid, returns 200 OK with the active session ID; if invalid, returns 401 Unauthorized;
+/// if conflicting with another active editor, returns 409 Conflict.
 pub async fn auth_handshake_handler(
     State(state): State<Arc<ServerState>>,
     Json(handshake): Json<AuthHandshake>,
 ) -> Response {
     match state.auth_manager.verify_handshake(&handshake).await {
-        Ok(auth_res) => (StatusCode::OK, Json(auth_res)).into_response(),
+        Ok(mut auth_res) => {
+            let session_result = match state
+                .session_manager
+                .acquire_session(handshake.editor_type, None, None)
+                .await
+            {
+                Ok(session_id) => Ok(session_id),
+                Err(SessionError::SessionLocked {
+                    active_editor,
+                    session_id,
+                }) if active_editor == handshake.editor_type => {
+                    state
+                        .session_manager
+                        .release_session(&session_id, "Re-authenticated by same editor")
+                        .await;
+                    state
+                        .session_manager
+                        .acquire_session(handshake.editor_type, None, None)
+                        .await
+                }
+                Err(e) => Err(e),
+            };
+
+            match session_result {
+                Ok(session_id) => {
+                    auth_res.session_token = Some(session_id);
+                    (StatusCode::OK, Json(auth_res)).into_response()
+                }
+                Err(SessionError::SessionLocked { active_editor, .. }) => {
+                    let conflict_res = AuthResponse {
+                        success: false,
+                        session_token: None,
+                        server_nonce: None,
+                        message: Some(format!(
+                            "Session is already locked by active {} connection",
+                            active_editor
+                        )),
+                    };
+                    (StatusCode::CONFLICT, Json(conflict_res)).into_response()
+                }
+                Err(err) => {
+                    let err_res = AuthResponse {
+                        success: false,
+                        session_token: None,
+                        server_nonce: None,
+                        message: Some(format!("Failed to acquire session: {}", err)),
+                    };
+                    (StatusCode::INTERNAL_SERVER_ERROR, Json(err_res)).into_response()
+                }
+            }
+        }
         Err(err) => {
             let auth_res = AuthResponse {
                 success: false,
