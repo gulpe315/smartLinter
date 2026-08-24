@@ -311,6 +311,11 @@ graph TD
   * 메인 영역: QA 영역과 TM 영역을 좌우/상하로 분할하고, TM 미로드 시 QA 영역이 100% 가변 확장되는 레이아웃 스위처 동작.
   * 하단 영역: AI 커맨드 고정 바 배치.
   * Tauri Rust 백엔드 이벤트(`bridge-status-changed`, `new-paragraph-detected` 등)와의 실시간 상태 스토어(Zustand) 연동.
+  * **[설계 결정 완료 사항 (2026-08-24, 사용자 위임에 따른 기본값 확정)]** 핀 모드(Pin Mode, 항상 위에 표시):
+    * **배경:** 대시보드가 Word/InDesign과 별개의 창이라, 단일 모니터 사용자는 창 전환(Alt+Tab)이 잦아질 수 있음 — 사용성 저하 우려로 사용자가 명시적으로 요청한 기능.
+    * 헤더에 핀 토글 아이콘 버튼 배치. 켜면 Tauri 윈도우를 항상 위에 표시(always-on-top)로 전환.
+    * 이 단계에서는 Tauri 앱 셸(윈도우) 자체가 아직 없을 수 있으므로, 실제 `window.setAlwaysOnTop()` 같은 Tauri 윈도우 API 호출은 인터페이스로 추상화해두고, 나중에 Tauri 앱 셸이 준비되는 시점(이 태스크 내 또는 후속 보완)에 실제로 연결. 최소한 토글 UI 상태와 스토어는 이번 태스크에서 완성.
+    * (화면 가장자리 도킹/스냅 배치는 이번 태스크 범위 밖 — 필요시 후속 태스크로 분리)
 * **(4) 선행 조건/의존성:**
   * Task 3 (Tauri 백엔드 브릿지 서버)
 * **(5) 예상 산출물:**
@@ -318,6 +323,7 @@ graph TD
   * `src/components/layout/Header.tsx`
   * `src/components/layout/MainLayout.tsx`
   * `src/components/layout/StatusBar.tsx`
+  * `src/components/layout/PinToggleButton.tsx`
   * `src/stores/bridgeStore.ts`
   * `src/styles/tailwind.css`
 
