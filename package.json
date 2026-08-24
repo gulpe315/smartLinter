@@ -5,8 +5,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts tests/unit/protocol_serialization_test.ts",
-    "test:shared": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts",
+    "test": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts shared/engine/__tests__/hash_util.test.ts shared/engine/__tests__/diff_engine.test.ts shared/engine/__tests__/special_elements.test.ts tests/unit/protocol_serialization_test.ts",
+    "test:shared": "node --test --experimental-strip-types shared/protocol/__tests__/protocol_serialization.test.ts shared/engine/__tests__/hash_util.test.ts shared/engine/__tests__/diff_engine.test.ts shared/engine/__tests__/special_elements.test.ts",
+    "test:engine": "node --test --experimental-strip-types shared/engine/__tests__/hash_util.test.ts shared/engine/__tests__/diff_engine.test.ts shared/engine/__tests__/special_elements.test.ts",
     "test:unit": "node --test --experimental-strip-types tests/unit/protocol_serialization_test.ts"
   },
   "keywords": [
