@@ -68,6 +68,14 @@ export interface QaReportPayload {
   report: QaReport;
 }
 
+/** AI Command natural language query result */
+export interface AiCommandResult {
+  suggestedText: string;
+  durationMs?: number;
+  model?: string;
+  error?: string;
+}
+
 /** Supported Bridge Event Map */
 export interface BridgeEventMap {
   'bridge-status-changed': BridgeStatusPayload;
@@ -100,6 +108,9 @@ export interface IBridgeService {
 
   /** Analyzes paragraph text with LLM and returns structured QaReport */
   analyzeParagraph(paragraph: ParagraphPayload): Promise<QaReport>;
+
+  /** Executes an interactive AI natural language revision command on a paragraph */
+  executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult>;
 
   /** Fetches installed Ollama models via GET /api/tags or Tauri backend */
   fetchOllamaModels(host?: string): Promise<ModelInfo[]>;
@@ -332,6 +343,61 @@ export class MockBridgeService implements IBridgeService {
       report,
     });
     return report;
+  }
+
+  async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {
+    const text = paragraph?.text || '';
+    let suggestedText = text;
+    const lower = instruction.toLowerCase();
+
+    if (lower.includes('간결') || lower.includes('요약')) {
+      suggestedText = text
+        .replace(/업데이트되어지게 됩니다/g, '업데이트됩니다')
+        .replace(/수행되어질 수 있도록 조치하여 주시기 바랍니다/g, '수행해 주십시오')
+        .replace(/확인하는 것이 필요합니다/g, '확인하십시오')
+        .replace(/를 통하여/g, '로')
+        .replace(/에 대하여/g, '에 대해');
+      if (suggestedText === text && text.length > 0) {
+        suggestedText = text.replace(/\s+/g, ' ').trim();
+      }
+    } else if (lower.includes('능동태') || lower.includes('피동')) {
+      suggestedText = text
+        .replace(/업데이트되어지게 됩니다/g, '업데이트합니다')
+        .replace(/변경되어졌습니다/g, '변경했습니다')
+        .replace(/처리되어집니다/g, '처리합니다')
+        .replace(/생성되어지도록/g, '생성하도록');
+      if (suggestedText === text && text.length > 0) {
+        suggestedText = text.replace(/되었습니다/g, '했습니다');
+      }
+    } else if (lower.includes('용어') || lower.includes('표준화') || lower.includes('통일')) {
+      suggestedText = text
+        .replace(/레플리카 카운트/g, '복제본 수')
+        .replace(/로드 밸런서/g, '부하 분산기')
+        .replace(/인스턴스/g, '가상 서버')
+        .replace(/오토 스케일링/g, '자동 확장');
+      if (suggestedText === text && text.length > 0) {
+        suggestedText = text.replace(/마스터/g, '주(Primary)');
+      }
+    } else if (lower.includes('맞춤법') || lower.includes('띄어쓰기')) {
+      suggestedText = text
+        .replace(/3 으로/g, '3으로')
+        .replace(/설정 하세요 \./g, '설정하세요.')
+        .replace(/수정 되어/g, '수정되어');
+    } else {
+      if (text.includes('업데이트되어지게 됩니다')) {
+        suggestedText = text.replace(/업데이트되어지게 됩니다/g, '업데이트됩니다');
+      } else if (text.includes('레플리카 카운트')) {
+        suggestedText = text.replace(/레플리카 카운트/g, '복제본 수');
+      } else if (text.length > 0) {
+        suggestedText = text;
+      }
+    }
+
+    return {
+      suggestedText,
+      durationMs: 120,
+      model: this.currentModel || 'qwen2.5:7b',
+    };
   }
 
   async sendReplacementCommand(command: ReplacementCommand): Promise<ReplacementResult> {
@@ -594,6 +660,23 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     return this.fallbackService.analyzeParagraph(paragraph);
+  }
+
+  async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.executeAiCommand(instruction, paragraph);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('execute_ai_command', { instruction, paragraph });
+      }
+    } catch (e) {
+      console.warn('Tauri invoke execute_ai_command failed, using fallback:', e);
+    }
+
+    return this.fallbackService.executeAiCommand(instruction, paragraph);
   }
 
 
