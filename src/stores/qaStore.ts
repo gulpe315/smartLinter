@@ -30,6 +30,7 @@ import {
   normalizeSeverity,
 } from '../types/qa.ts';
 import { getStaleConflictResolver } from '../services/stale_conflict_resolver.ts';
+import { getRollbackGuard } from '../services/rollback_guard.ts';
 
 export interface AcceptCardOptions {
   autoResolveStale?: boolean;
@@ -234,18 +235,15 @@ export const useQaStore = create<QAState>((set, get) => ({
           service: bridgeService,
         });
       } else {
-        // Mark as failed with message
-        set((state) => ({
-          cards: state.cards.map((c) =>
-            c.id === cardId
-              ? {
-                  ...c,
-                  status: 'failed',
-                  errorMessage: result.message || `치환 실패 (${result.status})`,
-                }
-              : c
-          ),
-        }));
+        // Handle FAILED, ROLLBACK_ABORTED, ROLLED_BACK, or other errors with RollbackGuard
+        await getRollbackGuard().handleReplacementResult({
+          cardId,
+          result,
+          suggestedText: card.suggestedSegment,
+          originalText: card.originalSegment,
+          paragraphId: card.paragraphId,
+          service: bridgeService,
+        });
       }
 
       return result;
@@ -344,6 +342,11 @@ export const useQaStore = create<QAState>((set, get) => ({
     // Subscribe to stale replacement conflicts for automatic resolution
     unlisteners.push(
       getStaleConflictResolver().initEventListener(bridgeService)
+    );
+
+    // Subscribe to rollback failure and abortion guard listener
+    unlisteners.push(
+      getRollbackGuard().initEventListener(bridgeService)
     );
 
     return () => {

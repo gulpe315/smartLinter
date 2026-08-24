@@ -19,7 +19,9 @@ export type QACardStatus =
   | 'dismissed'
   | 'failed'
   | 'stale_refreshing'
-  | 'stale_rejected';
+  | 'stale_rejected'
+  | 'rollback_aborted'
+  | 'rolled_back';
 
 /** Enhanced QA Card representation for the UI */
 export interface QACardData {
@@ -38,6 +40,8 @@ export interface QACardData {
   isStale?: boolean;
   isRefreshing?: boolean;
   staleMessage?: string;
+  rollbackStatus?: 'FAILED' | 'ROLLBACK_ABORTED' | 'ROLLED_BACK';
+  rollbackMessage?: string;
 }
 
 /** Severity filter options for the QA Card List */

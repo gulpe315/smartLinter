@@ -26,6 +26,7 @@ import {
 } from '../../types/qa.ts';
 import { InlineDiffViewer } from './InlineDiffViewer.tsx';
 import { StaleNotificationBadge } from './StaleNotificationBadge.tsx';
+import { RollbackAlertCard } from './RollbackAlertCard.tsx';
 
 export interface QACardItemProps {
   card: QACardData;
@@ -178,14 +179,22 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         />
       </div>
 
-      {/* Error Message if Failed */}
-      {card.status === 'failed' && card.errorMessage && (
-        <div
-          data-testid="qa-card-error-alert"
-          className="mb-3 p-2.5 rounded-lg bg-rose-950/60 border border-rose-800/80 flex items-center gap-2 text-xs text-rose-300"
-        >
-          <AlertCircle className="w-4 h-4 text-rose-400 flex-none" />
-          <span>{card.errorMessage}</span>
+      {/* Rollback Alert & Fallback Card (Task 17 UX) */}
+      {(card.rollbackStatus || card.status === 'failed' || card.status === 'rollback_aborted' || card.status === 'rolled_back') && (
+        <div data-testid={card.status === 'failed' ? 'qa-card-error-alert' : undefined} className="mb-3">
+          <RollbackAlertCard
+            status={
+              card.rollbackStatus ||
+              (card.status === 'rollback_aborted'
+                ? 'ROLLBACK_ABORTED'
+                : card.status === 'rolled_back'
+                ? 'ROLLED_BACK'
+                : 'FAILED')
+            }
+            message={card.rollbackMessage || card.errorMessage}
+            suggestedText={card.suggestedSegment}
+            originalText={card.originalSegment}
+          />
         </div>
       )}
 

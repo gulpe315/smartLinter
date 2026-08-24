@@ -120,4 +120,38 @@ describe('QACardItem Component', () => {
     const acceptBtn = screen.getByTestId('qa-accept-action-btn');
     expect(acceptBtn).toBeDisabled();
   });
+
+  it('renders RollbackAlertCard with copy button when rollbackStatus is FAILED', () => {
+    const failedRollbackCard: QACardData = {
+      ...sampleCard,
+      status: 'failed',
+      rollbackStatus: 'FAILED',
+      rollbackMessage: '⚠️ 서식이 복잡하여 자동 교체에 실패했습니다. 수동으로 확인해 주세요.',
+    };
+
+    render(<QACardItem card={failedRollbackCard} />);
+
+    expect(screen.getByTestId('rollback-alert-card')).toBeInTheDocument();
+    expect(screen.getByTestId('rollback-alert-message')).toHaveTextContent(
+      '서식이 복잡하여 자동 교체에 실패했습니다. 수동으로 확인해 주세요.'
+    );
+    expect(screen.getByTestId('clipboard-copy-button')).toBeInTheDocument();
+  });
+
+  it('renders RollbackAlertCard with safe abort notice when rollbackStatus is ROLLBACK_ABORTED', () => {
+    const abortedCard: QACardData = {
+      ...sampleCard,
+      status: 'rollback_aborted',
+      rollbackStatus: 'ROLLBACK_ABORTED',
+      rollbackMessage: '사용자 편집이 감지되어 자동 롤백을 안전하게 건너뛰었습니다. 🔄',
+    };
+
+    render(<QACardItem card={abortedCard} />);
+
+    expect(screen.getByTestId('rollback-alert-card')).toBeInTheDocument();
+    expect(screen.getByTestId('rollback-alert-message')).toHaveTextContent(
+      '사용자 편집이 감지되어 자동 롤백을 안전하게 건너뛰었습니다. 🔄'
+    );
+    expect(screen.getByTestId('rollback-alert-icon-aborted')).toBeInTheDocument();
+  });
 });
