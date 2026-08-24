@@ -131,7 +131,11 @@ graph TD
   * `SmartLinter_Plan.md` > `4. 로컬 하드웨어(VRAM/RAM) 다운 방지 최적화 전략` > `1, 2`
   * `SPIKE_RESULTS_TASK3.md` > `6.2. 8GB VRAM 하드웨어 예산 및 공유 검증`
 * **(3) 완료조건 (Acceptance Criteria):**
-  * Ollama REST API (`http://127.0.0.1:11434/api/generate` 및 `/api/chat`) 비동기 호출 클라이언트 완성.
+  * **[설계 결정 완료 사항 (2026-08-24, 사용자 위임에 따른 기본값 확정)]** 로컬 LLM 백엔드는 향후 Ollama 외 다른 런타임(LM Studio 등)으로 확장 가능하도록 **`LocalLlmProvider` 트레이트로 추상화**해야 함:
+    * 트레이트에 최소 `health_check()`, `list_models()`, `generate_stream(prompt, options)` 메서드를 정의하고, `OllamaProvider`를 그 구현체로 작성.
+    * `MicroScopingQueue` 등 상위 로직은 구체 타입(Ollama)이 아니라 이 트레이트에만 의존하도록 작성.
+    * 이번 태스크에서는 `OllamaProvider` 구현체 하나만 실제로 만들고 테스트함(스파이크 3의 실측 벤치마크도 Ollama 기준이므로). LM Studio 등 다른 프로바이더 구현은 범위 밖 — 트레이트만 확장 가능하게 열어두고 실제 구현은 나중 태스크로 미룸.
+  * Ollama REST API (`http://127.0.0.1:11434/api/generate` 및 `/api/chat`) 비동기 호출 클라이언트 완성 (`OllamaProvider`로 구현).
   * Ollama 데몬 헬스체크 및 모델(`qwen2.5:7b` 등) 로드 상태 실시간 감지.
   * **[설계 결정 완료 사항 (2026-08-24, 사용자 위임에 따른 기본값 확정)]** 모델은 하드코딩하지 않고 **런타임에 설치된 Ollama 모델 중에서 자유 선택** 가능해야 함:
     * `GET /api/tags`로 로컬에 설치된 Ollama 모델 목록(이름, 파라미터 크기, 양자화 레벨, 대략적 디스크/VRAM 용량)을 조회하는 API 완성.
@@ -144,7 +148,8 @@ graph TD
   * Task 1 (데이터 모델)
 * **(5) 예상 산출물:**
   * `src-tauri/src/ai/mod.rs`
-  * `src-tauri/src/ai/ollama_client.rs`
+  * `src-tauri/src/ai/provider.rs` (`LocalLlmProvider` 트레이트)
+  * `src-tauri/src/ai/ollama_client.rs` (`OllamaProvider` 구현체)
   * `src-tauri/src/ai/micro_queue.rs`
   * `src-tauri/src/ai/types.rs`
   * `src-tauri/tests/micro_queue_test.rs`
