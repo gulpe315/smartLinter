@@ -73,4 +73,31 @@ describe('SmartLinter Dashboard App Full Integration', () => {
 
     expect(screen.getByText('클라우드 인프라가 배포되었습니다.')).toBeInTheDocument();
   });
+
+  it('supports pin mode toggle in header and updates mock bridge service', () => {
+    render(<App />);
+
+    const pinBtn = screen.getByTestId('pin-toggle-btn');
+    expect(pinBtn).toBeInTheDocument();
+    expect(pinBtn).toHaveTextContent('핀 고정');
+    expect(mockBridge.isAlwaysOnTop()).toBe(false);
+
+    // Toggle on
+    act(() => {
+      pinBtn.click();
+    });
+
+    expect(pinBtn).toHaveTextContent('핀 고정됨');
+    expect(mockBridge.isAlwaysOnTop()).toBe(true);
+    expect(useBridgeStore.getState().pinned).toBe(true);
+
+    // Toggle off
+    act(() => {
+      pinBtn.click();
+    });
+
+    expect(pinBtn).toHaveTextContent('핀 고정');
+    expect(mockBridge.isAlwaysOnTop()).toBe(false);
+    expect(useBridgeStore.getState().pinned).toBe(false);
+  });
 });

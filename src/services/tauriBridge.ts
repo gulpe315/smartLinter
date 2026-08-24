@@ -80,6 +80,9 @@ export interface IBridgeService {
   /** Aborts ongoing batch scan */
   abortBatchScan(): Promise<boolean>;
 
+  /** Sets always-on-top window pin state (Pin Mode) */
+  setAlwaysOnTop(pinned: boolean): Promise<boolean>;
+
   /** Disconnects all listeners and cleans up resources */
   destroy(): void;
 }
@@ -89,6 +92,7 @@ export interface IBridgeService {
  */
 export class MockBridgeService implements IBridgeService {
   private listeners: Map<string, Set<(payload: any) => void>> = new Map();
+  private alwaysOnTop = false;
 
   listen<K extends BridgeEventName>(event: K, handler: BridgeEventHandler<K>): () => void {
     if (!this.listeners.has(event)) {
@@ -143,6 +147,16 @@ export class MockBridgeService implements IBridgeService {
       isAborted: true,
     });
     return true;
+  }
+
+  async setAlwaysOnTop(pinned: boolean): Promise<boolean> {
+    this.alwaysOnTop = pinned;
+    console.log(`[MockBridgeService] setAlwaysOnTop: ${pinned}`);
+    return this.alwaysOnTop;
+  }
+
+  isAlwaysOnTop(): boolean {
+    return this.alwaysOnTop;
   }
 
   destroy(): void {
@@ -273,6 +287,26 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     return this.fallbackService.abortBatchScan();
+  }
+
+  async setAlwaysOnTop(pinned: boolean): Promise<boolean> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.setAlwaysOnTop(pinned);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.window?.getCurrentWindow) {
+        await tauri.window.getCurrentWindow().setAlwaysOnTop(pinned);
+        return true;
+      } else if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('set_always_on_top', { pinned });
+      }
+    } catch (e) {
+      console.warn('Tauri invoke setAlwaysOnTop failed, using fallback:', e);
+    }
+
+    return this.fallbackService.setAlwaysOnTop(pinned);
   }
 
   destroy(): void {

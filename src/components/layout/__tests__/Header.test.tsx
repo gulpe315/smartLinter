@@ -124,4 +124,26 @@ describe('Header Component', () => {
     expect(progressContainer).toHaveTextContent('대용량 문서 일괄 분석 중... (45 / 100 문단)');
     expect(progressContainer).toHaveTextContent('45%');
   });
+
+  it('renders pin mode toggle button and toggles state on click', () => {
+    render(<Header />);
+
+    const pinBtn = screen.getByTestId('pin-toggle-btn');
+    expect(pinBtn).toBeInTheDocument();
+    expect(pinBtn).toHaveTextContent('핀 고정');
+    expect(pinBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(useBridgeStore.getState().pinned).toBe(false);
+
+    fireEvent.click(pinBtn);
+
+    expect(pinBtn).toHaveTextContent('핀 고정됨');
+    expect(pinBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(useBridgeStore.getState().pinned).toBe(true);
+
+    fireEvent.click(pinBtn);
+
+    expect(pinBtn).toHaveTextContent('핀 고정');
+    expect(pinBtn).toHaveAttribute('aria-pressed', 'false');
+    expect(useBridgeStore.getState().pinned).toBe(false);
+  });
 });

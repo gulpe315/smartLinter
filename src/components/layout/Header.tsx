@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
+import { PinToggleButton } from './PinToggleButton.tsx';
 
 export const Header: React.FC = () => {
   const {
@@ -164,6 +165,9 @@ export const Header: React.FC = () => {
 
         {/* Right: Layout Switcher & Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Always-on-top Pin Mode Toggle Button */}
+          <PinToggleButton />
+
           {/* Layout Split Mode Switcher (Horizontal vs Vertical) */}
           <button
             type="button"

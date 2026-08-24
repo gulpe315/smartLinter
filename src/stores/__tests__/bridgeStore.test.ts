@@ -24,6 +24,7 @@ describe('SmartLinter Bridge Zustand Store', () => {
     expect(state.tmLoaded).toBe(false);
     expect(state.tmEntriesCount).toBe(0);
     expect(state.splitMode).toBe('horizontal');
+    expect(state.pinned).toBe(false);
     expect(state.paragraphs).toEqual([]);
     expect(state.activeParagraph).toBeNull();
   });
@@ -86,6 +87,35 @@ describe('SmartLinter Bridge Zustand Store', () => {
 
     useBridgeStore.getState().setSplitMode('vertical');
     expect(useBridgeStore.getState().splitMode).toBe('vertical');
+  });
+
+  it('should toggle and set pin mode (always-on-top) and call bridgeService', async () => {
+    // Set default bridge service to mockService
+    const { setBridgeService } = await import('../../services/tauriBridge.ts');
+    setBridgeService(mockService);
+
+    expect(useBridgeStore.getState().pinned).toBe(false);
+    expect(mockService.isAlwaysOnTop()).toBe(false);
+
+    // Toggle on
+    useBridgeStore.getState().togglePin();
+    expect(useBridgeStore.getState().pinned).toBe(true);
+    expect(mockService.isAlwaysOnTop()).toBe(true);
+
+    // Toggle off
+    useBridgeStore.getState().togglePin();
+    expect(useBridgeStore.getState().pinned).toBe(false);
+    expect(mockService.isAlwaysOnTop()).toBe(false);
+
+    // Explicit setPinned(true)
+    useBridgeStore.getState().setPinned(true);
+    expect(useBridgeStore.getState().pinned).toBe(true);
+    expect(mockService.isAlwaysOnTop()).toBe(true);
+
+    // Explicit setPinned(false)
+    useBridgeStore.getState().setPinned(false);
+    expect(useBridgeStore.getState().pinned).toBe(false);
+    expect(mockService.isAlwaysOnTop()).toBe(false);
   });
 
   it('should manage paragraphs telemetry and deduplicate by paragraphId', () => {

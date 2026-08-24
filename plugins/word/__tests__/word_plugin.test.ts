@@ -95,6 +95,7 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
             // Verify Office.addin.hide() was called immediately
             assert.equal(env.office.addin.hideCallCount, 1);
             assert.equal(runtime.getVisibility(), 'Hidden');
+            await runtime.shutdown();
         });
 
         it('should track visibility mode changes dynamically', async () => {

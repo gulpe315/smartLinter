@@ -51,8 +51,9 @@ export interface BridgeState {
   batchPercent: number;
   batchAborted: boolean;
 
-  // --- Layout Configuration ---
+  // --- Layout Configuration & Window State ---
   splitMode: SplitLayoutMode;
+  pinned: boolean;
 
   // --- Telemetry & Active Paragraph ---
   activeParagraph: ParagraphPayload | null;
@@ -71,6 +72,8 @@ export interface BridgeState {
   setBatchScanProgress: (progress: Partial<BatchScanProgressPayload>) => void;
   setSplitMode: (mode: SplitLayoutMode) => void;
   toggleSplitMode: () => void;
+  setPinned: (pinned: boolean) => void;
+  togglePin: () => void;
   addParagraph: (payload: ParagraphPayload) => void;
   setActiveParagraph: (paragraph: ParagraphPayload | null) => void;
   setLastReplacementResult: (result: ReplacementResult | null) => void;
@@ -106,6 +109,7 @@ const initialState = {
   batchAborted: false,
 
   splitMode: 'horizontal' as SplitLayoutMode,
+  pinned: false,
 
   activeParagraph: null as ParagraphPayload | null,
   paragraphs: [] as ParagraphPayload[],
@@ -166,6 +170,21 @@ export const useBridgeStore = create<BridgeState>((set, get) => ({
     set((state) => ({
       splitMode: state.splitMode === 'horizontal' ? 'vertical' : 'horizontal',
     })),
+
+  setPinned: (pinned) => {
+    set({ pinned });
+    getBridgeService().setAlwaysOnTop(pinned).catch((err) => {
+      console.warn('Failed to set always on top:', err);
+    });
+  },
+
+  togglePin: () => {
+    const nextPinned = !get().pinned;
+    set({ pinned: nextPinned });
+    getBridgeService().setAlwaysOnTop(nextPinned).catch((err) => {
+      console.warn('Failed to toggle always on top:', err);
+    });
+  },
 
   addParagraph: (payload) =>
     set((state) => {
