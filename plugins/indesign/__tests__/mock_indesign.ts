@@ -2,17 +2,50 @@
  * Mock InDesign ExtendScript & UXP Environment for Headless Unit/Integration Testing
  * 
  * Accurately simulates InDesign's:
+ * - `app.doScript` with `UndoModes.ENTIRE_SCRIPT` atomic snapshot rollback
  * - `app.idleTasks` collection and IdleEvent lifecycle
- * - `app.documents` and `app.selection` (TextFrame, Story, Paragraph)
+ * - `app.documents` and `app.selection` (TextFrame, Story, Paragraph, Characters, Styles)
+ * - Character Style and Paragraph Style preservation
  * - ExtendScript `Socket` class for raw HTTP/TCP communication
  * - Native InDesign DOM events (`afterSelectionChanged`, `afterAttributeChanged`)
  */
 
+export interface MockCharacterStyle {
+    name: string;
+}
+
+export interface MockParagraphStyle {
+    name: string;
+}
+
+export interface MockHyperlink {
+    sourceText: string;
+    destinationURL: string;
+}
+
+export interface MockStyledRun {
+    start: number;
+    end: number;
+    characterStyle: string;
+}
+
+export interface MockCharacterRange {
+    contents: string;
+    appliedCharacterStyle?: MockCharacterStyle;
+}
+
 export interface MockParagraph {
     contents: string;
     parentStory?: { id: string };
+    appliedParagraphStyle?: MockParagraphStyle;
+    characterRuns?: MockStyledRun[];
+    hyperlinks?: MockHyperlink[];
+    insertionPoints?: Array<{
+        get contents(): string;
+        set contents(val: string);
+    }>;
     characters?: {
-        itemByRange: (start: number, end: number) => { contents: string };
+        itemByRange: (start: number, end: number) => MockCharacterRange;
     };
 }
 
@@ -36,6 +69,17 @@ export interface MockIdleTask {
     removeEventListener: (eventType: string, handler: (event: any) => void) => void;
     remove: () => void;
 }
+
+export const MockUndoModes = {
+    ENTIRE_SCRIPT: 'ENTIRE_SCRIPT',
+    FAST_ENTIRE_SCRIPT: 'FAST_ENTIRE_SCRIPT',
+    AUTO_UNDO: 'AUTO_UNDO',
+    SCRIPT_REQUEST: 'SCRIPT_REQUEST'
+};
+
+export const MockScriptLanguage = {
+    JAVASCRIPT: 'JAVASCRIPT'
+};
 
 export class MockSocket {
     public timeout = 3;
@@ -94,12 +138,24 @@ export class MockSocket {
     }
 }
 
+export interface DoScriptCallRecord {
+    script: any;
+    language: any;
+    args: any[];
+    undoMode: any;
+    undoName: string;
+    success: boolean;
+    error?: string;
+    rolledBack: boolean;
+}
+
 export class MockInDesignEnvironment {
     public documents: MockDocument[] = [];
     public activeDocument: MockDocument | null = null;
     public selection: any[] = [];
     public idleTaskList: Map<string, MockIdleTask> = new Map();
     public appListeners: Map<string, Array<(event: any) => void>> = new Map();
+    public doScriptHistory: DoScriptCallRecord[] = [];
 
     public socketInstances: MockSocket[] = [];
     public socketHandler?: (req: string) => string;
@@ -111,27 +167,116 @@ export class MockInDesignEnvironment {
         this.setSelectionText(initialText, docName);
     }
 
-    public setSelectionText(text: string, docName?: string, storyId = 'story-100'): void {
-        if (docName && this.activeDocument) {
-            this.activeDocument.name = docName;
-        }
+    public createParagraph(
+        text: string,
+        storyId = 'story-100',
+        options: {
+            paragraphStyle?: string;
+            characterRuns?: MockStyledRun[];
+            hyperlinks?: MockHyperlink[];
+        } = {}
+    ): MockParagraph {
+        const paraStyle: MockParagraphStyle = { name: options.paragraphStyle || 'BodyText' };
+        let characterRuns: MockStyledRun[] = options.characterRuns
+            ? JSON.parse(JSON.stringify(options.characterRuns))
+            : [{ start: 0, end: text.length, characterStyle: '[None]' }];
+        let hyperlinks: MockHyperlink[] = options.hyperlinks
+            ? JSON.parse(JSON.stringify(options.hyperlinks))
+            : [];
 
         const paragraph: MockParagraph = {
             contents: text,
             parentStory: { id: storyId },
-            characters: {
-                itemByRange: (start: number, end: number) => {
-                    const slice = text.substring(start, end + 1);
+            appliedParagraphStyle: paraStyle,
+            characterRuns: characterRuns,
+            hyperlinks: hyperlinks
+        };
+
+        // InsertionPoints
+        paragraph.insertionPoints = new Proxy([], {
+            get(_target, prop) {
+                const idx = typeof prop === 'string' ? parseInt(prop, 10) : NaN;
+                if (!isNaN(idx)) {
                     return {
-                        get contents() { return slice; },
+                        get contents() { return ''; },
                         set contents(val: string) {
-                            text = text.substring(0, start) + val + text.substring(end + 1);
+                            const current = paragraph.contents;
+                            const clamped = Math.max(0, Math.min(idx, current.length));
+                            paragraph.contents = current.substring(0, clamped) + val + current.substring(clamped);
                         }
                     };
                 }
+                if (prop === 'length') {
+                    return paragraph.contents.length + 1;
+                }
+                return (_target as any)[prop];
+            }
+        });
+
+        // Characters & itemByRange
+        paragraph.characters = {
+            itemByRange: (start: number, end: number) => {
+                const slice = paragraph.contents.substring(start, end + 1);
+
+                // Find predominant character style in range
+                let foundStyle = '[None]';
+                if (paragraph.characterRuns) {
+                    for (const run of paragraph.characterRuns) {
+                        if (start >= run.start && start < run.end) {
+                            foundStyle = run.characterStyle;
+                            break;
+                        }
+                    }
+                }
+
+                return {
+                    get contents() {
+                        return paragraph.contents.substring(start, end + 1);
+                    },
+                    set contents(val: string) {
+                        const before = paragraph.contents.substring(0, start);
+                        const after = paragraph.contents.substring(end + 1);
+                        paragraph.contents = before + val + after;
+
+                        // Update characterRuns offsets
+                        if (paragraph.characterRuns) {
+                            const oldLen = end - start + 1;
+                            const diff = val.length - oldLen;
+                            for (const run of paragraph.characterRuns) {
+                                if (run.start > end) {
+                                    run.start += diff;
+                                    run.end += diff;
+                                } else if (run.end >= end) {
+                                    run.end += diff;
+                                }
+                            }
+                        }
+                    },
+                    get appliedCharacterStyle() {
+                        return { name: foundStyle };
+                    }
+                };
             }
         };
 
+        return paragraph;
+    }
+
+    public setSelectionText(
+        text: string,
+        docName?: string,
+        storyId = 'story-100',
+        options: {
+            paragraphStyle?: string;
+            characterRuns?: MockStyledRun[];
+            hyperlinks?: MockHyperlink[];
+        } = {}
+    ): MockParagraph {
+        if (docName && this.activeDocument) {
+            this.activeDocument.name = docName;
+        }
+
+        const paragraph = this.createParagraph(text, storyId, options);
         const frame: MockTextFrame = {
             paragraphs: [paragraph],
             texts: [{ paragraphs: [paragraph] }],
@@ -139,6 +284,17 @@ export class MockInDesignEnvironment {
         };
 
         this.selection = [frame];
+        return paragraph;
+    }
+
+    public getSelectedParagraph(): MockParagraph | null {
+        if (this.selection.length > 0) {
+            const item = this.selection[0];
+            if (item.paragraphs && item.paragraphs.length > 0) {
+                return item.paragraphs[0];
+            }
+        }
+        return null;
     }
 
     public createSocketFactory(): () => MockSocket {
@@ -152,12 +308,88 @@ export class MockInDesignEnvironment {
         };
     }
 
+    public takeStateSnapshot(): Array<{ target: MockParagraph; contents: string; runs?: any[]; hyperlinks?: any[] }> {
+        const snapshot: Array<{ target: MockParagraph; contents: string; runs?: any[]; hyperlinks?: any[] }> = [];
+        for (const item of this.selection) {
+            if (item && item.paragraphs) {
+                for (const p of item.paragraphs) {
+                    snapshot.push({
+                        target: p,
+                        contents: p.contents,
+                        runs: p.characterRuns ? JSON.parse(JSON.stringify(p.characterRuns)) : undefined,
+                        hyperlinks: p.hyperlinks ? JSON.parse(JSON.stringify(p.hyperlinks)) : undefined
+                    });
+                }
+            }
+        }
+        return snapshot;
+    }
+
+    public restoreStateSnapshot(snapshot: Array<{ target: MockParagraph; contents: string; runs?: any[]; hyperlinks?: any[] }>): void {
+        for (const entry of snapshot) {
+            entry.target.contents = entry.contents;
+            if (entry.runs) {
+                entry.target.characterRuns = JSON.parse(JSON.stringify(entry.runs));
+            }
+            if (entry.hyperlinks) {
+                entry.target.hyperlinks = JSON.parse(JSON.stringify(entry.hyperlinks));
+            }
+        }
+    }
+
     public getApp(): any {
         const self = this;
         return {
             get documents() { return self.documents; },
             get activeDocument() { return self.activeDocument; },
             get selection() { return self.selection; },
+
+            doScript(
+                callback: () => any,
+                scriptLanguage = MockScriptLanguage.JAVASCRIPT,
+                args: any[] = [],
+                undoMode = MockUndoModes.ENTIRE_SCRIPT,
+                undoName = 'SmartLinter Multi-Hunk Replace'
+            ): any {
+                const snapshot = self.takeStateSnapshot();
+                const isAtomic = (undoMode === MockUndoModes.ENTIRE_SCRIPT ||
+                                  undoMode === MockUndoModes.FAST_ENTIRE_SCRIPT ||
+                                  undoMode === 'ENTIRE_SCRIPT' ||
+                                  undoMode === 'FAST_ENTIRE_SCRIPT');
+
+                try {
+                    let result: any;
+                    if (typeof callback === 'function') {
+                        result = callback.apply(null, args);
+                    }
+                    self.doScriptHistory.push({
+                        script: callback,
+                        language: scriptLanguage,
+                        args,
+                        undoMode,
+                        undoName,
+                        success: true,
+                        rolledBack: false
+                    });
+                    return result;
+                } catch (err: any) {
+                    if (isAtomic) {
+                        self.restoreStateSnapshot(snapshot);
+                    }
+                    self.doScriptHistory.push({
+                        script: callback,
+                        language: scriptLanguage,
+                        args,
+                        undoMode,
+                        undoName,
+                        success: false,
+                        error: err.message,
+                        rolledBack: isAtomic
+                    });
+                    // Native InDesign doScript re-throws the error to the outer caller
+                    throw err;
+                }
+            },
 
             idleTasks: {
                 itemByName(name: string): MockIdleTask {

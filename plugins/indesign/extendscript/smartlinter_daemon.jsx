@@ -14,6 +14,8 @@
 
 #include "bridge_socket.jsx"
 #include "text_observer.jsx"
+#include "transaction_runner.jsx"
+#include "atomic_replacer.jsx"
 
 (function(global) {
     'use strict';
@@ -62,6 +64,22 @@
             });
         } else {
             this.textObserver = null;
+        }
+
+        var ReplacerClass = (typeof SmartLinterAtomicReplacer !== 'undefined')
+            ? SmartLinterAtomicReplacer
+            : (global.SmartLinterAtomicReplacer || null);
+
+        if (config.replacer) {
+            this.replacer = config.replacer;
+        } else if (ReplacerClass) {
+            this.replacer = new ReplacerClass({
+                appInstance: config.appInstance || (typeof app !== 'undefined' ? app : null),
+                bridgeSocket: this.bridgeSocket,
+                textObserver: this.textObserver
+            });
+        } else {
+            this.replacer = null;
         }
 
         this.appInstance = config.appInstance || (typeof app !== 'undefined' ? app : null);
@@ -204,7 +222,7 @@
             } catch (e) {}
         }
 
-        if (this.bridgeSocket) {
+        if (this.bridgeSocket && typeof this.bridgeSocket.disconnect === 'function') {
             this.bridgeSocket.disconnect();
         }
 
@@ -215,7 +233,7 @@
      * Attempts handshake connection to bridge server.
      */
     SmartLinterDaemon.prototype.attemptConnection = function() {
-        if (!this.bridgeSocket) return false;
+        if (!this.bridgeSocket || typeof this.bridgeSocket.handshake !== 'function') return false;
         this.lastConnectAttemptTime = (new Date()).getTime();
         var success = this.bridgeSocket.handshake();
         if (success) {
@@ -307,6 +325,49 @@
             sessionToken: this.bridgeSocket ? this.bridgeSocket.sessionToken : null,
             lastSentPayload: this.textObserver ? this.textObserver.lastSentPayload : null,
             lastHeartbeatTime: this.lastHeartbeatTime
+        };
+    };
+
+    /**
+     * Executes atomic text replacement on the active InDesign paragraph.
+     * @param {Object|string} command ReplacementCommand
+     * @param {Object} [options]
+     * @returns {Object} ReplacementResult
+     */
+    SmartLinterDaemon.prototype.executeReplacement = function(command, options) {
+        options = options || {};
+        if (!this.replacer) {
+            var ReplacerClass = (typeof SmartLinterAtomicReplacer !== 'undefined')
+                ? SmartLinterAtomicReplacer
+                : (global.SmartLinterAtomicReplacer || null);
+            if (ReplacerClass) {
+                this.replacer = new ReplacerClass({
+                    appInstance: this.appInstance,
+                    bridgeSocket: this.bridgeSocket,
+                    textObserver: this.textObserver
+                });
+            }
+        }
+
+        if (this.replacer) {
+            var inApp = this.appInstance || (typeof app !== 'undefined' ? app : null);
+            var mergedOptions = {
+                appInstance: inApp,
+                bridgeSocket: this.bridgeSocket
+            };
+            for (var key in options) {
+                if (options.hasOwnProperty(key)) {
+                    mergedOptions[key] = options[key];
+                }
+            }
+            return this.replacer.execute(command, mergedOptions);
+        }
+
+        return {
+            commandId: command ? (command.commandId || 'unknown') : 'unknown',
+            status: 'FAILED',
+            currentHash: '',
+            message: 'AtomicReplacer not initialized in daemon'
         };
     };
 
