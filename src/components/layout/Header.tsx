@@ -3,26 +3,25 @@
  *
  * Displays native editor connection indicator (Word/InDesign),
  * LLM status (Ollama model & latency), TM/guidelines load badge,
- * batch scan progress indicator, and layout switcher buttons.
+ * layout switcher buttons, and triggers for settings & guideline panels.
  */
 
 import React from 'react';
 import {
   FileText,
-  Layers,
   Sparkles,
   Database,
   BookOpen,
   Columns,
   Rows,
   Radio,
-  CheckCircle2,
   AlertCircle,
-  XCircle,
-  RefreshCw,
+  Settings,
 } from 'lucide-react';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
+import { useConfigStore } from '../../stores/configStore.ts';
 import { PinToggleButton } from './PinToggleButton.tsx';
+import { BatchProgressBar } from '../config/BatchProgressBar.tsx';
 
 export const Header: React.FC = () => {
   const {
@@ -38,15 +37,13 @@ export const Header: React.FC = () => {
     guidelinesCount,
     splitMode,
     toggleSplitMode,
-    batchScanning,
-    batchCurrent,
-    batchTotal,
-    batchPercent,
   } = useBridgeStore();
 
+  const { openSettingsModal, openGuidelineViewer } = useConfigStore();
+
   return (
-    <header className="flex-none bg-slate-900 border-b border-slate-800 text-slate-100 px-4 py-2.5 select-none shadow-md z-30">
-      <div className="flex items-center justify-between gap-4">
+    <header className="flex-none bg-slate-900 border-b border-slate-800 text-slate-100 select-none shadow-md z-30">
+      <div className="px-4 py-2.5 flex items-center justify-between gap-4">
         {/* Left: Brand Logo & Title */}
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/40 text-indigo-400 font-bold">
@@ -65,7 +62,7 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Center: Realtime Status Badges */}
+        {/* Center: Realtime Status Badges (Interactive triggers) */}
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Editor Connection Indicator */}
           <div
@@ -105,15 +102,17 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* LLM Status Indicator */}
-          <div
+          {/* LLM Status Indicator (Click to open Settings) */}
+          <button
+            type="button"
             data-testid="llm-status-badge"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+            onClick={openSettingsModal}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer hover:border-indigo-500 ${
               llmAlive
                 ? 'bg-indigo-950/50 border-indigo-700/60 text-indigo-300'
                 : 'bg-amber-950/40 border-amber-800/60 text-amber-300'
             }`}
-            title={`LLM 상태: ${llmAlive ? '온라인' : '오프라인/대기'}`}
+            title={`LLM 설정 열기: ${llmModel || 'qwen2.5:7b'}`}
           >
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
             <span className="font-mono text-[11px]">
@@ -128,42 +127,46 @@ export const Header: React.FC = () => {
                 <AlertCircle className="w-2.5 h-2.5" /> Standby
               </span>
             )}
-          </div>
+          </button>
 
-          {/* TM Load Badge */}
-          <div
+          {/* TM Load Badge (Click to open TM Manager) */}
+          <button
+            type="button"
             data-testid="tm-status-badge"
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+            onClick={openGuidelineViewer}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer hover:border-cyan-500 ${
               tmLoaded
                 ? 'bg-cyan-950/50 border-cyan-700/60 text-cyan-300'
                 : 'bg-slate-800/70 border-slate-700 text-slate-400'
             }`}
-            title={tmLoaded ? `TM 로드 완료 (${tmEntriesCount.toLocaleString()}개 엔트리)` : 'TM 미로드 (단일 QA 모드)'}
+            title={tmLoaded ? `TM 로드 완료 (${tmEntriesCount.toLocaleString()}개 엔트리) - 클릭하여 관리` : 'TM 미로드 - 클릭하여 로드'}
           >
             <Database className="w-3.5 h-3.5 text-cyan-400" />
             <span className="font-mono text-[11px]">
               {tmLoaded ? `TM: ${tmEntriesCount.toLocaleString()}건` : 'TM: 미로드'}
             </span>
-          </div>
+          </button>
 
-          {/* Guidelines Badge */}
-          <div
+          {/* Guidelines Badge (Click to open Guidelines) */}
+          <button
+            type="button"
             data-testid="guidelines-status-badge"
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+            onClick={openGuidelineViewer}
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer hover:border-violet-500 ${
               guidelinesLoaded
                 ? 'bg-violet-950/50 border-violet-700/60 text-violet-300'
                 : 'bg-slate-800/70 border-slate-700 text-slate-400'
             }`}
-            title={guidelinesLoaded ? `가이드라인 규칙 ${guidelinesCount}개 적용 중` : '기본 규칙 적용 중'}
+            title={guidelinesLoaded ? `가이드라인 규칙 ${guidelinesCount}개 적용 중 - 클릭하여 검토` : '기본 규칙 적용 중 - 클릭하여 검토'}
           >
             <BookOpen className="w-3.5 h-3.5 text-violet-400" />
             <span className="font-mono text-[11px]">
               {guidelinesLoaded ? `.agents (${guidelinesCount})` : '.agents'}
             </span>
-          </div>
+          </button>
         </div>
 
-        {/* Right: Layout Switcher & Action Controls */}
+        {/* Right: Layout Switcher, Pin Toggle & Settings Action Controls */}
         <div className="flex items-center gap-2">
           {/* Always-on-top Pin Mode Toggle Button */}
           <PinToggleButton />
@@ -188,27 +191,22 @@ export const Header: React.FC = () => {
               </>
             )}
           </button>
+
+          {/* Settings Modal Button */}
+          <button
+            type="button"
+            data-testid="header-settings-btn"
+            onClick={openSettingsModal}
+            className="flex items-center justify-center p-1.5 rounded-md bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 text-slate-300 hover:text-slate-100 transition-colors cursor-pointer"
+            title="환경 설정 (Ollama 모델, 가이드라인, TM)"
+          >
+            <Settings className="w-3.5 h-3.5 text-slate-300" />
+          </button>
         </div>
       </div>
 
-      {/* Optional Inline Batch Scan Progress (Visible when scanning) */}
-      {batchScanning && (
-        <div data-testid="batch-progress-container" className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs text-indigo-300 font-mono">
-            <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
-            <span>대용량 문서 일괄 분석 중... ({batchCurrent} / {batchTotal} 문단)</span>
-          </div>
-          <div className="flex items-center gap-3 flex-1 max-w-xs">
-            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-indigo-500 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${batchPercent}%` }}
-              />
-            </div>
-            <span className="text-[11px] font-mono text-slate-400">{batchPercent}%</span>
-          </div>
-        </div>
-      )}
+      {/* Top Real-time Batch Progress Bar */}
+      <BatchProgressBar />
     </header>
   );
 };

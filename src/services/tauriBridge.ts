@@ -11,6 +11,16 @@ import {
   type ReplacementCommand,
   type ReplacementResult,
 } from '../../shared/protocol/types.ts';
+import {
+  type ModelInfo,
+  type GuidelineSet,
+  type TmEntry,
+  evaluateVramWarning,
+} from '../types/config.ts';
+import {
+  parseGuidelineContent,
+  parseTmContent,
+} from '../utils/parserUtils.ts';
 
 /** Bridge status event payload */
 export interface BridgeStatusPayload {
@@ -77,6 +87,21 @@ export interface IBridgeService {
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
 
+  /** Fetches installed Ollama models via GET /api/tags or Tauri backend */
+  fetchOllamaModels(host?: string): Promise<ModelInfo[]>;
+
+  /** Sets the active Ollama model */
+  setOllamaModel(modelName: string): Promise<boolean>;
+
+  /** Loads and parses guideline file content */
+  loadGuidelineContent(content: string, filename?: string): Promise<GuidelineSet>;
+
+  /** Loads and parses TM file content */
+  loadTmContent(content: string, filename?: string): Promise<{ count: number; entries: TmEntry[] }>;
+
+  /** Starts a batch scan simulation or triggers backend queue */
+  startBatchScan(total?: number): Promise<void>;
+
   /** Aborts ongoing batch scan */
   abortBatchScan(): Promise<boolean>;
 
@@ -87,12 +112,99 @@ export interface IBridgeService {
   destroy(): void;
 }
 
+/** Default mock models for testing and development */
+export const DEFAULT_MOCK_MODELS: ModelInfo[] = [
+  {
+    name: 'qwen2.5:7b',
+    model: 'qwen2.5:7b',
+    modifiedAt: '2026-08-20T10:00:00Z',
+    sizeBytes: 4_400_000_000,
+    digest: 'sha256:4a5b6c7d',
+    parameterSize: '7.6B',
+    quantizationLevel: 'Q4_K_M',
+    ...evaluateVramWarning(4_400_000_000, '7.6B'),
+    details: {
+      family: 'qwen2',
+      format: 'gguf',
+      parameterSize: '7.6B',
+      quantizationLevel: 'Q4_K_M',
+    },
+  },
+  {
+    name: 'llama3.1:8b',
+    model: 'llama3.1:8b',
+    modifiedAt: '2026-08-21T12:30:00Z',
+    sizeBytes: 4_700_000_000,
+    digest: 'sha256:8e9f0a1b',
+    parameterSize: '8.0B',
+    quantizationLevel: 'Q4_K_M',
+    ...evaluateVramWarning(4_700_000_000, '8.0B'),
+    details: {
+      family: 'llama',
+      format: 'gguf',
+      parameterSize: '8.0B',
+      quantizationLevel: 'Q4_K_M',
+    },
+  },
+  {
+    name: 'qwen2.5:14b',
+    model: 'qwen2.5:14b',
+    modifiedAt: '2026-08-19T08:15:00Z',
+    sizeBytes: 9_000_000_000,
+    digest: 'sha256:14c15d16',
+    parameterSize: '14.7B',
+    quantizationLevel: 'Q4_K_M',
+    ...evaluateVramWarning(9_000_000_000, '14.7B'),
+    details: {
+      family: 'qwen2',
+      format: 'gguf',
+      parameterSize: '14.7B',
+      quantizationLevel: 'Q4_K_M',
+    },
+  },
+  {
+    name: 'mistral:7b',
+    model: 'mistral:7b',
+    modifiedAt: '2026-08-18T14:20:00Z',
+    sizeBytes: 4_100_000_000,
+    digest: 'sha256:7f8g9h0i',
+    parameterSize: '7.2B',
+    quantizationLevel: 'Q4_0',
+    ...evaluateVramWarning(4_100_000_000, '7.2B'),
+    details: {
+      family: 'mistral',
+      format: 'gguf',
+      parameterSize: '7.2B',
+      quantizationLevel: 'Q4_0',
+    },
+  },
+  {
+    name: 'gemma2:9b',
+    model: 'gemma2:9b',
+    modifiedAt: '2026-08-22T09:00:00Z',
+    sizeBytes: 5_400_000_000,
+    digest: 'sha256:9a0b1c2d',
+    parameterSize: '9.2B',
+    quantizationLevel: 'Q4_K_M',
+    ...evaluateVramWarning(5_400_000_000, '9.2B'),
+    details: {
+      family: 'gemma2',
+      format: 'gguf',
+      parameterSize: '9.2B',
+      quantizationLevel: 'Q4_K_M',
+    },
+  },
+];
+
 /**
  * In-memory / Mock Bridge Service for browser development and unit testing
  */
 export class MockBridgeService implements IBridgeService {
   private listeners: Map<string, Set<(payload: any) => void>> = new Map();
   private alwaysOnTop = false;
+  private currentModel = 'qwen2.5:7b';
+  private batchInterval: any = null;
+  private mockModels: ModelInfo[] = [...DEFAULT_MOCK_MODELS];
 
   listen<K extends BridgeEventName>(event: K, handler: BridgeEventHandler<K>): () => void {
     if (!this.listeners.has(event)) {
@@ -138,7 +250,84 @@ export class MockBridgeService implements IBridgeService {
     };
   }
 
+  async fetchOllamaModels(_host?: string): Promise<ModelInfo[]> {
+    return [...this.mockModels];
+  }
+
+  async setOllamaModel(modelName: string): Promise<boolean> {
+    this.currentModel = modelName;
+    this.emit('llm-status-changed', {
+      isAlive: true,
+      provider: 'ollama',
+      activeModel: modelName,
+      latencyMs: 42,
+      message: 'Model switched successfully',
+    });
+    return true;
+  }
+
+  async loadGuidelineContent(content: string, filename?: string): Promise<GuidelineSet> {
+    const set = parseGuidelineContent(content, filename);
+    this.emit('tm-status-changed', {
+      tmLoaded: false,
+      entriesCount: 0,
+      guidelinesLoaded: true,
+      guidelinesCount: set.rules.length,
+    });
+    return set;
+  }
+
+  async loadTmContent(content: string, filename?: string): Promise<{ count: number; entries: TmEntry[] }> {
+    const entries = parseTmContent(content, filename);
+    this.emit('tm-status-changed', {
+      tmLoaded: entries.length > 0,
+      entriesCount: entries.length,
+      fileName: filename,
+      guidelinesLoaded: true,
+      guidelinesCount: 5,
+    });
+    return { count: entries.length, entries };
+  }
+
+  async startBatchScan(total = 20): Promise<void> {
+    if (this.batchInterval) {
+      clearInterval(this.batchInterval);
+    }
+
+    let current = 0;
+    this.emit('batch-scan-progress', {
+      active: true,
+      current: 0,
+      total,
+      percent: 0,
+      isAborted: false,
+    });
+
+    this.batchInterval = setInterval(() => {
+      current += 1;
+      const percent = Math.round((current / total) * 100);
+      const isDone = current >= total;
+
+      this.emit('batch-scan-progress', {
+        active: !isDone,
+        current,
+        total,
+        percent: Math.min(percent, 100),
+        isAborted: false,
+      });
+
+      if (isDone) {
+        clearInterval(this.batchInterval);
+        this.batchInterval = null;
+      }
+    }, 150);
+  }
+
   async abortBatchScan(): Promise<boolean> {
+    if (this.batchInterval) {
+      clearInterval(this.batchInterval);
+      this.batchInterval = null;
+    }
     this.emit('batch-scan-progress', {
       active: false,
       current: 0,
@@ -151,7 +340,6 @@ export class MockBridgeService implements IBridgeService {
 
   async setAlwaysOnTop(pinned: boolean): Promise<boolean> {
     this.alwaysOnTop = pinned;
-    console.log(`[MockBridgeService] setAlwaysOnTop: ${pinned}`);
     return this.alwaysOnTop;
   }
 
@@ -160,6 +348,10 @@ export class MockBridgeService implements IBridgeService {
   }
 
   destroy(): void {
+    if (this.batchInterval) {
+      clearInterval(this.batchInterval);
+      this.batchInterval = null;
+    }
     this.listeners.clear();
   }
 }
@@ -270,6 +462,122 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     return this.fallbackService.fetchBridgeHealth();
+  }
+
+  async fetchOllamaModels(host?: string): Promise<ModelInfo[]> {
+    if (!this.isTauriAvailable()) {
+      // Try direct fetch to Ollama API if in browser / dev mode
+      try {
+        const ollamaUrl = host || 'http://127.0.0.1:11434';
+        const res = await fetch(`${ollamaUrl}/api/tags`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.models && Array.isArray(data.models)) {
+            return data.models.map((m: any) => {
+              const param = m.details?.parameter_size;
+              const quant = m.details?.quantization_level;
+              const size = m.size || 0;
+              const { vramWarning, vramWarningReason } = evaluateVramWarning(size, param);
+              return {
+                name: m.name,
+                model: m.model || m.name,
+                modifiedAt: m.modified_at,
+                sizeBytes: size,
+                digest: m.digest,
+                parameterSize: param,
+                quantizationLevel: quant,
+                vramWarning,
+                vramWarningReason,
+                details: m.details,
+              };
+            });
+          }
+        }
+      } catch {
+        // Fallback to mock models if local ollama is not reachable
+      }
+      return this.fallbackService.fetchOllamaModels(host);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('list_ollama_models', { host });
+      }
+    } catch (e) {
+      console.warn('Tauri invoke list_ollama_models failed, using fallback:', e);
+    }
+
+    return this.fallbackService.fetchOllamaModels(host);
+  }
+
+  async setOllamaModel(modelName: string): Promise<boolean> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.setOllamaModel(modelName);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('set_ollama_model', { modelName });
+      }
+    } catch (e) {
+      console.warn('Tauri invoke set_ollama_model failed, using fallback:', e);
+    }
+
+    return this.fallbackService.setOllamaModel(modelName);
+  }
+
+  async loadGuidelineContent(content: string, filename?: string): Promise<GuidelineSet> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.loadGuidelineContent(content, filename);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('load_guideline_content', { content, filename });
+      }
+    } catch (e) {
+      console.warn('Tauri invoke load_guideline_content failed, using fallback:', e);
+    }
+
+    return this.fallbackService.loadGuidelineContent(content, filename);
+  }
+
+  async loadTmContent(content: string, filename?: string): Promise<{ count: number; entries: TmEntry[] }> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.loadTmContent(content, filename);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.core?.invoke) {
+        return await tauri.core.invoke('load_tm_content', { content, filename });
+      }
+    } catch (e) {
+      console.warn('Tauri invoke load_tm_content failed, using fallback:', e);
+    }
+
+    return this.fallbackService.loadTmContent(content, filename);
+  }
+
+  async startBatchScan(total?: number): Promise<void> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.startBatchScan(total);
+    }
+
+    try {
+      const tauri = (window as any).__TAURI__;
+      if (tauri?.core?.invoke) {
+        await tauri.core.invoke('start_batch_scan', { total });
+        return;
+      }
+    } catch (e) {
+      console.warn('Tauri invoke start_batch_scan failed, using fallback:', e);
+    }
+
+    return this.fallbackService.startBatchScan(total);
   }
 
   async abortBatchScan(): Promise<boolean> {

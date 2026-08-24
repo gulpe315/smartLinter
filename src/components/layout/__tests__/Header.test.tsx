@@ -121,7 +121,7 @@ describe('Header Component', () => {
 
     const progressContainer = screen.getByTestId('batch-progress-container');
     expect(progressContainer).toBeInTheDocument();
-    expect(progressContainer).toHaveTextContent('대용량 문서 일괄 분석 중... (45 / 100 문단)');
+    expect(progressContainer).toHaveTextContent('현재 45 / 100 문단 분석 중...');
     expect(progressContainer).toHaveTextContent('45%');
   });
 
