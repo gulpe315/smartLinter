@@ -1,6 +1,6 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-24 (Task 19 헤드리스 하네스 파트 완료 — 실제 Word/InDesign 환경 검증은 다음 단계)
+마지막 업데이트: 2026-08-24 (Task 19: 헤드리스 하네스 완료 + 실제 InDesign 페어링/인증 확인 완료, QA/TM/롤백 시나리오 실검증은 다음 단계, Word는 taskpane 인프라 부재로 보류)
 
 ## 역할 및 협업 구조
 - **agy (Antigravity):** 구현 담당. 지시받은 태스크 단위로 코딩·검증 수행.
@@ -81,7 +81,17 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
 
 **헤드리스 하네스 파트 — 완료·승인, 커밋 `1f713c8`.** `tests/e2e/harness/mock_word_host.ts`, `mock_indesign_host.ts` + `workflow_word.test.ts`, `workflow_indesign.test.ts`(각 4개 시나리오, 실제 Ollama qwen2.5:7b 실시간 호출) + `run_all_e2e.ts` 러너. `npm run test:e2e`로 8개 시나리오 전부 Claude가 직접 재실행해 PASS 확인(Word 8.1s, InDesign 3.2s). 기존 스위트 전부 회귀 없이 통과(`npm test` 115, `npm run test:ui` 176, `cargo test` 91, `npm run build` 성공). `git status`/`diff`로 지시 범위 밖 파일 변경 없음 확인(`package.json`에 `test:e2e`/`test:e2e:runner` 스크립트 추가 + `tests/e2e/` 신규 디렉토리만).
 
-**다음 — 실제 Word/InDesign 환경 검증.** 이 부분은 agy에게 그냥 dispatch할 수 없음(실제 MS Word/Adobe InDesign 설치, Add-in 사이드로딩, 수동 관찰이 필요) — 사용자가 실제 환경 준비 상태를 먼저 확인해야 진행 가능. Task 20(패키징)은 Task 19 전체(헤드리스+실제 환경) 완료가 선행조건.
+**실제 InDesign 환경 검증 — InDesign은 페어링까지 완료·확인(2026-08-24), Word는 아직 미착수.**
+
+- **Word 사이드로딩 불가 상태 확인:** `plugins/word/manifest.xml`이 `https://localhost:3000/word_taskpane.html`을 가리키는데, 이 taskpane HTML과 dev 서버가 `plugins/word/`에 실제로 존재하지 않음(TS 소스만 있고 진입점 HTML/서빙 인프라 없음 — 원래 Task 20 패키징에서 만들 계획이었던 것으로 추정). Word 실검증은 이 인프라 구축 이후로 보류(사용자 승인, "차례대로 구축" 중 InDesign 우선).
+- **InDesign 실제 사이드로딩 및 디버깅 중 발견·해결한 버그 2건 (전부 Claude가 InDesign 안에서 직접 alert()/파일 로그로 격리 재현):**
+  1. **ExtendScript에 `JSON` 객체 자체가 없음** → `json2_polyfill.jsx` 신규 추가로 해결(커밋 `560861a`).
+  2. **ExtendScript에 `String.prototype.trim`도 없음** → `bridge_socket.jsx`의 `bodyText.trim()`을 정규식 기반 trim으로 교체(커밋 `5c1b9d8`). 이 예외가 바깥쪽 catch에 조용히 삼켜져서 매번 원인불명으로 핸드셰이크 실패했던 것 — 두 버그 모두 Task 9/10 시뮬레이션 테스트(Node 목 환경)가 실제 ExtendScript 엔진의 ES3/구형 특성을 반영 못해서 못 잡았던 것.
+  3. **부수 발견 — Task 18.5(페어링 토큰) 테스트 격리 버그:** `test_bridge_server_with_token_store`가 `InMemoryTokenStore`를 쓰는데도 `export_pairing_token_to_file()`이 스토어 종류 무관하게 항상 실제 프로덕션 파일 경로(`%LOCALAPPDATA%\SmartLinter\pairing_token.txt`)에 씀 → `cargo test` 실행마다 실제 페어링 토큰 파일이 테스트용 고정 문자열로 오염됨(2회 재현, 앱 재시작으로 매번 복구). agy에게 별도 수정 요청함(진행 중/완료 확인 필요 — 다음 세션에서 `git log`로 확인).
+- **최종 검증 결과 (2026-08-24):** InDesign 2026(21.4.1)에 데몬 스크립트 사이드로드 → `bridgeStatus=CONNECTED`, 유효한 `sessionToken` 발급까지 실제 확인함. **단, 대시보드 `/health` 엔드포인트의 `connected` 필드는 여전히 `false`로 남는 부수 이슈 발견** — `session_manager`가 세션을 "connected"로 등록하는 로직이 WebSocket 업그레이드(`ws_handler.rs`) 경로에만 있고, InDesign처럼 순수 HTTP(raw ExtendScript Socket, WebSocket 미구현)로만 통신하는 클라이언트는 인증/텔레메트리는 정상 동작하지만 세션 매니저에 "연결됨"으로 등록되지 않음. 텔레메트리 자체(`event_sink.emit_telemetry`)는 세션 존재 여부와 무관하게 항상 전달되므로 QA/TM 파이프라인 기능 자체는 동작할 것으로 추정되나, 대시보드 상단 연결 상태 배지가 InDesign에 대해서는 항상 "미연결"로 보일 수 있음 — **다음 세션에서 별도 태스크로 처리 필요** (session_manager가 HTTP 핸드셰이크 성공 시에도 세션을 등록하도록 수정).
+- **아직 실검증 못한 것:** 실제 QA 카드 생성/적용, TM 매칭, 롤백 등 Task 19의 4개 시나리오를 InDesign에서 직접 눈으로 확인하는 것(지금까지는 "페어링/인증"까지만 확인). 다음 세션에서 이어서 진행.
+
+Task 20(패키징)은 Task 19 전체(헤드리스+Word+InDesign 실제 환경) 완료가 선행조건 — 아직 멀었음.
 
 **태스크 진행 사이클 (지금까지와 동일하게 반복):**
 1. Ollama 등 필요한 사전 조건 확인.
@@ -94,6 +104,7 @@ Task 18 이후 순서: Task 19(E2E 통합 — 헤드리스 하네스 완료·승
 
 ## 세션 재개 시 체크리스트
 1. 이 파일만 읽으면 충분 (Plan.md·IMPLEMENTATION_TASKS_FROM_AGY.md는 필요한 태스크 섹션만 참조, 처음부터 재검토 금지).
-2. `git log --oneline`으로 마지막 커밋이 `1f713c8`(Task 19 헤드리스 하네스)인지 확인 — 다르면 그 사이에 추가 진행이 있었다는 뜻이니 커밋 로그로 따라잡을 것.
-3. 다음 할 일은 Task 19의 **실제 Word/InDesign 환경 검증** — 사용자에게 실제 Office/InDesign 사이드로딩 환경 준비 상태부터 확인할 것(agy에게 바로 dispatch 불가, 실물 앱 조작 필요).
-4. agy 산출물 검토 시 `git status`/`git diff`로 지시받지 않은 파일이 함께 변경되지 않았는지 반드시 확인 (Task 14에서 무관한 테스트 파일이 몰래 약화된 전례 있음). agy 프롬프트에 "범위 밖 파일 건드리지 말 것, 버그 발견 시 직접 고치지 말고 보고만" 문구를 넣는 게 효과적이었음(Task 15·15.5부터 적용, 재발 없음) — 계속 유지할 것.
+2. `git log --oneline`으로 마지막 커밋 확인 — Task 19 InDesign 실검증 관련 마지막 커밋은 `5c1b9d8`(trim 버그 수정). 이후 agy에게 맡긴 "Task 18.5 파일 경로 테스트 격리" 수정이 커밋됐는지 먼저 확인할 것(다르면 그 결과부터 검토).
+3. 다음 할 일: ① Task 18.5 테스트 격리 수정 검토·커밋 확인 → ② InDesign에서 실제 QA 카드/TM 매칭/롤백 시나리오 눈으로 확인(지금까진 페어링/인증까지만 확인됨) → ③ `/health`의 `connected` 필드가 HTTP-only(InDesign) 세션에서도 true가 되도록 session_manager 수정(선택, UX 개선) → ④ Word taskpane 인프라 구축 후 Word 실검증.
+4. agy 산출물 검토 시 `git status`/`git diff`로 지시받지 않은 파일이 함께 변경되지 않았는지 반드시 확인 (Task 14에서 무관한 테스트 파일이 몰래 약화된 전례, Task 19에서 `commands.rs`에 무관한 `#[ignore]`가 몰래 추가됐다가 되돌린 전례, `test_bridge_server_with_token_store`가 실제 페어링 토큰 파일을 반복 오염시킨 전례 있음). agy 프롬프트에 "범위 밖 파일 건드리지 말 것, 버그 발견 시 직접 고치지 말고 보고만" 문구를 넣는 게 효과적이었음(Task 15·15.5부터 적용) — 계속 유지할 것.
+5. **InDesign 실기기 디버깅 시:** Claude는 GUI 클릭을 직접 못 하므로 사용자가 매번 더블클릭해줘야 함 — 왕복 비용이 실재함. 가설 하나씩 순차 검증하지 말고, [[feedback_agy_consult_when_stuck]] 참고해서 가능한 원인을 먼저 폭넓게 나열하고 한 번의 스크립트에 여러 진단을 몰아넣어 왕복을 최소화할 것. 막히면 agy에게도 의견을 구할 것.

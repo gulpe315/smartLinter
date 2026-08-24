@@ -136,13 +136,31 @@ impl BridgeServer {
     /// and initializes `AuthManager` with this token.
     pub fn with_defaults(event_sink: Arc<dyn BridgeEventSink>) -> Self {
         let keyring = KeyringStore::default();
-        Self::with_token_store(&keyring, event_sink)
+        let export_path = get_pairing_token_file_path();
+        if export_path.is_none() {
+            warn!("Could not determine local app data path for pairing token bootstrap export");
+        }
+        Self::with_token_store_and_export_path(&keyring, event_sink, export_path.as_deref())
     }
 
     /// Creates a server with default configuration and token resolved from a specified `SecureTokenStore`.
+    ///
+    /// Does not export the pairing token to the filesystem, isolating tests and custom token stores
+    /// from production filesystem paths. Use [`with_defaults`] or [`with_token_store_and_export_path`]
+    /// if bootstrap file export is required.
     pub fn with_token_store<S: SecureTokenStore>(
         store: &S,
         event_sink: Arc<dyn BridgeEventSink>,
+    ) -> Self {
+        Self::with_token_store_and_export_path(store, event_sink, None)
+    }
+
+    /// Creates a server with default configuration, token resolved from `SecureTokenStore`,
+    /// and optionally exports the pairing token to a specific file path.
+    pub fn with_token_store_and_export_path<S: SecureTokenStore>(
+        store: &S,
+        event_sink: Arc<dyn BridgeEventSink>,
+        export_path: Option<&std::path::Path>,
     ) -> Self {
         let config = BridgeServerConfig::default();
         let token = store
@@ -155,8 +173,10 @@ impl BridgeServer {
                 generate_crypto_token()
             });
 
-        // Export token to local bootstrap file for InDesign/Word plugin discovery
-        export_pairing_token_to_file(&token);
+        // Export token to bootstrap file only if an explicit export path is provided
+        if let Some(path) = export_path {
+            export_pairing_token_to_path(&token, path);
+        }
 
         let auth_manager = Arc::new(AuthManager::with_token(token));
         Self::new(config, auth_manager, event_sink)
@@ -444,5 +464,28 @@ mod tests {
         let active_token = server.auth_manager().get_token().await;
         assert_eq!(active_token, known_token);
         assert!(server.auth_manager().validate_token(known_token).await);
+    }
+
+    #[tokio::test]
+    async fn test_bridge_server_with_token_store_and_export_path() {
+        let known_token = "test_custom_token_for_path_export_1234567890abcdef";
+        let store = InMemoryTokenStore::with_initial_token(known_token);
+        let sink = Arc::new(NoopEventSink);
+        let temp_dir = std::env::temp_dir().join(format!("smartlinter_test_{}", rand::random::<u32>()));
+        let test_file_path = temp_dir.join("pairing_token.txt");
+
+        let server = BridgeServer::with_token_store_and_export_path(
+            &store,
+            sink,
+            Some(&test_file_path),
+        );
+
+        let active_token = server.auth_manager().get_token().await;
+        assert_eq!(active_token, known_token);
+        assert!(test_file_path.exists(), "Custom exported token file must exist");
+        let read_token = std::fs::read_to_string(&test_file_path).expect("File must be readable");
+        assert_eq!(read_token.trim(), known_token);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
