@@ -29,6 +29,11 @@ import {
   type QACategoryFilter,
   normalizeSeverity,
 } from '../types/qa.ts';
+import { getStaleConflictResolver } from '../services/stale_conflict_resolver.ts';
+
+export interface AcceptCardOptions {
+  autoResolveStale?: boolean;
+}
 
 export interface QAState {
   // --- Active & History Cards ---
@@ -45,7 +50,7 @@ export interface QAState {
   addCard: (card: Partial<QACardData> & { category: string; originalSegment: string; suggestedSegment: string; reason: string }) => string;
   addReport: (payload: QaReportPayload) => void;
   dismissCard: (cardId: string) => void;
-  acceptCard: (cardId: string, service?: IBridgeService) => Promise<ReplacementResult | null>;
+  acceptCard: (cardId: string, service?: IBridgeService, options?: AcceptCardOptions) => Promise<ReplacementResult | null>;
   retryCard: (cardId: string) => void;
   removeCard: (cardId: string) => void;
   clearAll: () => void;
@@ -155,7 +160,7 @@ export const useQaStore = create<QAState>((set, get) => ({
     });
   },
 
-  acceptCard: async (cardId, service) => {
+  acceptCard: async (cardId, service, options) => {
     const card = get().cards.find((c) => c.id === cardId);
     if (!card || card.status === 'applying') {
       return null;
@@ -218,6 +223,15 @@ export const useQaStore = create<QAState>((set, get) => ({
             appliedCards: [appliedCard, ...state.appliedCards],
             activeCardId: state.activeCardId === cardId ? null : state.activeCardId,
           };
+        });
+      } else if (result.status === 'STALE_REJECTED' && options?.autoResolveStale) {
+        // Immediately trigger StaleConflictResolver for single paragraph rescan UX
+        await getStaleConflictResolver().resolveStaleConflict({
+          cardId,
+          paragraphId: card.paragraphId,
+          staleHash: baseHash,
+          currentHash: result.currentHash,
+          service: bridgeService,
         });
       } else {
         // Mark as failed with message
@@ -325,6 +339,11 @@ export const useQaStore = create<QAState>((set, get) => ({
       bridgeService.listen('new-paragraph-detected', () => {
         get().setIsAnalyzing(true);
       })
+    );
+
+    // Subscribe to stale replacement conflicts for automatic resolution
+    unlisteners.push(
+      getStaleConflictResolver().initEventListener(bridgeService)
     );
 
     return () => {

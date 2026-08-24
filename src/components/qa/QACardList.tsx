@@ -176,7 +176,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
               >
                 <QACardItem
                   card={card}
-                  onAccept={(id) => acceptCard(id)}
+                  onAccept={(id) => acceptCard(id, undefined, { autoResolveStale: true })}
                   onDismiss={(id) => dismissCard(id)}
                 />
               </div>

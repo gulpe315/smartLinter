@@ -4,6 +4,7 @@
 //! between the Desktop Dashboard and Editor Bridge plugins (MS Word / Adobe InDesign).
 
 pub mod auth_manager;
+pub mod conflict_dispatcher;
 pub mod router;
 pub mod session;
 pub mod ws_handler;
@@ -20,6 +21,7 @@ pub use auth_manager::{
     constant_time_compare, generate_crypto_token, generate_nonce, generate_session_token,
     AuthError, AuthManager,
 };
+pub use conflict_dispatcher::{ConflictDispatcher, StaleConflictEvent};
 pub use router::{create_router, ApiResponse, HealthResponse};
 pub use session::{
     BridgeEventSink, BridgeStatusEvent, BroadcastEventSink, ConnectionState, EditorSession,

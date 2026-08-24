@@ -25,6 +25,7 @@ import {
   normalizeSeverity,
 } from '../../types/qa.ts';
 import { InlineDiffViewer } from './InlineDiffViewer.tsx';
+import { StaleNotificationBadge } from './StaleNotificationBadge.tsx';
 
 export interface QACardItemProps {
   card: QACardData;
@@ -42,7 +43,8 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   className = '',
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
-  const isApplying = propIsApplying || card.status === 'applying';
+  const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
+  const isApplying = propIsApplying || card.status === 'applying' || isStale;
 
   const categoryStyle = getCategoryBadgeClasses(card.category);
   const severityStyle = getSeverityBadgeClasses(card.severity);
@@ -65,11 +67,18 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     <article
       data-testid={`qa-card-item-${card.id}`}
       className={`group relative rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 shadow-md p-4 transition-all duration-300 ease-out hover:shadow-indigo-950/20 hover:shadow-lg ${
-        card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
+        isStale ? 'ring-1 ring-amber-500/50 border-amber-500/40 bg-slate-900' : card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
       } ${
         card.status === 'failed' ? 'border-rose-900/80 bg-rose-950/20' : ''
       } ${className}`}
     >
+      {/* Stale Document Modified Notification Badge (Task 16 UX) */}
+      {isStale && (
+        <div className="mb-3">
+          <StaleNotificationBadge message={card.staleMessage} />
+        </div>
+      )}
+
       {/* Top Header: Category, Severity, and Reason Tooltip */}
       <div className="flex items-center justify-between gap-2 mb-3">
         {/* Left: Badges */}
@@ -210,7 +219,15 @@ export const QACardItem: React.FC<QACardItemProps> = ({
             onClick={() => onAccept?.(card.id)}
             className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border border-indigo-500 shadow-sm shadow-indigo-950/50 transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isApplying ? (
+            {isStale ? (
+              <>
+                <Loader2
+                  data-testid="accept-spinner"
+                  className="w-3.5 h-3.5 animate-spin text-amber-200"
+                />
+                <span className="text-amber-200">새로고침 중...</span>
+              </>
+            ) : isApplying ? (
               <>
                 <Loader2
                   data-testid="accept-spinner"

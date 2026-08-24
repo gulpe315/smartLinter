@@ -12,7 +12,14 @@ import {
 export type { QaIssue, QaReport, QaSeverity, QaStatus };
 
 /** Execution state of an individual QA card */
-export type QACardStatus = 'pending' | 'applying' | 'applied' | 'dismissed' | 'failed';
+export type QACardStatus =
+  | 'pending'
+  | 'applying'
+  | 'applied'
+  | 'dismissed'
+  | 'failed'
+  | 'stale_refreshing'
+  | 'stale_rejected';
 
 /** Enhanced QA Card representation for the UI */
 export interface QACardData {
@@ -28,6 +35,9 @@ export interface QACardData {
   status: QACardStatus;
   createdAt: number;
   errorMessage?: string;
+  isStale?: boolean;
+  isRefreshing?: boolean;
+  staleMessage?: string;
 }
 
 /** Severity filter options for the QA Card List */

@@ -101,4 +101,23 @@ describe('QACardItem Component', () => {
     expect(screen.getByTestId('qa-card-error-alert')).toBeInTheDocument();
     expect(screen.getByText('문서 상태 불일치 (STALE_REJECTED)')).toBeInTheDocument();
   });
+
+  it('renders StaleNotificationBadge and refreshing state when card status is stale_refreshing', () => {
+    const staleCard: QACardData = {
+      ...sampleCard,
+      status: 'stale_refreshing',
+      isStale: true,
+    };
+
+    render(<QACardItem card={staleCard} />);
+
+    expect(screen.getByTestId('stale-notification-badge')).toBeInTheDocument();
+    expect(
+      screen.getByText('문서가 방금 수정되었습니다. 최신 상태로 새로고침합니다 🔄')
+    ).toBeInTheDocument();
+    expect(screen.getByText('새로고침 중...')).toBeInTheDocument();
+
+    const acceptBtn = screen.getByTestId('qa-accept-action-btn');
+    expect(acceptBtn).toBeDisabled();
+  });
 });
