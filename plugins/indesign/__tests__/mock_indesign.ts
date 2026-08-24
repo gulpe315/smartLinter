@@ -454,14 +454,16 @@ export class MockInDesignEnvironment {
         };
     }
 
-    public triggerIdleTick(taskName = 'smartlinter_persistent_monitor'): void {
+    public triggerIdleTick(taskName = 'smartlinter_persistent_monitor', eventObj?: any): any {
         const task = this.idleTaskList.get(taskName);
+        const evt = eventObj || { name: 'onIdle', time: Date.now(), idleTime: 0 };
         if (task && task.isValid) {
             const handlers = task.listeners.get('onIdle') || task.listeners.get('ON_IDLE') || [];
             for (const handler of handlers) {
-                handler({ name: 'onIdle', time: Date.now() });
+                handler(evt);
             }
         }
+        return evt;
     }
 
     public triggerSelectionChange(newText?: string): void {
@@ -481,6 +483,13 @@ export class MockInDesignEnvironment {
         const handlers = this.appListeners.get('afterAttributeChanged') || [];
         for (const handler of handlers) {
             handler({ name: 'afterAttributeChanged', time: Date.now() });
+        }
+    }
+
+    public triggerActivate(): void {
+        const handlers = this.appListeners.get('afterActivate') || [];
+        for (const handler of handlers) {
+            handler({ name: 'afterActivate', time: Date.now() });
         }
     }
 }

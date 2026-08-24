@@ -270,8 +270,11 @@
         if (res.ok) {
             this.status = 'CONNECTED';
             return true;
+        } else {
+            this.status = 'ERROR';
+            this.lastError = (res.body && res.body.error) || (res.body && res.body.message) || ('Telemetry failed with status ' + res.statusCode);
+            return false;
         }
-        return false;
     };
 
     /**
@@ -309,7 +312,14 @@
             return false;
         }
         var res = this.httpRequest('POST', '/replacement/result', result);
-        return res.ok;
+        if (res.ok) {
+            this.status = 'CONNECTED';
+            return true;
+        } else {
+            this.status = 'ERROR';
+            this.lastError = (res.body && res.body.error) || (res.body && res.body.message) || ('Replacement result failed with status ' + res.statusCode);
+            return false;
+        }
     };
 
     /**

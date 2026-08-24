@@ -759,4 +759,329 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             assert.equal(typeof uxpController.handleRestartDaemon, 'function');
         });
     });
+
+    // =========================================================================
+    // 7. Acceptance Criterion (7): Focus Loss -> Immediate Reconnection & Throttle Resilience
+    // =========================================================================
+    describe('Criterion (7): Immediate Reconnection & Throttle Resilience on Focus/Events', () => {
+        let env: MockInDesignEnvironment;
+
+        beforeEach(() => {
+            env = new MockInDesignEnvironment('Initial editorial story paragraph.', 'FocusDoc.indd');
+        });
+
+        it('should trigger immediate connection attempt on selection change when bridgeSocket is in ERROR/DISCONNECTED state and throttle interval has passed', () => {
+            let handshakeCount = 0;
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /auth/handshake')) {
+                    handshakeCount++;
+                    const bodyStr = JSON.stringify({
+                        success: true,
+                        sessionToken: 'session-reconnected-001'
+                    });
+                    return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                const bodyStr = JSON.stringify({ success: true });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+            };
+
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: 49152,
+                token: 'test-token',
+                socketFactory: env.createSocketFactory()
+            });
+
+            const daemon = new sandbox.SmartLinterDaemon({
+                appInstance: env.getApp(),
+                bridgeSocket: bridgeSocket,
+                reconnectIntervalMs: 3000,
+                sleepMs: 1000
+            });
+
+            daemon.start();
+            assert.equal(handshakeCount, 1, 'Initial handshake on start');
+            assert.equal(bridgeSocket.status, 'CONNECTED');
+
+            // Simulate connection drop / error
+            bridgeSocket.status = 'ERROR';
+            daemon.lastConnectAttemptTime = Date.now() - 3500; // Throttle interval passed
+
+            // User changes selection in InDesign
+            env.triggerSelectionChange('New paragraph after focus switch');
+            assert.equal(handshakeCount, 2, 'Handshake should be immediately attempted on selection change');
+            assert.equal(bridgeSocket.status, 'CONNECTED', 'Socket status should recover to CONNECTED');
+
+            daemon.stop();
+        });
+
+        it('should throttle rapid selection change events within reconnectIntervalMs to prevent socket open storming', () => {
+            let handshakeCount = 0;
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /auth/handshake')) {
+                    handshakeCount++;
+                    const bodyStr = JSON.stringify({ success: false, message: 'Server down' });
+                    return `HTTP/1.1 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                return `HTTP/1.1 500 Internal Error\r\n\r\n`;
+            };
+
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: 49152,
+                token: 'test-token',
+                socketFactory: env.createSocketFactory()
+            });
+
+            const daemon = new sandbox.SmartLinterDaemon({
+                appInstance: env.getApp(),
+                bridgeSocket: bridgeSocket,
+                reconnectIntervalMs: 3000,
+                sleepMs: 1000
+            });
+
+            daemon.start();
+            assert.equal(handshakeCount, 1);
+            assert.equal(bridgeSocket.status, 'ERROR');
+
+            // Simulate rapid user clicks / selection changes within throttle window
+            for (let i = 0; i < 10; i++) {
+                env.triggerSelectionChange();
+            }
+
+            // Handshake count should remain 1 because < 3000ms elapsed
+            assert.equal(handshakeCount, 1, 'Rapid selection changes within throttle window must not spam handshake');
+
+            daemon.stop();
+        });
+
+        it('should not attempt handshake on selection change when bridgeSocket is already CONNECTED', () => {
+            let handshakeCount = 0;
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /auth/handshake')) {
+                    handshakeCount++;
+                    const bodyStr = JSON.stringify({ success: true, sessionToken: 's-1' });
+                    return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                const bodyStr = JSON.stringify({ success: true });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+            };
+
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: 49152,
+                token: 'test-token',
+                socketFactory: env.createSocketFactory()
+            });
+
+            const daemon = new sandbox.SmartLinterDaemon({
+                appInstance: env.getApp(),
+                bridgeSocket: bridgeSocket,
+                reconnectIntervalMs: 3000
+            });
+
+            daemon.start();
+            assert.equal(handshakeCount, 1);
+            assert.equal(bridgeSocket.status, 'CONNECTED');
+
+            // Trigger selection change while CONNECTED
+            daemon.lastConnectAttemptTime = Date.now() - 5000;
+            env.triggerSelectionChange();
+
+            assert.equal(handshakeCount, 1, 'No handshake should be triggered when status is CONNECTED');
+
+            daemon.stop();
+        });
+
+        it('should trigger immediate reconnection check on attribute change event', () => {
+            let handshakeCount = 0;
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /auth/handshake')) {
+                    handshakeCount++;
+                    const bodyStr = JSON.stringify({ success: true, sessionToken: 's-attr-1' });
+                    return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                const bodyStr = JSON.stringify({ success: true });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+            };
+
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: 49152,
+                token: 'test-token',
+                socketFactory: env.createSocketFactory()
+            });
+
+            const daemon = new sandbox.SmartLinterDaemon({
+                appInstance: env.getApp(),
+                bridgeSocket: bridgeSocket,
+                reconnectIntervalMs: 3000
+            });
+
+            daemon.start();
+            assert.equal(handshakeCount, 1);
+
+            bridgeSocket.status = 'ERROR';
+            daemon.lastConnectAttemptTime = Date.now() - 4000;
+
+            env.triggerAttributeChange('Attribute modified text');
+            assert.equal(handshakeCount, 2, 'Attribute change must trigger throttled reconnection check');
+            assert.equal(bridgeSocket.status, 'CONNECTED');
+
+            daemon.stop();
+        });
+
+        it('should trigger immediate force reconnection on heartbeat failure in onIdleTick without waiting for next tick or throttle', () => {
+            let handshakeCount = 0;
+            let heartbeatCallCount = 0;
+
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /auth/handshake')) {
+                    handshakeCount++;
+                    const bodyStr = JSON.stringify({ success: true, sessionToken: 's-hb-recovery' });
+                    return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                if (req.includes('POST /heartbeat')) {
+                    heartbeatCallCount++;
+                    // Fail heartbeat
+                    const bodyStr = JSON.stringify({ success: false, error: 'Session expired' });
+                    return `HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                const bodyStr = JSON.stringify({ success: true });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+            };
+
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: 49152,
+                token: 'test-token',
+                socketFactory: env.createSocketFactory()
+            });
+
+            const daemon = new sandbox.SmartLinterDaemon({
+                appInstance: env.getApp(),
+                bridgeSocket: bridgeSocket,
+                heartbeatIntervalMs: 5000,
+                reconnectIntervalMs: 3000
+            });
+
+            daemon.start();
+            assert.equal(handshakeCount, 1, 'Initial handshake');
+            assert.equal(bridgeSocket.status, 'CONNECTED');
+
+            // Simulate heartbeat interval elapsing
+            daemon.lastHeartbeatTime = Date.now() - 6000;
+            daemon.lastConnectAttemptTime = Date.now(); // Note: connect attempt was right now (throttle active)
+
+            // Trigger single idle tick -> should send heartbeat -> heartbeat fails -> immediate force attemptConnection(true)
+            env.triggerIdleTick();
+
+            assert.equal(heartbeatCallCount, 1, 'Heartbeat must have been sent');
+            assert.equal(handshakeCount, 2, 'Handshake must be immediately retried within the same tick upon heartbeat failure');
+            assert.equal(bridgeSocket.status, 'CONNECTED', 'Bridge socket status should be recovered to CONNECTED');
+
+            daemon.stop();
+        });
+
+        it('should explicitly set event.idleTime to sleepMs / 1000 at the end of onIdleTick', () => {
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const daemon = new sandbox.SmartLinterDaemon({
+                appInstance: env.getApp(),
+                sleepMs: 1500
+            });
+
+            daemon.start();
+
+            const customEvent: any = { name: 'onIdle', time: Date.now(), idleTime: 0 };
+            env.triggerIdleTick('smartlinter_persistent_monitor', customEvent);
+
+            assert.equal(customEvent.idleTime, 1.5, 'event.idleTime must be set to sleepMs / 1000 (seconds)');
+
+            daemon.stop();
+        });
+
+        it('should trigger reconnection on window activate event (afterActivate)', () => {
+            let handshakeCount = 0;
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /auth/handshake')) {
+                    handshakeCount++;
+                    const bodyStr = JSON.stringify({ success: true, sessionToken: 's-activate-1' });
+                    return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                const bodyStr = JSON.stringify({ success: true });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+            };
+
+            const sandbox = loadExtendScript(daemonScriptPath, { app: env.getApp() });
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: 49152,
+                token: 'test-token',
+                socketFactory: env.createSocketFactory()
+            });
+
+            const daemon = new sandbox.SmartLinterDaemon({
+                appInstance: env.getApp(),
+                bridgeSocket: bridgeSocket,
+                reconnectIntervalMs: 3000
+            });
+
+            daemon.start();
+            assert.equal(handshakeCount, 1);
+
+            bridgeSocket.status = 'ERROR';
+            daemon.lastConnectAttemptTime = Date.now() - 4000;
+
+            // Trigger window activate event
+            env.triggerActivate();
+
+            assert.equal(handshakeCount, 2, 'Focus restoration / activate event must trigger reconnection check');
+            assert.equal(bridgeSocket.status, 'CONNECTED');
+
+            daemon.stop();
+        });
+
+        it('should update bridgeSocket status to ERROR when sendTelemetry or sendReplacementResult fails', () => {
+            const env = new MockInDesignEnvironment();
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /telemetry')) {
+                    const bodyStr = JSON.stringify({ success: false, error: 'Internal Error' });
+                    return `HTTP/1.1 500 Internal Server Error\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                if (req.includes('POST /replacement/result')) {
+                    const bodyStr = JSON.stringify({ success: false, error: 'Unauthorized' });
+                    return `HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                const bodyStr = JSON.stringify({ success: true });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+            };
+
+            const sandbox = loadExtendScript(bridgeSocketPath);
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: 49152,
+                token: 'test-token',
+                socketFactory: env.createSocketFactory()
+            });
+
+            // 1. sendTelemetry failure
+            bridgeSocket.status = 'CONNECTED';
+            const telOk = bridgeSocket.sendTelemetry({ paragraphId: 'p-1', hash: 'h-1' });
+            assert.equal(telOk, false);
+            assert.equal(bridgeSocket.status, 'ERROR');
+            assert.ok(bridgeSocket.lastError);
+
+            // 2. sendReplacementResult failure
+            bridgeSocket.status = 'CONNECTED';
+            const resOk = bridgeSocket.sendReplacementResult({ commandId: 'c-1', status: 'SUCCESS' });
+            assert.equal(resOk, false);
+            assert.equal(bridgeSocket.status, 'ERROR');
+            assert.ok(bridgeSocket.lastError);
+        });
+    });
 });

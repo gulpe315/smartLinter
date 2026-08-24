@@ -103,6 +103,9 @@
         this.boundAttributeHandler = function(event) {
             self.onAttributeChanged(event);
         };
+        this.boundActivateHandler = function(event) {
+            self.onActivate(event);
+        };
     }
 
     SmartLinterDaemon.prototype.log = function(msg) {
@@ -175,10 +178,18 @@
                 var attrEvent = (typeof Event !== 'undefined' && Event.AFTER_ATTRIBUTE_CHANGED)
                     ? Event.AFTER_ATTRIBUTE_CHANGED
                     : 'afterAttributeChanged';
+                var actEvent = (typeof Event !== 'undefined' && Event.AFTER_ACTIVATE)
+                    ? Event.AFTER_ACTIVATE
+                    : 'afterActivate';
 
                 inApp.addEventListener(selEvent, this.boundSelectionHandler);
                 inApp.addEventListener(attrEvent, this.boundAttributeHandler);
-                this.log('Attached native InDesign event listeners (selection & attribute changed)');
+                try {
+                    inApp.addEventListener(actEvent, this.boundActivateHandler);
+                } catch (eAct) {
+                    // afterActivate might not be available on all InDesign versions
+                }
+                this.log('Attached native InDesign event listeners (selection, attribute changed & activate)');
             }
         } catch (err) {
             this.log('Warning: Could not attach native event listeners: ' + err.message);
@@ -217,9 +228,15 @@
                 var attrEvent = (typeof Event !== 'undefined' && Event.AFTER_ATTRIBUTE_CHANGED)
                     ? Event.AFTER_ATTRIBUTE_CHANGED
                     : 'afterAttributeChanged';
+                var actEvent = (typeof Event !== 'undefined' && Event.AFTER_ACTIVATE)
+                    ? Event.AFTER_ACTIVATE
+                    : 'afterActivate';
 
                 inApp.removeEventListener(selEvent, this.boundSelectionHandler);
                 inApp.removeEventListener(attrEvent, this.boundAttributeHandler);
+                try {
+                    inApp.removeEventListener(actEvent, this.boundActivateHandler);
+                } catch (eAct) {}
             } catch (e) {}
         }
 
@@ -232,10 +249,22 @@
 
     /**
      * Attempts handshake connection to bridge server.
+     * @param {boolean} [force=false] If true, bypasses status check and throttle delay
+     * @returns {boolean}
      */
-    SmartLinterDaemon.prototype.attemptConnection = function() {
+    SmartLinterDaemon.prototype.attemptConnection = function(force) {
         if (!this.bridgeSocket || typeof this.bridgeSocket.handshake !== 'function') return false;
-        this.lastConnectAttemptTime = (new Date()).getTime();
+
+        if (!force && this.bridgeSocket.status === 'CONNECTED') {
+            return false;
+        }
+
+        var now = (new Date()).getTime();
+        if (!force && (now - this.lastConnectAttemptTime < this.reconnectIntervalMs)) {
+            return false;
+        }
+
+        this.lastConnectAttemptTime = now;
         var success = this.bridgeSocket.handshake();
         if (success) {
             this.log('Connected to Tauri Bridge Server (' + this.bridgeSocket.host + ':' + this.bridgeSocket.port + ')');
@@ -255,12 +284,8 @@
         this.tickCount++;
         var now = (new Date()).getTime();
 
-        // 1. Connection check & Auto-reconnection
-        if (this.bridgeSocket && this.bridgeSocket.status !== 'CONNECTED') {
-            if (now - this.lastConnectAttemptTime >= this.reconnectIntervalMs) {
-                this.attemptConnection();
-            }
-        }
+        // 1. Connection check & Auto-reconnection (throttled)
+        this.attemptConnection();
 
         // 2. Active paragraph observation & dispatch
         if (this.textObserver) {
@@ -279,9 +304,20 @@
                 if (inApp && inApp.documents && inApp.documents.length > 0 && inApp.activeDocument) {
                     activeDocName = inApp.activeDocument.name || '';
                 }
-                this.bridgeSocket.sendHeartbeat(activeDocName);
+                var hbSuccess = this.bridgeSocket.sendHeartbeat(activeDocName);
                 this.lastHeartbeatTime = now;
+                if (!hbSuccess) {
+                    this.log('Heartbeat failed, attempting immediate reconnection');
+                    this.attemptConnection(true);
+                }
             }
+        }
+
+        // 4. Update idle event sleep time if event object is provided
+        if (event && typeof event === 'object') {
+            try {
+                event.idleTime = this.sleepMs / 1000;
+            } catch (e) {}
         }
     };
 
@@ -292,6 +328,10 @@
         if (!this.isRunning) return;
         this.eventCount++;
 
+        // 1. Immediate reconnection check (throttled)
+        this.attemptConnection();
+
+        // 2. Active paragraph observation & dispatch
         if (this.textObserver) {
             var inApp = this.appInstance || (typeof app !== 'undefined' ? app : null);
             this.textObserver.captureActiveParagraph(inApp, this.bridgeSocket);
@@ -305,6 +345,27 @@
         if (!this.isRunning) return;
         this.eventCount++;
 
+        // 1. Immediate reconnection check (throttled)
+        this.attemptConnection();
+
+        // 2. Active paragraph observation & dispatch
+        if (this.textObserver) {
+            var inApp = this.appInstance || (typeof app !== 'undefined' ? app : null);
+            this.textObserver.captureActiveParagraph(inApp, this.bridgeSocket);
+        }
+    };
+
+    /**
+     * InDesign Application Activation event callback (window/document focus restored)
+     */
+    SmartLinterDaemon.prototype.onActivate = function(event) {
+        if (!this.isRunning) return;
+        this.eventCount++;
+
+        // 1. Immediate reconnection check (throttled)
+        this.attemptConnection();
+
+        // 2. Active paragraph observation & dispatch
         if (this.textObserver) {
             var inApp = this.appInstance || (typeof app !== 'undefined' ? app : null);
             this.textObserver.captureActiveParagraph(inApp, this.bridgeSocket);
