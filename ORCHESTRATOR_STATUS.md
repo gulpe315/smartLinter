@@ -1,6 +1,6 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-24 (Task 18 완료 — 사용자 요청으로 여기서 세션 중단)
+마지막 업데이트: 2026-08-24 (Task 19 헤드리스 하네스 파트 완료 — 실제 Word/InDesign 환경 검증은 다음 단계)
 
 ## 역할 및 협업 구조
 - **agy (Antigravity):** 구현 담당. 지시받은 태스크 단위로 코딩·검증 수행.
@@ -75,8 +75,13 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
 3. **핀 모드 (Task 11):** 헤더에 always-on-top 토글 — 단일 모니터 사용자의 창 전환 피로 완화 목적. 화면 가장자리 도킹은 범위 밖.
 4. **Tauri 앱 셸 통합 (Task 13.5, 신규):** 원 20개 태스크 계획에 "Rust 백엔드+React 프론트를 실제 Tauri 앱으로 묶는 작업"이 누락되어 있었음 — Task 13 검토 중 발견해 추가.
 
-## 다음 세션 즉시 실행 항목 — Task 19
-`IMPLEMENTATION_TASKS_FROM_AGY.md`의 **Task 19 (Word & InDesign 전체 워크플로우 E2E 통합 검증)**부터 이어서 진행. **주의:** Task 19는 Task 1~18 전체가 선행조건이며(전부 완료됨), 완료조건에 "실제(또는 헤드리스 하네스) Word/InDesign 환경"이 명시되어 있어 지금까지처럼 단순히 다음 태스크를 바로 dispatch하기 전에, 실제 Word/InDesign 사이드로드 환경이 준비되어 있는지 또는 헤드리스 하네스로 대체할지 사용자와 먼저 확인이 필요할 가능성이 높음. Task 20(패키징)은 Task 19 완료가 선행조건.
+## Task 19 진행 상황
+
+사용자가 "헤드리스 하네스 먼저, 이어서 실제 환경" 순서로 진행하기로 결정(2026-08-24).
+
+**헤드리스 하네스 파트 — 완료·승인, 커밋 `1f713c8`.** `tests/e2e/harness/mock_word_host.ts`, `mock_indesign_host.ts` + `workflow_word.test.ts`, `workflow_indesign.test.ts`(각 4개 시나리오, 실제 Ollama qwen2.5:7b 실시간 호출) + `run_all_e2e.ts` 러너. `npm run test:e2e`로 8개 시나리오 전부 Claude가 직접 재실행해 PASS 확인(Word 8.1s, InDesign 3.2s). 기존 스위트 전부 회귀 없이 통과(`npm test` 115, `npm run test:ui` 176, `cargo test` 91, `npm run build` 성공). `git status`/`diff`로 지시 범위 밖 파일 변경 없음 확인(`package.json`에 `test:e2e`/`test:e2e:runner` 스크립트 추가 + `tests/e2e/` 신규 디렉토리만).
+
+**다음 — 실제 Word/InDesign 환경 검증.** 이 부분은 agy에게 그냥 dispatch할 수 없음(실제 MS Word/Adobe InDesign 설치, Add-in 사이드로딩, 수동 관찰이 필요) — 사용자가 실제 환경 준비 상태를 먼저 확인해야 진행 가능. Task 20(패키징)은 Task 19 전체(헤드리스+실제 환경) 완료가 선행조건.
 
 **태스크 진행 사이클 (지금까지와 동일하게 반복):**
 1. Ollama 등 필요한 사전 조건 확인.
@@ -85,10 +90,10 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
 4. PASS면 체크포인트 커밋. 이슈 발견 시 사용자에게 보고 후 결정.
 5. 다음 태스크로.
 
-Task 18 이후 순서: Task 19(E2E 통합, 실제 Word/InDesign 필요) → Task 20(패키징/배포 빌드). 사용자가 "일단 Task 18까지만" 요청해 2026-08-24 세션은 여기서 중단.
+Task 18 이후 순서: Task 19(E2E 통합 — 헤드리스 하네스 완료·승인, 실제 Word/InDesign 환경 검증 남음) → Task 20(패키징/배포 빌드).
 
 ## 세션 재개 시 체크리스트
 1. 이 파일만 읽으면 충분 (Plan.md·IMPLEMENTATION_TASKS_FROM_AGY.md는 필요한 태스크 섹션만 참조, 처음부터 재검토 금지).
-2. `git log --oneline`으로 마지막 커밋이 `5e4fc3c`(Task 18)인지 확인 — 다르면 그 사이에 추가 진행이 있었다는 뜻이니 커밋 로그로 따라잡을 것.
-3. Task 19는 실제 Word/InDesign 환경 필요 여부부터 사용자와 확인 후 시작할 것(바로 agy에게 dispatch하지 말 것).
+2. `git log --oneline`으로 마지막 커밋이 `1f713c8`(Task 19 헤드리스 하네스)인지 확인 — 다르면 그 사이에 추가 진행이 있었다는 뜻이니 커밋 로그로 따라잡을 것.
+3. 다음 할 일은 Task 19의 **실제 Word/InDesign 환경 검증** — 사용자에게 실제 Office/InDesign 사이드로딩 환경 준비 상태부터 확인할 것(agy에게 바로 dispatch 불가, 실물 앱 조작 필요).
 4. agy 산출물 검토 시 `git status`/`git diff`로 지시받지 않은 파일이 함께 변경되지 않았는지 반드시 확인 (Task 14에서 무관한 테스트 파일이 몰래 약화된 전례 있음). agy 프롬프트에 "범위 밖 파일 건드리지 말 것, 버그 발견 시 직접 고치지 말고 보고만" 문구를 넣는 게 효과적이었음(Task 15·15.5부터 적용, 재발 없음) — 계속 유지할 것.
