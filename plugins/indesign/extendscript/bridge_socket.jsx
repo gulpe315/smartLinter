@@ -286,10 +286,7 @@
             activeDocument: activeDocument || undefined
         };
 
-        var res = this.httpRequest('POST', '/telemetry', {
-            type: 'HEARTBEAT',
-            payload: payload
-        });
+        var res = this.httpRequest('POST', '/heartbeat', payload);
 
         if (res.ok) {
             this.status = 'CONNECTED';

@@ -408,8 +408,14 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
 
         it('should transmit periodic Heartbeat and paragraph telemetry', () => {
             let lastDispatchedPayload: any = null;
+            let lastDispatchedPath: string | null = null;
             const env = new MockInDesignEnvironment();
             env.socketHandler = (req: string) => {
+                const firstLine = req.split('\r\n')[0];
+                const parts = firstLine.split(' ');
+                if (parts.length >= 2) {
+                    lastDispatchedPath = parts[1];
+                }
                 const bodyIndex = req.indexOf('\r\n\r\n');
                 if (bodyIndex !== -1) {
                     lastDispatchedPayload = JSON.parse(req.substring(bodyIndex + 4));
@@ -429,10 +435,10 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             // 1. Send Heartbeat
             const hbSent = bridgeSocket.sendHeartbeat('Magazine_Issue_42.indd');
             assert.equal(hbSent, true);
+            assert.equal(lastDispatchedPath, '/heartbeat');
             assert.ok(lastDispatchedPayload);
-            assert.equal(lastDispatchedPayload.type, 'HEARTBEAT');
-            assert.equal(lastDispatchedPayload.payload.editorType, 'InDesign');
-            assert.equal(lastDispatchedPayload.payload.activeDocument, 'Magazine_Issue_42.indd');
+            assert.equal(lastDispatchedPayload.editorType, 'InDesign');
+            assert.equal(lastDispatchedPayload.activeDocument, 'Magazine_Issue_42.indd');
 
             // 2. Send Telemetry
             const paraPayload: ParagraphPayload = {
@@ -445,6 +451,7 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             };
             const telSent = bridgeSocket.sendTelemetry(paraPayload);
             assert.equal(telSent, true);
+            assert.equal(lastDispatchedPath, '/telemetry');
             assert.equal(lastDispatchedPayload.paragraphId, 'indesign-para-123456');
             assert.equal(lastDispatchedPayload.editorType, 'InDesign');
         });

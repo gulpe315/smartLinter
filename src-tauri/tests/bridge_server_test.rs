@@ -42,7 +42,7 @@ async fn start_test_server(
     let sink = event_sink.unwrap_or_else(|| Arc::new(BroadcastEventSink::new(128)));
     let config = BridgeServerConfig::new()
         .with_port(0) // Bind to random free port
-        .with_heartbeat_timeout(heartbeat_timeout.unwrap_or(Duration::from_secs(5)));
+        .with_heartbeat_timeout(heartbeat_timeout.unwrap_or(Duration::from_secs(15)));
 
     let server = BridgeServer::new(config, auth.clone(), sink.clone());
     let handle = server.start().await.expect("Server should start successfully");
@@ -56,7 +56,7 @@ async fn test_default_config_constants() {
     assert_eq!(config.host, "127.0.0.1");
     assert_eq!(config.port, DEFAULT_BRIDGE_PORT);
     assert_eq!(config.port, 49152);
-    assert_eq!(config.heartbeat_timeout, Duration::from_secs(5));
+    assert_eq!(config.heartbeat_timeout, Duration::from_secs(15));
 }
 
 #[tokio::test]
@@ -585,4 +585,123 @@ async fn test_http_handshake_session_lifecycle_and_health() {
     assert_eq!(health_after_reauth["sessionId"], new_indesign_session_id);
 
     server.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn test_http_heartbeat_keeps_session_alive_and_updates_doc() {
+    let auth = Arc::new(AuthManager::new());
+    let sink = Arc::new(BroadcastEventSink::new(128));
+    let valid_token = auth.get_token().await;
+
+    // Configure 300ms timeout with 50ms check interval for rapid testing
+    let mut config = BridgeServerConfig::new()
+        .with_port(0)
+        .with_heartbeat_timeout(Duration::from_millis(300));
+    config.heartbeat_check_interval = Duration::from_millis(50);
+
+    let server = BridgeServer::new(config, auth.clone(), sink.clone());
+    let handle = server.start().await.unwrap();
+    let client = reqwest::Client::new();
+
+    // 1. Initial Handshake to create session
+    let handshake = AuthHandshake {
+        token: valid_token.clone(),
+        editor_type: EditorType::InDesign,
+        version: "1.0.0".to_string(),
+        client_nonce: generate_nonce(),
+    };
+    let res = client
+        .post(format!("{}/auth/handshake", handle.http_url()))
+        .json(&handshake)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    // Verify connected: true
+    let health: serde_json::Value = client
+        .get(format!("{}/health", handle.http_url()))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(health["connected"], true);
+    assert_eq!(health["activeEditor"], "InDesign");
+
+    // 2. Send 4 heartbeats spaced 100ms apart (total elapsed 400ms > 300ms timeout)
+    for i in 1..=4 {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let hb = HeartbeatPayload {
+            editor_type: EditorType::InDesign,
+            timestamp: smart_linter::server::session::current_timestamp_ms(),
+            active_document: Some(format!("Magazine_Page_{}.indd", i)),
+        };
+        let hb_res = client
+            .post(format!("{}/heartbeat", handle.http_url()))
+            .header("Authorization", format!("Bearer {}", valid_token))
+            .json(&hb)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(hb_res.status(), StatusCode::OK);
+    }
+
+    // Health should still be connected: true despite elapsed time > initial timeout
+    let health_after_hb: serde_json::Value = client
+        .get(format!("{}/health", handle.http_url()))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(health_after_hb["connected"], true);
+    assert_eq!(health_after_hb["activeEditor"], "InDesign");
+
+    let snapshot = handle.session_manager().get_snapshot().await.unwrap();
+    assert_eq!(snapshot.active_document, Some("Magazine_Page_4.indd".to_string()));
+
+    // 3. Stop sending heartbeats and wait for timeout (> 300ms)
+    tokio::time::sleep(Duration::from_millis(450)).await;
+
+    let health_timed_out: serde_json::Value = client
+        .get(format!("{}/health", handle.http_url()))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(health_timed_out["connected"], false);
+    assert!(health_timed_out["activeEditor"].is_null());
+
+    // 4. Test POST /heartbeat without active session returns 200 OK gracefully (no panic / no session creation)
+    let hb_no_session = HeartbeatPayload {
+        editor_type: EditorType::InDesign,
+        timestamp: smart_linter::server::session::current_timestamp_ms(),
+        active_document: Some("OrphanDoc.indd".to_string()),
+    };
+    let hb_no_session_res = client
+        .post(format!("{}/heartbeat", handle.http_url()))
+        .header("Authorization", format!("Bearer {}", valid_token))
+        .json(&hb_no_session)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(hb_no_session_res.status(), StatusCode::OK);
+    assert!(!handle.session_manager().is_connected().await);
+
+    // 5. Test POST /heartbeat with invalid token returns 401 Unauthorized
+    let hb_bad_token_res = client
+        .post(format!("{}/heartbeat", handle.http_url()))
+        .header("Authorization", "Bearer bad_pairing_token")
+        .json(&hb_no_session)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(hb_bad_token_res.status(), StatusCode::UNAUTHORIZED);
+
+    handle.shutdown().await.unwrap();
 }

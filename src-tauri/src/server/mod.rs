@@ -38,8 +38,10 @@ pub use ws_handler::close_codes;
 pub const DEFAULT_BRIDGE_PORT: u16 = 49152;
 /// Default host for the local bridge binding.
 pub const DEFAULT_BRIDGE_HOST: &str = "127.0.0.1";
-/// Default heartbeat timeout duration (5 seconds).
-pub const DEFAULT_HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(5);
+/// Default heartbeat timeout duration (15 seconds).
+/// Increased from 5s to 15s to provide a 3x buffer over the InDesign daemon's 5s heartbeat interval (5000ms),
+/// preventing premature disconnection from minor network or event loop jitter.
+pub const DEFAULT_HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(15);
 /// Default heartbeat evaluation interval (1 second).
 pub const DEFAULT_HEARTBEAT_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 

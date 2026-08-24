@@ -12,7 +12,9 @@ use axum::Router;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::protocol::{AuthHandshake, AuthResponse, ParagraphPayload, ReplacementCommand};
+use crate::protocol::{
+    AuthHandshake, AuthResponse, HeartbeatPayload, ParagraphPayload, ReplacementCommand,
+};
 use crate::server::session::{SessionError, SessionSnapshot};
 use crate::server::ws_handler::ws_upgrade_handler;
 use crate::server::ServerState;
@@ -69,6 +71,7 @@ pub fn create_router(state: Arc<ServerState>) -> Router {
         .route("/health", get(health_check_handler))
         .route("/auth/handshake", post(auth_handshake_handler))
         .route("/telemetry", post(telemetry_handler))
+        .route("/heartbeat", post(heartbeat_handler))
         .route("/command", post(send_command_handler))
         .route("/status", get(session_status_handler))
         .route("/ws", get(ws_upgrade_handler))
@@ -197,6 +200,43 @@ pub async fn telemetry_handler(
         StatusCode::OK,
         Json(ApiResponse::ok(serde_json::json!({
             "paragraphId": payload.paragraph_id,
+            "status": "received"
+        }))),
+    )
+        .into_response()
+}
+
+/// Periodic heartbeat ingestion endpoint (`POST /heartbeat`).
+///
+/// Requires valid token authentication. Receives `HeartbeatPayload` from HTTP-based editor plugins (e.g. InDesign).
+pub async fn heartbeat_handler(
+    State(state): State<Arc<ServerState>>,
+    headers: HeaderMap,
+    Json(payload): Json<HeartbeatPayload>,
+) -> Response {
+    let token_candidate = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .or_else(|| headers.get("x-bridge-token").and_then(|v| v.to_str().ok()));
+
+    if !state.auth_manager.validate_bearer_or_raw(token_candidate).await {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ApiResponse::<()>::err("401 Unauthorized: Invalid or missing pairing token")),
+        )
+            .into_response();
+    }
+
+    if let Some(snapshot) = state.session_manager.get_snapshot().await {
+        let _ = state
+            .session_manager
+            .record_heartbeat(&snapshot.session_id, payload.active_document)
+            .await;
+    }
+
+    (
+        StatusCode::OK,
+        Json(ApiResponse::ok(serde_json::json!({
             "status": "received"
         }))),
     )
