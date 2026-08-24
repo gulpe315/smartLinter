@@ -375,6 +375,30 @@ graph TD
 
 ---
 
+### Task 13.5: Tauri 앱 셸 통합 (Tauri App Shell Integration) — 신규 추가
+* **(1) 목표:**
+  * **[설계 결정 완료 사항 (2026-08-24, 사용자 위임에 따른 기본값 확정)]** 지금까지 `src-tauri/`는 axum 브릿지 서버 + AI/TM 라이브러리 코드일 뿐, 실제 `tauri` 크레이트 의존성도 없고 `main.rs`는 버전 문자열만 출력하는 더미였음(원래 20개 태스크 계획에 이 통합 작업이 누락되어 있었음 — Task 13 검토 중 사용자가 발견). 이 태스크에서 지금까지 따로 만들어진 Rust 백엔드(server/, ai/, tm/, protocol/)와 React 프론트엔드(src/)를 하나의 실제 Tauri 데스크톱 앱으로 묶는다.
+* **(2) 설계 근거:**
+  * `SmartLinter_Plan.md` > `1.B. 메인 두뇌 (Standalone Dashboard App)`
+  * Task 20의 완료조건("`npm run tauri build` 성공")이 전제하는 통합 작업
+* **(3) 완료조건 (Acceptance Criteria):**
+  * `src-tauri/Cargo.toml`에 `tauri` 크레이트(2.x) 의존성 추가, `tauri.conf.json` 작성(프론트엔드 빌드 산출물 `dist/`를 webview로 로드).
+  * `main.rs`를 `tauri::Builder::default()` 기반 실제 앱 엔트리포인트로 교체 — Task 3의 브릿지 서버를 Tauri 앱 시작 시 백그라운드로 함께 구동.
+  * Task 3의 `BridgeEventSink` 트레이트(`emit(bridge-status-changed)` 등 추상화)를 실제 Tauri 윈도우의 `app_handle.emit()` 호출로 연결.
+  * Task 11의 `PinToggleButton`이 호출하는 `IBridgeService.setAlwaysOnTop()`을 실제 Tauri 윈도우 API(`window.setAlwaysOnTop()`)로 연결하는 Tauri command(`#[tauri::command]`) 추가.
+  * `npm run tauri dev`로 실제 데스크톱 창이 뜨고, 대시보드 UI가 정상 렌더링되며, 브릿지 서버(127.0.0.1:49152)가 함께 구동됨을 확인.
+  * 기존 Rust/TS 테스트(`cargo test`, `npm test`, `npm run test:ui`)와 `npm run build`가 회귀 없이 통과.
+* **(4) 선행 조건/의존성:**
+  * Task 3 (브릿지 서버), Task 11 (대시보드 셸)
+* **(5) 예상 산출물:**
+  * `src-tauri/Cargo.toml` (tauri 의존성 추가)
+  * `src-tauri/tauri.conf.json`
+  * `src-tauri/src/main.rs` (재작성)
+  * `src-tauri/src/commands.rs` (Tauri command 핸들러: `set_always_on_top` 등)
+  * `src-tauri/build.rs` (필요시)
+
+---
+
 ### Task 14: 고속 TM Fuzzy Match 제안 뷰어 (TM Match Viewer & Instant Replacer)
 * **(1) 목표:**
   * 문단 수신 시 0.1초 만에 계산된 TM Fuzzy Match 후보군을 카드 형태로 표시하고, 일치율(Score %)에 따른 시각적 뱃지와 원클릭 교체 기능을 제공하는 전용 패널을 구현합니다.
@@ -537,6 +561,7 @@ graph TD
 | **11** | **Task 11: 대시보드 셸 & 반응형 레이아웃** | Frontend UI | Task 3 | React/Tailwind 골격 |
 | **12** | **Task 12: 설정/가이드라인 & TM 제어 패널** | Frontend UI | Task 6, 11 | 배치 진행률 및 설정 |
 | **13** | **Task 13: 실시간 QA 카드 리스트 & 인라인 Diff** | Frontend UI | Task 5, 11 | 핵심 QA UI |
+| **13.5** | **Task 13.5: Tauri 앱 셸 통합 (신규)** | Infra | Task 3, 11 | 실제 데스크톱 앱으로 배선 |
 | **14** | **Task 14: 고속 TM Fuzzy Match 제안 뷰어** | Frontend UI | Task 6, 11 | 0.1초 TM 카드 |
 | **15** | **Task 15: 하단 AI 커맨드 채팅 & 즉시 수정** | Frontend UI | Task 4, 13 | Action-First 채팅 |
 | **16** | **Task 16: Stale 충돌 방지 & 단일 문단 자동 재스캔** | Resilience | Task 8, 10, 13 | 재스캔 UX 완결 |
