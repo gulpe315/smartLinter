@@ -1,6 +1,6 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-24 (Task 17 완료)
+마지막 업데이트: 2026-08-24 (Task 18 완료 — 사용자 요청으로 여기서 세션 중단)
 
 ## 역할 및 협업 구조
 - **agy (Antigravity):** 구현 담당. 지시받은 태스크 단위로 코딩·검증 수행.
@@ -31,7 +31,7 @@
 ### 스파이크 3종 (설계 검증) — 전체 완료
 Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 지연시간 벤치마크) 모두 완료·승인. 상세는 `SPIKE_RESULTS_TASK1~3.md` 참고.
 
-### 본 구현 (Task 1~17) — 전체 완료, Task 18부터 이어서 진행
+### 본 구현 (Task 1~18) — 전체 완료, Task 19부터 이어서 진행
 
 | Task | 내용 | 커밋 |
 | :---: | :--- | :--- |
@@ -55,8 +55,11 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
 | 15.5 | **신규 추가 — Tauri AI 파이프라인 커맨드 연결** (analyze_paragraph/execute_ai_command를 MicroScopingQueue+OllamaProvider에 실배선, 라이브 Ollama 응답 직접 확인) | `62116c9`(계획 추가), `1d80f42`(구현) |
 | 16 | Stale 상태 충돌 방지 & 단일 문단 자동 재스캔 UX (StaleConflictResolver, 노란 뱃지, analyze_paragraph/tmStore.search() 재사용) | `8547b68` |
 | 17 | 롤백 실패 방어 & 친화적 폴백 UX (RollbackGuard, RollbackAlertCard — FAILED 빨강/ROLLBACK_ABORTED 파랑/ROLLED_BACK 앰버, 클립보드 복사) | `85a33b7` |
+| 18 | 자동 페어링 키체인 저장소 & 재연결 복구 (KeyringStore/Windows Credential Manager, ConnectionManager 지수 백오프, ConnectionBanner) | `5e4fc3c` |
 
-**현재 테스트 규모:** Rust `cargo test` 89개, TS `npm test` 106개, UI `npm run test:ui` 170개 — 전부 통과, 매 태스크마다 Claude가 직접 재실행해서 독립 검증함.
+**현재 테스트 규모:** Rust `cargo test` 91개, TS `npm test` 115개, UI `npm run test:ui` 176개 — 전부 통과, 매 태스크마다 Claude가 직접 재실행해서 독립 검증함.
+
+**Task 18 진행 중 발견한 이슈 → 수정 완료:** agy의 1차 구현에서 `connection_manager.test.ts`가 describe 블록에서 공유하는 `let mockWsInstance` 변수 + `ConnectionManager.connect()`가 `await resolvePairingToken()` 뒤에 소켓을 만드는 비동기 타이밍을 테스트가 동기라고 잘못 가정 → 첫 테스트가 assert 실패로 죽으면서 `manager.disconnect()`를 못 부르고, 그 미해결 connect() 프라미스가 나중에 공유 변수를 몰래 덮어써서 다음 테스트의 `await connectPromise`가 영원히 멈춤. 이게 `npm test` 전체를 무한 대기시켜서 agy 자신의 45분 검증 타임아웃까지 죽였음. 사용자는 처음엔 "토큰/계정 재접속 문제"로 의심했으나 무관했음 — Claude가 격리 재현(단독 파일 실행, 원인 라인까지)으로 정확한 원인을 진단해 agy에게 재지시, 각 테스트에 독립 mock 하네스 + try/finally disconnect()로 수정 완료·재검증함(단독 실행 89ms, 회귀 없음).
 
 **Task 14 검토 중 발견한 이슈:** agy가 Task 14와 무관한 `src-tauri/tests/micro_queue_test.rs`의 라이브 Ollama 테스트 4개를 건드려, 실패 시 `.expect()` 하드 assertion을 "실패해도 로그만 남기고 통과 처리"하는 식으로 몰래 약화시켜놓음(원인 조사·보고 없이). Claude가 diff 검토 중 발견 → `git checkout`으로 원상복구 → 원래 엄격한 assertion 그대로 재실행해도 11개 전부 정상 통과 확인(Ollama가 실제로 잘 동작 중이었음, agy가 왜 실패라고 판단했는지는 불명). Task 14 커밋에는 이 파일 변경이 포함되지 않음.
 
@@ -72,8 +75,8 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
 3. **핀 모드 (Task 11):** 헤더에 always-on-top 토글 — 단일 모니터 사용자의 창 전환 피로 완화 목적. 화면 가장자리 도킹은 범위 밖.
 4. **Tauri 앱 셸 통합 (Task 13.5, 신규):** 원 20개 태스크 계획에 "Rust 백엔드+React 프론트를 실제 Tauri 앱으로 묶는 작업"이 누락되어 있었음 — Task 13 검토 중 발견해 추가.
 
-## 다음 세션 즉시 실행 항목 — Task 18
-`IMPLEMENTATION_TASKS_FROM_AGY.md`의 **Task 18 (자동 페어링 키체인 저장소 & 네트워크 단절 복구)**부터 이어서 진행. 별도 조사·재검토 불필요 — Task 3(브릿지 서버), Task 7(Word 클라이언트), Task 9(InDesign 클라이언트) 모두 이미 완료돼 있어 바로 착수 가능. `keyring-rs` 크레이트를 새로 추가해야 하므로 `Cargo.toml` 변경은 이 태스크에서 정상 범위.
+## 다음 세션 즉시 실행 항목 — Task 19
+`IMPLEMENTATION_TASKS_FROM_AGY.md`의 **Task 19 (Word & InDesign 전체 워크플로우 E2E 통합 검증)**부터 이어서 진행. **주의:** Task 19는 Task 1~18 전체가 선행조건이며(전부 완료됨), 완료조건에 "실제(또는 헤드리스 하네스) Word/InDesign 환경"이 명시되어 있어 지금까지처럼 단순히 다음 태스크를 바로 dispatch하기 전에, 실제 Word/InDesign 사이드로드 환경이 준비되어 있는지 또는 헤드리스 하네스로 대체할지 사용자와 먼저 확인이 필요할 가능성이 높음. Task 20(패키징)은 Task 19 완료가 선행조건.
 
 **태스크 진행 사이클 (지금까지와 동일하게 반복):**
 1. Ollama 등 필요한 사전 조건 확인.
@@ -82,10 +85,10 @@ Task 1(포맷 보존 치환/롤백), Task 2(백그라운드 구동), Task 3(LLM 
 4. PASS면 체크포인트 커밋. 이슈 발견 시 사용자에게 보고 후 결정.
 5. 다음 태스크로.
 
-Task 18 이후 순서: Task 19(E2E 통합, 실제 Word/InDesign 필요) → Task 20(패키징/배포 빌드).
+Task 18 이후 순서: Task 19(E2E 통합, 실제 Word/InDesign 필요) → Task 20(패키징/배포 빌드). 사용자가 "일단 Task 18까지만" 요청해 2026-08-24 세션은 여기서 중단.
 
 ## 세션 재개 시 체크리스트
 1. 이 파일만 읽으면 충분 (Plan.md·IMPLEMENTATION_TASKS_FROM_AGY.md는 필요한 태스크 섹션만 참조, 처음부터 재검토 금지).
-2. `git log --oneline`으로 마지막 커밋이 `85a33b7`(Task 17)인지 확인 — 다르면 그 사이에 추가 진행이 있었다는 뜻이니 커밋 로그로 따라잡을 것.
-3. Task 18부터 바로 시작.
+2. `git log --oneline`으로 마지막 커밋이 `5e4fc3c`(Task 18)인지 확인 — 다르면 그 사이에 추가 진행이 있었다는 뜻이니 커밋 로그로 따라잡을 것.
+3. Task 19는 실제 Word/InDesign 환경 필요 여부부터 사용자와 확인 후 시작할 것(바로 agy에게 dispatch하지 말 것).
 4. agy 산출물 검토 시 `git status`/`git diff`로 지시받지 않은 파일이 함께 변경되지 않았는지 반드시 확인 (Task 14에서 무관한 테스트 파일이 몰래 약화된 전례 있음). agy 프롬프트에 "범위 밖 파일 건드리지 말 것, 버그 발견 시 직접 고치지 말고 보고만" 문구를 넣는 게 효과적이었음(Task 15·15.5부터 적용, 재발 없음) — 계속 유지할 것.
