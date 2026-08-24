@@ -7,10 +7,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::sync::Arc;
+use smart_linter::ai::{DEFAULT_MODEL_NAME, LocalLlmProvider, MicroScopingQueue, OllamaProvider};
 use smart_linter::commands;
 use smart_linter::protocol::{ParagraphPayload, ReplacementResult};
 use smart_linter::server::{BridgeEventSink, BridgeServer, BridgeStatusEvent};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Tauri implementation of `BridgeEventSink` that emits events to the Tauri webview.
 pub struct TauriBridgeEventSink {
@@ -52,6 +53,12 @@ fn main() {
             let app_handle = app.handle().clone();
             let event_sink = Arc::new(TauriBridgeEventSink::new(app_handle));
 
+            // Initialize Local LLM Provider & MicroScopingQueue (Task 4, 15.5)
+            let ollama_provider: Arc<dyn LocalLlmProvider> =
+                Arc::new(OllamaProvider::with_default_url());
+            let queue = MicroScopingQueue::new(ollama_provider, DEFAULT_MODEL_NAME);
+            app.manage(queue);
+
             // Launch Local Bridge Server (Task 3) in background runtime
             tauri::async_runtime::spawn(async move {
                 let server = BridgeServer::with_defaults(event_sink);
@@ -74,7 +81,11 @@ fn main() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::set_always_on_top])
+        .invoke_handler(tauri::generate_handler![
+            commands::set_always_on_top,
+            commands::analyze_paragraph,
+            commands::execute_ai_command
+        ])
         .run(tauri::generate_context!())
         .expect("error while running SmartLinter tauri application");
 }
