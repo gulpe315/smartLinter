@@ -232,15 +232,21 @@ pub async fn heartbeat_handler(
             .session_manager
             .record_heartbeat(&snapshot.session_id, payload.active_document)
             .await;
-    }
 
-    (
-        StatusCode::OK,
-        Json(ApiResponse::ok(serde_json::json!({
-            "status": "received"
-        }))),
-    )
-        .into_response()
+        (
+            StatusCode::OK,
+            Json(ApiResponse::ok(serde_json::json!({
+                "status": "received"
+            }))),
+        )
+            .into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::<()>::err("404 Not Found: No active editor session")),
+        )
+            .into_response()
+    }
 }
 
 /// Replacement command dispatcher endpoint (`POST /command`).

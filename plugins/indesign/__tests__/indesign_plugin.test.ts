@@ -456,6 +456,37 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             assert.equal(lastDispatchedPayload.editorType, 'InDesign');
         });
 
+        it('should demote status to ERROR when heartbeat fails (e.g. 404 Not Found on expired session)', () => {
+            const env = new MockInDesignEnvironment();
+            env.socketHandler = (req: string) => {
+                if (req.includes('POST /heartbeat')) {
+                    const bodyStr = JSON.stringify({ success: false, error: '404 Not Found: No active editor session' });
+                    return `HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+                }
+                const bodyStr = JSON.stringify({ success: true });
+                return `HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bodyStr.length}\r\n\r\n${bodyStr}`;
+            };
+
+            const sandbox = loadExtendScript(bridgeSocketPath);
+            const bridgeSocket = new sandbox.SmartLinterBridgeSocket({
+                host: '127.0.0.1',
+                port: serverPort,
+                token: validToken,
+                socketFactory: env.createSocketFactory()
+            });
+
+            // Simulate previously connected socket
+            bridgeSocket.status = 'CONNECTED';
+            assert.equal(bridgeSocket.status, 'CONNECTED');
+
+            // Send Heartbeat against mock server returning 404
+            const hbSent = bridgeSocket.sendHeartbeat('Magazine_Issue_42.indd');
+            assert.equal(hbSent, false);
+            assert.equal(bridgeSocket.status, 'ERROR');
+            assert.ok(bridgeSocket.lastError);
+            assert.ok(bridgeSocket.lastError.includes('404') || bridgeSocket.lastError.includes('No active editor session'));
+        });
+
         it('should bootstrap pairing token from local pairing_token.txt file when present (Task 18.5)', () => {
             const tempDir = fs.mkdtempSync(path.join(path.resolve(__dirname, '../../../'), 'temp-token-test-'));
             const appDataSmartLinterDir = path.join(tempDir, 'SmartLinter');

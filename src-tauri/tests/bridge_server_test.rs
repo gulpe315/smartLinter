@@ -677,7 +677,7 @@ async fn test_http_heartbeat_keeps_session_alive_and_updates_doc() {
     assert_eq!(health_timed_out["connected"], false);
     assert!(health_timed_out["activeEditor"].is_null());
 
-    // 4. Test POST /heartbeat without active session returns 200 OK gracefully (no panic / no session creation)
+    // 4. Test POST /heartbeat without active session returns 404 Not Found (session expired / zombie recovery trigger)
     let hb_no_session = HeartbeatPayload {
         editor_type: EditorType::InDesign,
         timestamp: smart_linter::server::session::current_timestamp_ms(),
@@ -690,7 +690,7 @@ async fn test_http_heartbeat_keeps_session_alive_and_updates_doc() {
         .send()
         .await
         .unwrap();
-    assert_eq!(hb_no_session_res.status(), StatusCode::OK);
+    assert_eq!(hb_no_session_res.status(), StatusCode::NOT_FOUND);
     assert!(!handle.session_manager().is_connected().await);
 
     // 5. Test POST /heartbeat with invalid token returns 401 Unauthorized

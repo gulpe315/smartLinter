@@ -292,8 +292,11 @@
             this.status = 'CONNECTED';
             this.lastHeartbeatTimestamp = payload.timestamp;
             return true;
+        } else {
+            this.status = 'ERROR';
+            this.lastError = (res.body && res.body.error) || (res.body && res.body.message) || ('Heartbeat failed with status ' + res.statusCode);
+            return false;
         }
-        return false;
     };
 
     /**
