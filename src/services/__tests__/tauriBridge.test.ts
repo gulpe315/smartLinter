@@ -26,6 +26,9 @@ describe('TauriBridgeService & IPC Integration', () => {
     const health = await service.fetchBridgeHealth();
     expect(health.version).toBe('0.1.0-mock');
 
+    expect(await service.checkIndesignStatus()).toBe(false);
+    await expect(service.connectIndesign()).resolves.toBeUndefined();
+
     const command: ReplacementCommand = {
       commandId: 'cmd-1',
       paragraphId: 'para-1',
@@ -52,6 +55,27 @@ describe('TauriBridgeService & IPC Integration', () => {
 
     expect(invokeMock).toHaveBeenCalledWith('set_always_on_top', { pinned: true });
     expect(isPinned).toBe(true);
+
+    service.destroy();
+  });
+
+  it('invokes InDesign commands through Tauri when available', async () => {
+    const invokeMock = vi
+      .fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(undefined);
+    (window as any).__TAURI__ = {
+      core: {
+        invoke: invokeMock,
+      },
+    };
+
+    const service = new TauriBridgeService();
+
+    expect(await service.checkIndesignStatus()).toBe(true);
+    await expect(service.connectIndesign()).resolves.toBeUndefined();
+    expect(invokeMock).toHaveBeenNthCalledWith(1, 'check_indesign_status');
+    expect(invokeMock).toHaveBeenNthCalledWith(2, 'connect_indesign');
 
     service.destroy();
   });

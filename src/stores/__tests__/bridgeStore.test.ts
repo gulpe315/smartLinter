@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useBridgeStore } from '../bridgeStore.ts';
 import { MockBridgeService } from '../../services/tauriBridge.ts';
 import { type ParagraphPayload } from '../../../shared/protocol/types.ts';
@@ -116,6 +116,28 @@ describe('SmartLinter Bridge Zustand Store', () => {
     useBridgeStore.getState().setPinned(false);
     expect(useBridgeStore.getState().pinned).toBe(false);
     expect(mockService.isAlwaysOnTop()).toBe(false);
+  });
+
+  it('connects InDesign and refreshes the editor status', async () => {
+    const { setBridgeService } = await import('../../services/tauriBridge.ts');
+    const connectIndesign = vi.spyOn(mockService, 'connectIndesign');
+    vi.spyOn(mockService, 'fetchBridgeHealth').mockResolvedValue({
+      connected: true,
+      editorType: 'InDesign',
+      activeDocument: 'Catalog_2026.indd',
+    });
+    setBridgeService(mockService);
+
+    const connecting = useBridgeStore.getState().connectIndesign();
+    expect(useBridgeStore.getState().isConnectingIndesign).toBe(true);
+
+    await connecting;
+
+    expect(connectIndesign).toHaveBeenCalledOnce();
+    expect(useBridgeStore.getState().isConnectingIndesign).toBe(false);
+    expect(useBridgeStore.getState().editorConnected).toBe(true);
+    expect(useBridgeStore.getState().editorType).toBe('InDesign');
+    expect(useBridgeStore.getState().activeDocument).toBe('Catalog_2026.indd');
   });
 
   it('should manage paragraphs telemetry and deduplicate by paragraphId', () => {

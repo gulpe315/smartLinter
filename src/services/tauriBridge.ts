@@ -134,6 +134,12 @@ export interface IBridgeService {
   /** Sets always-on-top window pin state (Pin Mode) */
   setAlwaysOnTop(pinned: boolean): Promise<boolean>;
 
+  /** Checks whether Adobe InDesign is currently available to connect. */
+  checkIndesignStatus(): Promise<boolean>;
+
+  /** Opens or connects to the Adobe InDesign integration. */
+  connectIndesign(): Promise<void>;
+
   /** Disconnects all listeners and cleans up resources */
   destroy(): void;
 }
@@ -512,6 +518,14 @@ export class MockBridgeService implements IBridgeService {
     return this.alwaysOnTop;
   }
 
+  async checkIndesignStatus(): Promise<boolean> {
+    return false;
+  }
+
+  async connectIndesign(): Promise<void> {
+    return Promise.resolve();
+  }
+
   isAlwaysOnTop(): boolean {
     return this.alwaysOnTop;
   }
@@ -831,6 +845,24 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     return this.fallbackService.setAlwaysOnTop(pinned);
+  }
+
+  async checkIndesignStatus(): Promise<boolean> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.checkIndesignStatus();
+    }
+
+    const tauri = (window as any).__TAURI__;
+    return tauri.core.invoke('check_indesign_status');
+  }
+
+  async connectIndesign(): Promise<void> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.connectIndesign();
+    }
+
+    const tauri = (window as any).__TAURI__;
+    await tauri.core.invoke('connect_indesign');
   }
 
   destroy(): void {

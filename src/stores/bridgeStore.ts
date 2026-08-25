@@ -32,6 +32,7 @@ export interface BridgeState {
   isReconnecting: boolean;
   reconnectAttempt: number;
   nextRetryDelayMs: number;
+  isConnectingIndesign: boolean;
 
   // --- LLM Status ---
   llmAlive: boolean;
@@ -77,6 +78,7 @@ export interface BridgeState {
   toggleSplitMode: () => void;
   setPinned: (pinned: boolean) => void;
   togglePin: () => void;
+  connectIndesign: () => Promise<void>;
   addParagraph: (payload: ParagraphPayload) => void;
   setActiveParagraph: (paragraph: ParagraphPayload | null) => void;
   setLastReplacementResult: (result: ReplacementResult | null) => void;
@@ -96,6 +98,7 @@ const initialState = {
   isReconnecting: false,
   reconnectAttempt: 0,
   nextRetryDelayMs: 0,
+  isConnectingIndesign: false,
 
   llmAlive: false,
   llmProvider: 'ollama',
@@ -206,6 +209,21 @@ export const useBridgeStore = create<BridgeState>((set, get) => ({
     getBridgeService().setAlwaysOnTop(nextPinned).catch((err) => {
       console.warn('Failed to toggle always on top:', err);
     });
+  },
+
+  connectIndesign: async () => {
+    set({ isConnectingIndesign: true });
+
+    try {
+      const bridgeService = getBridgeService();
+      await bridgeService.connectIndesign();
+      const status = await bridgeService.fetchBridgeHealth();
+      get().setEditorStatus(status);
+    } catch (err) {
+      console.warn('Failed to connect to InDesign:', err);
+    } finally {
+      set({ isConnectingIndesign: false });
+    }
   },
 
   addParagraph: (payload) =>

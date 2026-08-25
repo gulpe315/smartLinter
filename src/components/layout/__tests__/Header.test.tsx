@@ -1,12 +1,14 @@
 import React from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Header } from '../Header.tsx';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
+import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
 
 describe('Header Component', () => {
   beforeEach(() => {
     useBridgeStore.getState().reset();
+    setBridgeService(new MockBridgeService());
   });
 
   it('renders branding and default standby badges', () => {
@@ -27,6 +29,27 @@ describe('Header Component', () => {
     // TM status: not loaded
     const tmBadge = screen.getByTestId('tm-status-badge');
     expect(tmBadge).toHaveTextContent('TM: 미로드');
+  });
+
+  it('calls the InDesign connect action when the button is clicked', async () => {
+    const connectIndesign = vi.fn().mockResolvedValue(undefined);
+    useBridgeStore.setState({ connectIndesign });
+
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('connect-indesign-btn'));
+
+    await waitFor(() => {
+      expect(connectIndesign).toHaveBeenCalledOnce();
+    });
+  });
+
+  it('disables the InDesign connect button while a connection is in progress', () => {
+    useBridgeStore.setState({ isConnectingIndesign: true });
+
+    render(<Header />);
+
+    expect(screen.getByTestId('connect-indesign-btn')).toBeDisabled();
+    expect(screen.getByTestId('connect-indesign-btn')).toHaveTextContent('연결 중...');
   });
 
   it('renders connected Word editor badge with active document', () => {

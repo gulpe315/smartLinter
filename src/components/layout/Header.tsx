@@ -16,6 +16,7 @@ import {
   Rows,
   Radio,
   AlertCircle,
+  RefreshCw,
   Settings,
 } from 'lucide-react';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
@@ -28,6 +29,8 @@ export const Header: React.FC = () => {
     editorConnected,
     editorType,
     activeDocument,
+    isConnectingIndesign,
+    connectIndesign,
     llmAlive,
     llmModel,
     llmLatency,
@@ -101,6 +104,20 @@ export const Header: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {!editorConnected && (
+            <button
+              type="button"
+              data-testid="connect-indesign-btn"
+              onClick={connectIndesign}
+              disabled={isConnectingIndesign}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-pink-900/60 hover:bg-pink-800/70 disabled:bg-slate-800 disabled:text-slate-500 border border-pink-700/60 disabled:border-slate-700 text-pink-200 text-xs font-medium transition-colors disabled:cursor-not-allowed"
+              title="InDesign 연결"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isConnectingIndesign ? 'animate-spin' : ''}`} />
+              <span>{isConnectingIndesign ? '연결 중...' : 'InDesign 연결'}</span>
+            </button>
+          )}
 
           {/* LLM Status Indicator (Click to open Settings) */}
           <button
