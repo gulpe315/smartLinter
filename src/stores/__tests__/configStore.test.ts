@@ -43,6 +43,24 @@ describe('useConfigStore', () => {
     expect(useConfigStore.getState().selectedModel).toBe('llama3.1:8b');
     expect(localStorage.getItem('smartlinter_selected_model')).toBe('llama3.1:8b');
     expect(useBridgeStore.getState().llmModel).toBe('llama3.1:8b');
+    expect(useBridgeStore.getState().llmAlive).toBe(true);
+  });
+
+  it('keeps the newest Ollama health result when requests resolve out of order', async () => {
+    let resolveFirst!: (value: any) => void;
+    let resolveSecond!: (value: any) => void;
+    mockBridge.checkOllamaHealth = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSecond = resolve; }));
+
+    const first = useConfigStore.getState().refreshLlmHealth();
+    const second = useConfigStore.getState().refreshLlmHealth();
+    resolveSecond({ isAlive: true, provider: 'ollama', activeModel: 'qwen2.5:7b' });
+    await second;
+    resolveFirst({ isAlive: false, provider: 'ollama', activeModel: 'qwen2.5:7b', message: 'stale' });
+    await first;
+
+    expect(useBridgeStore.getState().llmAlive).toBe(true);
   });
 
   it('should load custom guideline text, sync bridgeStore and allow reset', async () => {

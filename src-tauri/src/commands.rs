@@ -251,6 +251,47 @@ pub async fn list_ollama_models(
     provider.list_models().await.map_err(|error| format!("Failed to list Ollama models: {error}"))
 }
 
+/// Checks the Ollama daemon directly and verifies that the selected model is installed.
+#[tauri::command]
+pub async fn check_ollama_health(
+    host: Option<String>,
+    model_name: String,
+    queue: State<'_, MicroScopingQueue>,
+) -> Result<crate::ai::LlmHealthStatus, String> {
+    let provider: std::sync::Arc<dyn LocalLlmProvider> = match host.filter(|value| !value.trim().is_empty()) {
+        Some(host) => std::sync::Arc::new(OllamaProvider::new(host)),
+        None => queue.provider(),
+    };
+    let mut health = provider.health_check().await
+        .map_err(|error| format!("Failed to check Ollama health: {error}"))?;
+
+    if !health.is_alive {
+        return Ok(health);
+    }
+
+    let selected_model = model_name.trim();
+    if selected_model.is_empty() {
+        health.is_alive = false;
+        health.message = Some("No Ollama model is selected".to_string());
+        return Ok(health);
+    }
+
+    let model_installed = provider
+        .list_models()
+        .await
+        .map_err(|error| format!("Failed to verify installed Ollama models: {error}"))?
+        .iter()
+        .any(|model| model.name == selected_model || model.model == selected_model);
+
+    health.active_model = Some(selected_model.to_string());
+    if !model_installed {
+        health.is_alive = false;
+        health.message = Some(format!("Selected Ollama model '{selected_model}' is not installed"));
+    }
+
+    Ok(health)
+}
+
 /// Selects the default model used by subsequent queued AI jobs.
 #[tauri::command]
 pub async fn set_ollama_model(model_name: String, queue: State<'_, MicroScopingQueue>) -> Result<bool, String> {

@@ -117,6 +117,8 @@ export interface IBridgeService {
   /** Fetches installed Ollama models via GET /api/tags or Tauri backend */
   fetchOllamaModels(host?: string): Promise<ModelInfo[]>;
 
+  /** Checks the Ollama daemon and verifies that the selected model is installed. */
+  checkOllamaHealth(host: string | undefined, modelName: string): Promise<LlmStatusPayload>;
 
   /** Sets the active Ollama model */
   setOllamaModel(modelName: string): Promise<boolean>;
@@ -431,6 +433,17 @@ export class MockBridgeService implements IBridgeService {
     return [...this.mockModels];
   }
 
+  async checkOllamaHealth(_host: string | undefined, modelName: string): Promise<LlmStatusPayload> {
+    const installed = this.mockModels.some((model) => model.name === modelName || model.model === modelName);
+    return {
+      isAlive: installed,
+      provider: 'ollama',
+      activeModel: modelName,
+      latencyMs: 42,
+      message: installed ? undefined : `Selected Ollama model '${modelName}' is not installed`,
+    };
+  }
+
   async setOllamaModel(modelName: string): Promise<boolean> {
     this.currentModel = modelName;
     this.emit('llm-status-changed', {
@@ -720,6 +733,40 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     return this.fallbackService.fetchOllamaModels(host);
+  }
+
+  async checkOllamaHealth(host: string | undefined, modelName: string): Promise<LlmStatusPayload> {
+    if (!this.isTauriAvailable()) {
+      try {
+        const ollamaUrl = (host || 'http://127.0.0.1:11434').replace(/\/$/, '');
+        const start = performance.now();
+        const [versionResponse, tagsResponse] = await Promise.all([
+          fetch(`${ollamaUrl}/api/version`),
+          fetch(`${ollamaUrl}/api/tags`),
+        ]);
+        if (!versionResponse.ok || !tagsResponse.ok) {
+          return { isAlive: false, provider: 'ollama', activeModel: modelName, message: 'Ollama health check failed' };
+        }
+        const tags = await tagsResponse.json();
+        const installed = Array.isArray(tags.models) && tags.models.some((model: any) => model.name === modelName || model.model === modelName);
+        return {
+          isAlive: installed,
+          provider: 'ollama',
+          activeModel: modelName,
+          latencyMs: Math.round(performance.now() - start),
+          message: installed ? undefined : `Selected Ollama model '${modelName}' is not installed`,
+        };
+      } catch (error) {
+        return { isAlive: false, provider: 'ollama', activeModel: modelName, message: error instanceof Error ? error.message : 'Cannot connect to Ollama' };
+      }
+    }
+
+    try {
+      return await invoke('check_ollama_health', { host, modelName });
+    } catch (error) {
+      console.warn('Tauri invoke check_ollama_health failed:', error);
+      return { isAlive: false, provider: 'ollama', activeModel: modelName, message: error instanceof Error ? error.message : 'Ollama health check failed' };
+    }
   }
 
   async setOllamaModel(modelName: string): Promise<boolean> {

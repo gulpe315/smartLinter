@@ -24,6 +24,8 @@ const STORAGE_KEYS = {
   CUSTOM_GUIDELINE_NAME: 'smartlinter_custom_guideline_name',
 };
 
+let llmHealthRequestVersion = 0;
+
 export interface ConfigState {
   // --- Ollama Model Configuration ---
   ollamaHost: string;
@@ -58,6 +60,7 @@ export interface ConfigState {
   // --- Actions: Ollama Models ---
   setOllamaHost: (host: string) => void;
   fetchModels: () => Promise<void>;
+  refreshLlmHealth: () => Promise<void>;
   setSelectedModel: (modelName: string) => Promise<void>;
 
   // --- Actions: Guidelines Management ---
@@ -120,9 +123,30 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   toggleGuidelineViewer: () => set((state) => ({ isGuidelineViewerOpen: !state.isGuidelineViewerOpen })),
 
   setOllamaHost: (host: string) => {
+    llmHealthRequestVersion += 1;
     set({ ollamaHost: host });
     if (typeof window !== 'undefined' && window.localStorage) {
       localStorage.setItem(STORAGE_KEYS.OLLAMA_HOST, host);
+    }
+  },
+
+  refreshLlmHealth: async () => {
+    const requestVersion = ++llmHealthRequestVersion;
+    const { ollamaHost, selectedModel } = get();
+    try {
+      const status = await getBridgeService().checkOllamaHealth(ollamaHost, selectedModel);
+      if (requestVersion === llmHealthRequestVersion) {
+        useBridgeStore.getState().setLlmStatus(status);
+      }
+    } catch (error) {
+      if (requestVersion === llmHealthRequestVersion) {
+        useBridgeStore.getState().setLlmStatus({
+          isAlive: false,
+          provider: 'ollama',
+          activeModel: selectedModel,
+          message: error instanceof Error ? error.message : 'Ollama health check failed',
+        });
+      }
     }
   },
 
@@ -150,6 +174,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   },
 
   setSelectedModel: async (modelName: string) => {
+    llmHealthRequestVersion += 1;
     set({ selectedModel: modelName });
 
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -160,13 +185,10 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       const bridge = getBridgeService();
       await bridge.setOllamaModel(modelName);
 
-      // Sync with bridgeStore
-      useBridgeStore.getState().setLlmStatus({
-        activeModel: modelName,
-        isAlive: true,
-      });
     } catch (err) {
       console.warn('Failed to switch Ollama model on backend:', err);
+    } finally {
+      await get().refreshLlmHealth();
     }
   },
 

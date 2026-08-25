@@ -7,7 +7,10 @@
 use crate::ai::types::{GenerateOptions, QueueJobRequest};
 
 /// Canonical compressed system instruction for fast paragraph QA linting.
-pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast paragraph QA linter. Check Korean target against source for terminology, grammar, passive voice, numbers, and punctuation.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+
+/// System instruction used when no source text is available for comparison.
+pub const MONOLINGUAL_SYSTEM_INSTRUCTION: &str = "You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
 
 /// Embedded raw Tera/template string.
 pub const QA_COMPRESSED_TEMPLATE: &str = include_str!("templates/qa_compressed.tera");
@@ -77,16 +80,25 @@ impl PromptBuilder {
 
     /// Builds the system prompt component (instruction + optional guidelines).
     pub fn build_system_prompt(&self) -> String {
-        if let Some(ref g) = self.guidelines {
-            format!("{}\n\nGuidelines:\n{}", COMPRESSED_SYSTEM_INSTRUCTION, g.trim())
+        let instruction = if self.source.trim().is_empty() {
+            MONOLINGUAL_SYSTEM_INSTRUCTION
         } else {
-            COMPRESSED_SYSTEM_INSTRUCTION.to_string()
+            COMPRESSED_SYSTEM_INSTRUCTION
+        };
+        if let Some(ref g) = self.guidelines {
+            format!("{}\n\nGuidelines:\n{}", instruction, g.trim())
+        } else {
+            instruction.to_string()
         }
     }
 
     /// Builds the user prompt component containing the source and target paragraphs.
     pub fn build_user_prompt(&self) -> String {
-        format!("SRC: {}\nTGT: {}", self.source.trim(), self.target.trim())
+        if self.source.trim().is_empty() {
+            format!("TEXT: {}", self.target.trim())
+        } else {
+            format!("SRC: {}\nTGT: {}", self.source.trim(), self.target.trim())
+        }
     }
 
     /// Builds the full single-string prompt (combining system instructions and SRC/TGT payload).
@@ -229,7 +241,7 @@ mod tests {
         let tgt = "계속하려면 Submit 버튼을 클릭하십시오.";
         let prompt = format_compressed_prompt(src, tgt);
 
-        assert!(prompt.contains("You are a fast paragraph QA linter."));
+        assert!(prompt.contains("You are a fast bilingual paragraph QA linter."));
         assert!(prompt.contains("SRC: Click the Submit button to continue."));
         assert!(prompt.contains("TGT: 계속하려면 Submit 버튼을 클릭하십시오."));
     }
@@ -257,6 +269,16 @@ mod tests {
         assert!(req.options.is_some());
         let opts = req.options.unwrap();
         assert_eq!(opts.format, Some("json".to_string()));
+    }
+
+    #[test]
+    fn test_prompt_builder_uses_monolingual_mode_when_source_is_blank() {
+        let builder = PromptBuilder::new().source("  \n").target("라인을 연길하세요");
+        let req = builder.build_queue_request("para_01");
+
+        assert!(req.system.as_deref().unwrap().contains("monolingual"));
+        assert_eq!(req.prompt, "TEXT: 라인을 연길하세요");
+        assert!(!req.prompt.contains("SRC:"));
     }
 
     #[test]

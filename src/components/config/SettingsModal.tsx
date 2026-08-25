@@ -46,6 +46,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     isLoadingModels,
     modelError,
     fetchModels,
+    refreshLlmHealth,
     setSelectedModel,
     guidelines,
     tmEntries,
@@ -86,7 +87,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSaveHost = async () => {
     setOllamaHost(hostInput);
-    await fetchModels();
+    await Promise.all([fetchModels(), refreshLlmHealth()]);
   };
 
   const handleTriggerBatchScan = async () => {

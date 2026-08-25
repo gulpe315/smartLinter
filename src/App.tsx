@@ -17,6 +17,7 @@ export const App: React.FC = () => {
   const initEventListener = useBridgeStore((state) => state.initEventListener);
   const initQaListener = useQaStore((state) => state.initEventListener);
   const initTmListener = useTmStore((state) => state.initEventListener);
+  const refreshLlmHealth = useConfigStore((state) => state.refreshLlmHealth);
   const {
     isSettingsModalOpen,
     closeSettingsModal,
@@ -35,12 +36,14 @@ export const App: React.FC = () => {
       .catch(() => {
         // Event listeners remain active and will handle later bridge status changes.
       });
+    // This is independent of editor connectivity: the badge reflects a real Ollama /api/version check.
+    void refreshLlmHealth();
     return () => {
       cleanupBridge();
       cleanupQa();
       cleanupTm();
     };
-  }, [initEventListener, initQaListener, initTmListener]);
+  }, [initEventListener, initQaListener, initTmListener, refreshLlmHealth]);
 
   return (
     <div

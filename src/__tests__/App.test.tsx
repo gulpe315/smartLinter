@@ -42,6 +42,25 @@ describe('SmartLinter Dashboard App Full Integration', () => {
     });
   });
 
+  it('checks Ollama health on mount independently of editor connectivity', async () => {
+    mockBridge.checkOllamaHealth = vi.fn().mockResolvedValue({
+      isAlive: true,
+      provider: 'ollama',
+      activeModel: 'qwen2.5:7b',
+      latencyMs: 8,
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockBridge.checkOllamaHealth).toHaveBeenCalledWith(
+        'http://127.0.0.1:11434',
+        'qwen2.5:7b'
+      );
+      expect(useBridgeStore.getState().llmAlive).toBe(true);
+    });
+  });
+
   it('subscribes to live bridge events and updates all UI sections reactively', () => {
     render(<App />);
 

@@ -128,6 +128,9 @@ pub struct QaReport {
     /// Optional raw LLM completion text retained for diagnostics.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub raw_response: Option<String>,
+    /// Parser diagnostic set when no structured QA result could be recovered.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parser_error: Option<String>,
 }
 
 impl QaReport {
@@ -137,6 +140,7 @@ impl QaReport {
             status: QaStatus::Pass,
             issues: Vec::new(),
             raw_response: None,
+            parser_error: None,
         }
     }
 
@@ -146,6 +150,7 @@ impl QaReport {
             status: QaStatus::Fail,
             issues,
             raw_response: None,
+            parser_error: None,
         }
     }
 
@@ -296,6 +301,7 @@ impl QaParser {
                 status: QaStatus::Pass,
                 issues: Vec::new(),
                 raw_response: Some(raw.to_string()),
+                parser_error: Some("LLM returned an empty response instead of QA JSON".to_string()),
             };
         }
 
@@ -325,6 +331,7 @@ impl QaParser {
                 status: QaStatus::Fail,
                 issues: recovered_issues,
                 raw_response: Some(raw.to_string()),
+                parser_error: None,
             };
         }
 
@@ -339,6 +346,7 @@ impl QaParser {
                 status: QaStatus::Pass,
                 issues: Vec::new(),
                 raw_response: Some(raw.to_string()),
+                parser_error: None,
             };
         }
 
@@ -348,6 +356,7 @@ impl QaParser {
             status: QaStatus::Pass,
             issues: Vec::new(),
             raw_response: Some(raw.to_string()),
+            parser_error: Some("LLM response could not be parsed as QA JSON".to_string()),
         }
     }
 
@@ -453,6 +462,7 @@ impl QaParser {
                     status,
                     issues,
                     raw_response: Some(original_raw.to_string()),
+                    parser_error: None,
                 });
             }
         }
@@ -474,6 +484,7 @@ impl QaParser {
                 status,
                 issues,
                 raw_response: Some(original_raw.to_string()),
+                parser_error: None,
             });
         }
 
@@ -484,6 +495,7 @@ impl QaParser {
                     status: QaStatus::Fail,
                     issues: vec![issue],
                     raw_response: Some(original_raw.to_string()),
+                    parser_error: None,
                 });
             }
         }
@@ -734,9 +746,11 @@ mod tests {
         let empty_report = QaParser::parse("");
         assert_eq!(empty_report.status, QaStatus::Pass);
         assert_eq!(empty_report.issues.len(), 0);
+        assert!(empty_report.parser_error.is_some());
 
         let garbage_report = QaParser::parse("Random conversational refusal or gibberish text");
         assert_eq!(garbage_report.status, QaStatus::Pass);
         assert_eq!(garbage_report.issues.len(), 0);
+        assert!(garbage_report.parser_error.is_some());
     }
 }

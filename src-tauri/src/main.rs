@@ -79,6 +79,7 @@ fn main() {
             commands::execute_ai_command,
             commands::send_replacement_command,
             commands::list_ollama_models,
+            commands::check_ollama_health,
             commands::set_ollama_model,
             commands::load_guideline_content,
             commands::load_tm_content
