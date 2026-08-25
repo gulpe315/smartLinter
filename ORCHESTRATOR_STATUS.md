@@ -1,8 +1,39 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-25 (InDesign COM 자동화 백엔드+프론트엔드 버튼 완성·커밋 완료, 앱 전체에 걸친 Tauri IPC mock-fallback 버그도 발견·수정·커밋 완료, **그리고 실제 버튼 클릭 라이브 테스트 성공 확인 완료.** 대시보드 "InDesign 연결" 버튼 → `/health`가 `connected:true, activeEditor:"InDesign"`로 전환됨을 curl로 직접 확인함. 이 아키텍처 전환(Scripts Panel 수동 더블클릭 → 대시보드 원클릭 COM 연결)은 이걸로 완료.)
+마지막 업데이트: 2026-08-25 (Task 19 시나리오 1 실검증 중 연쇄 버그 8건 발견·수정·전부 커밋 완료. 다음 세션은 클린 재기동 후 전체 흐름 재검증부터 시작.)
 
-## 진행 중인 작업 (세션 이어받기용, 2026-08-25 최종)
+## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-25 최종 인계)
+
+1. **`git log --oneline -1`로 최신 커밋이 `2852321`(Re-sync persisted model choice to backend queue on startup)인지 확인.** 아니라면 이 파일의 아래 절들을 시간순으로 훑어서 무슨 일이 있었는지 파악할 것.
+2. **협업 원칙부터 숙지할 것 (이번 세션 내내 반복 확인된 최우선 규칙, [[feedback_agy_consult_when_stuck]] 참고):**
+   - 원인 불명 현상이든 사용자의 새 제안이든, **Claude 혼자 코드를 깊게 파고들어 결론을 내리지 말 것.** 재현 여부 정도의 가벼운 확인(파일 1~2개, 몇 줄 grep 수준)만 직접 하고, 곧바로 Codex(`codex exec -C "D:\data\dev\App\SmartLinter" --approve-for-me '...'`)와 agy(`agy -p '...' --add-dir "D:\data\dev\App\SmartLinter" --print-timeout 15m --dangerously-skip-permissions --sandbox`) 양쪽에 현상을 그대로 공유해서 의견을 구하고, 두 응답을 종합해서 판단할 것.
+   - 실제 코드 수정은 Codex에게 위임. Claude는 결과를 독립 재검증(cargo test/npm test/npm run test:ui 직접 재실행)하고 `git diff`로 범위 이탈 없는지 확인한 뒤 커밋.
+   - 프롬프트에 큰따옴표(`"`)를 넣으면 PowerShell/CLI 인자가 깨짐 — 작은따옴표로만 감싸고 본문엔 큰따옴표 아예 넣지 말 것(길면 임시 `.md` 파일로 지시서를 써서 경로만 넘기는 방법 사용, 이번 세션에서 `TASK_REQUEST_FOR_CODEX_IPC_COMMANDS.md`로 실제로 이렇게 함).
+3. **앱 클린 재기동 절차(매번 필요, InDesign daemon은 소스에서 직접 주입되므로 별도 파일 동기화 불필요):**
+   ```
+   tasklist | grep -iE "smart-linter"          # 있으면
+   taskkill //F //IM smart-linter.exe //T       # 트리 전체 종료
+   netstat -ano | grep ":5173" | grep LISTENING  # 좀비 vite 프로세스 남아있는지 확인(자주 남음)
+   taskkill //F //PID <해당PID>                  # 있으면 같이 종료
+   cd "D:\data\dev\App\SmartLinter" && npx tauri dev --no-watch   # run_in_background:true로
+   ```
+   `Local Bridge server listening on 127.0.0.1:49152` 로그가 뜰 때까지 대기 후, 사용자에게 InDesign 창에서 "InDesign 연결" 버튼을 눌러달라고 요청 → `curl http://127.0.0.1:49152/health`로 `connected:true` 확인.
+4. **다음 라이브 재검증 순서 (이번 세션 마지막에 미완료 상태로 끝남 — 여기부터 이어갈 것):**
+   - InDesign에 포커스 유지한 채 오타 문장 입력(예: "라인을 연길하세요") → 타이핑 멈춘 뒤 약 1초 뒤에 카드가 **정확히 하나만** 뜨는지(디바운스+안정 문단ID 수정 확인).
+   - 이번엔 실제로 오타가 잡히는지(monolingual 프롬프트 분기 + 모델 재동기화 수정이 실제 라이브에서 작동하는지 — 코드 수정만 됐고 아직 라이브로 확인 못함).
+   - LLM 상태 배지가 앱 켜자마자 자동으로 Ready로 뜨는지(수동으로 모델 바꿨다 되돌리는 우회 없이).
+   - QA 카드 [적용] → InDesign 문서에 실제로 텍스트가 바뀌는지(atomic_replacer.jsx 수정 이후 아직 최종 확인 못함).
+   - 전부 통과하면 Task 19 시나리오 1 완전히 종료 — 시나리오 2(Stale 재스캔)/3(롤백)으로 진행.
+5. **밀린 신규 기능 백엔로그 (agy+Codex 검토는 끝났고 구현 착수 전, 우선순위 1→3→2 권장):**
+   - QA 카드 "위치 보기" 버튼(InDesign에서 해당 문단으로 이동)
+   - 적용 전 인라인 수정 (가장 쉬움, 프론트엔드만)
+   - 동일 이슈 일괄 적용 (1번 이후)
+   - 수정 이력 캐시 + 무시 이력 억제 (TM과 별도 저장소 vs TM tier 통합, agy/Codex 의견 갈림 — 실제 설계 착수 시 다시 물어볼 것)
+   - `start_batch_scan`/`abort_batch_scan`(문서 전체 일괄 스캔): InDesign/Word 어느 쪽에도 "전체 문단 열거" 기능 자체가 없어서 별도 설계 필요, 아직 미착수
+
+---
+
+## 참고: 이전 인계 시점 메모 (2026-08-25, 이제 지나간 상태)
 
 **새 세션 시작 시 가장 먼저 할 일:** `git log --oneline -5`로 최신 커밋이 `0bd595b`(Ignore src-tauri/src/bin/...)인지 확인. 그 아래로 `fd90a5f`(Fix Tauri IPC mock-fallback), `b2a7f5f`(InDesign connect button), `ff3e82b`/`86c5bb9`(COM automation backend)가 순서대로 있어야 정상.
 
@@ -50,11 +81,13 @@ SUCCESS만 반환했을 가능성이 높았음.
 그리고 **실제 InDesign에서 [적용] 버튼 라이브 재테스트가 아직 안 됨**(코드 수정만 완료) — 앱 클린
 재기동 후 QA 카드 [적용] → InDesign 문서에 실제로 텍스트가 바뀌는지 확인 필요.
 
-**신규 발견 (2026-08-25, Task 19 시나리오 1 라이브 재검증 중):**
-- QA 자동 분석 트리거 누락 발견·수정(커밋 `250c384`) — `new-paragraph-detected` 리스너가 `setIsAnalyzing(true)`만 하고 실제 `analyzeParagraph()` 호출을 안 해서 스피너가 무한히 도는 문제였음. 상세는 아래 "Task 19 진행 상황" 절 참고.
-- LLM 상태 배지(Header의 "qwen2.5:7b" 표시)가 실제 헬스체크와 배선 안 됨(항상 Standby, 설정에서 모델 수동 선택할 때만 낙관적으로 true) — 아직 미수정, 별도 태스크로 처리 필요.
-- **실제 InDesign에서 [적용] 클릭 시 치환 실패 → 자동 롤백 확인(2026-08-25).** agy 진단: COM DoScript/데몬 통신/JSON/해시검증은 전부 정상, 실패 지점은 `atomic_replacer.jsx`의 DOM 조작부로 좁혀짐 — 유력 후보 (1) `Characters.itemByRange().contents`가 문자열이 아니라 문자 배열을 반환해서 `oldText !== currentContent` 불일치로 예외 발생, (2) `indesign_com.rs`가 이미 `DoScript`로 스크립트를 실행 중인데 그 안에서 `transaction_runner.jsx`가 또 `UndoModes.ENTIRE_SCRIPT`로 중첩 `doScript` 호출 — InDesign이 이 중첩을 거부할 가능성(신규 COM 아키텍처 특유의 문제, 기존 Scripts Panel 방식에선 없었던 경로). Codex 교차검증 응답 대기 중, 다음 세션 이어서 처리.
-- **신규 기능 요청 (사용자, 2026-08-25):** QA 카드에 "위치 보기" 버튼 — 치환 여부 판단 전에 InDesign 문서에서 해당 문단 위치로 이동/선택해서 보여주는 기능. agy가 지적한 `atomic_replacer.jsx`의 `paragraphId` 추적 개선(현재는 `inApp.selection[0]`에 의존)과 같은 기반으로 구현 가능 — 치환 실패 수정과 묶어서 다음 태스크로 진행할 것.
+**신규 발견 (2026-08-25, Task 19 시나리오 1 라이브 재검증 중) — 아래 항목 전부 최종 수정·커밋 완료, 상세 경과만 기록으로 남김:**
+- QA 자동 분석 트리거 누락 → 수정(`250c384`).
+- InDesign [적용] 치환이 항상 롤백되던 버그 → 원인 확정(`Characters.itemByRange().contents`가 배열 반환, 중첩 `doScript`는 원인 아님— Codex가 Adobe 문서로 확증) → 수정(`306e2ea`).
+- source 없을 때 LLM이 검수를 포기하던 문제(원문 대조 전제 프롬프트) → monolingual 모드 분기로 수정(`8e39576`).
+- LLM 상태 배지가 Standby 고정 → 자동 헬스체크 추가(`8e39576`), 그런데 이것만으론 부족했음 → 진짜 원인은 앱 재시작 시 모델 선택이 백엔드 큐에 재동기화 안 돼서 `analyze_paragraph`가 계속 존재하지 않는 기본모델을 찾다 404 나던 것(Codex가 로그 증거로 확정) → `syncSelectedModel` 추가로 수정(`2852321`, 세션 재시작으로 한 번 유실됐다가 워킹트리에서 복구해서 재검증 후 커밋함).
+- `parserError` 필드가 Rust엔 있지만 프론트 타입에 없어서 파싱 실패와 진짜 PASS가 구분 안 되던 문제 → 타입 추가 + qaStore 콘솔 경고로 최소 관측 가능하게 수정(`2852321`).
+- **신규 기능 요청 (사용자, 2026-08-25):** QA 카드에 "위치 보기" 버튼 — 아직 미착수, agy가 지적한 `atomic_replacer.jsx`의 `paragraphId` 추적 개선(현재는 `inApp.selection[0]`에 의존)과 같은 기반으로 구현 가능.
 - **신규 기능 요청 3건 (사용자, 2026-08-25, 아직 설계 착수 안 함):**
   1. **적용 전 인라인 수정:** QA 카드의 제안(suggestedSegment)이 부분적으로만 맞을 때, 사용자가 직접 고친 뒤 그 수정본으로 치환할 수 있어야 함 — 프론트엔드 UI만으로 가능해 보임(acceptCard가 card.suggestedSegment를 그대로 쓰므로, 편집 모드 UI만 추가하면 나머지 파이프라인은 그대로 재사용 가능).
   2. **수정 이력 별도 캐시 저장:** 사용자가 확정한 교정(원문→수정본)을 TM과 별개의 저장소에 남겨서, 동일 문장이 나중에 재발견되면 그 교정본을 재사용(LLM 재호출 없이 자동 제안 또는 자동 적용). 저장 위치/조회 시점(분석 파이프라인 어디에 끼워넣을지)을 새로 설계해야 하는 제법 큰 기능 — 별도 설계 필요.
