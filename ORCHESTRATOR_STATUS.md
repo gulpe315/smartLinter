@@ -1,27 +1,27 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-25 (InDesign COM 자동화 백엔드 완성·라이브 검증·커밋 완료. 이전 업데이트가 이걸 "실현 불가능"이라고 잘못 기록했었음 — 아래 "정정" 절 먼저 읽을 것. 다음은 프론트엔드 연결 버튼)
+마지막 업데이트: 2026-08-25 (InDesign COM 자동화 백엔드+프론트엔드 버튼 완성·커밋 완료, 앱 전체에 걸친 Tauri IPC mock-fallback 버그도 발견·수정·커밋 완료. **다음 세션 최우선 할 일은 실제 버튼 클릭 라이브 테스트** — 아직 성공 확인 못함, 아래 "다음 세션 진행 순서" 참고)
 
 ## 진행 중인 작업 (세션 이어받기용, 2026-08-25 최종)
 
-**새 세션 시작 시 가장 먼저 할 일:** `git log --oneline -5`로 최신 커밋이 `86c5bb9`(Add Windows COM automation backend...) 이후 그대로인지 확인.
+**새 세션 시작 시 가장 먼저 할 일:** `git log --oneline -5`로 최신 커밋이 `0bd595b`(Ignore src-tauri/src/bin/...)인지 확인. 그 아래로 `fd90a5f`(Fix Tauri IPC mock-fallback), `b2a7f5f`(InDesign connect button), `ff3e82b`/`86c5bb9`(COM automation backend)가 순서대로 있어야 정상.
 
-**⚠️ 정정: 직전 업데이트("실현 불가능 확정 후 폐기")는 틀렸음.**
+**이번 세션 요약 (커밋 순서대로):**
+1. `86c5bb9` — InDesign COM 자동화 백엔드(`indesign_com.rs`) 완성·라이브 검증 성공. `GetActiveObject`(ROT 기반, InDesign이 자기 자신을 ROT에 등록 안 해서 항상 실패)가 아니라 `CoCreateInstance`(`CLSCTX_LOCAL_SERVER`)로 전환. 안전장치 2단: ① `CreateToolhelp32Snapshot`으로 InDesign.exe가 실제로 떠 있을 때만 시도(새 인스턴스 오발사 방지), ② 이 컴퓨터에 InDesign 2025/2026이 동시 설치돼 있어서(agy가 지적) `GetFileVersionInfoW`로 실행 중 프로세스의 정확한 연도를 판별해 매칭되는 ProgID 하나로만 attach. Claude가 PowerShell `New-Object -ComObject`로 직접 실측(성공, 프로세스 수 불변)해서 검증.
+2. **(같은 세션 중, 원인 미확정 사고)** `917b195` — 코드가 `git reset`으로 사라지고 "실현 불가능, 포기"라는 틀린 결론이 커밋됐던 사고. `git stash`에 다행히 보존돼 있어 복구. `codex.exe app-server`(Antigravity IDE 내장 확장, 이번 세션 CLI 호출과 별개 프로세스) 좀비 프로세스가 원인일 가능성 있으나 확정 못함. **다음에 또 이런 일이 생기면 `tasklist`로 이 프로세스부터 확인.**
+3. `ff3e82b` — 917b195의 잘못된 결론을 정정하는 문서 커밋.
+4. `b2a7f5f` — 프론트엔드에 "InDesign 연결" 버튼 추가(Header.tsx, bridgeStore.ts, tauriBridge.ts). Codex 구현, Claude가 build+test(151+181) 독립 재검증 후 커밋.
+5. **`fd90a5f` — 훨씬 중요한 버그 발견·수정.** 버튼을 실제 앱에서 클릭해도 반응이 없어서 진단한 결과: `TauriBridgeService.isTauriAvailable()`이 `'__TAURI__' in window`로 체크하는데, **Tauri v2는 기본적으로 `window.__TAURI__` 전역을 주입 안 함**(`withGlobalTauri` 옵트인 필요, 이 프로젝트엔 없음) — 그래서 실제 네이티브 앱 창 안에서도 이 체크가 항상 false가 되어 **`tauriBridge.ts`의 모든 IPC 호출(get_bridge_status, analyze_paragraph, set_always_on_top 등 전부)이 조용히 MockBridgeService(가짜 데이터)로 빠지고 있었음.** 이건 이번에 추가한 버튼만의 문제가 아니라 **앱 전체에 걸친 기존 잠재 버그**였음(Codex가 확인). Tauri v2 공식 문서 기준 정식 방식인 `@tauri-apps/api/core`의 `invoke`/`isTauri`, `@tauri-apps/api/event`의 `emit`/`listen`으로 전체 교체. Claude가 build+cargo check+test(151+181) 독립 재검증 후 커밋.
+6. `0bd595b` — 진단용 스모크 테스트 바이너리 폴더(`src-tauri/src/bin/`, `indesign_smoke.rs` — `detect_running_indesign()`/`inject_daemon_script()`를 직접 호출해보는 용도, `cargo run --bin indesign_smoke`)를 `.gitignore`에 추가(재사용 가치 있어 삭제 안 하고 유지, 커밋은 안 함).
 
-같은 날 세션 중, 이 대화와는 별도로(원인 미확정 — 아래 "사고 경위" 참고) 코드가 `git stash`로 밀려나고 ORCHESTRATOR_STATUS.md가 "InDesign COM automation confirmed non-viable, abandoned"로 잘못 업데이트되어 커밋(`917b195`)된 사고가 있었음. 그 결론의 근거("ROT를 직접 열거했더니 0개, CoCreateInstance도 attach가 아니라 새 인스턴스를 만드는 것")는 **실측 없이 이론적 반박만으로 내려진 잘못된 결론**이었음.
+**⚠️ 남은 것 — 실제 라이브 클릭 테스트가 아직 성공한 적 없음:** `fd90a5f` 수정 이후 브릿지 서버(`npx tauri dev --no-watch`)를 재시작하지 않은 채로 세션이 끝남. 코드 수정(특히 `tauriBridge.ts`의 import 추가)이 Vite HMR로 잘 반영됐는지도 불확실(HMR 특성상 모듈 상단 import 변경이나 zustand 스토어 재생성 시 stale 상태가 남을 수 있음). **다음 세션 최우선 할 일:**
+1. `tasklist`로 기존 `smart-linter.exe`/`npx tauri dev` 프로세스가 떠 있는지 확인 → 있으면 완전히 종료 후(taskkill로 트리 전체) `npx tauri dev --no-watch`로 클린 재기동(Claude가 직접 Bash로, 사용자에게 시키지 말 것).
+2. InDesign이 켜져 있는지 확인(`tasklist InDesign.exe`) — 안 켜져 있으면 사용자에게 켜달라고 요청.
+3. 새로 뜬 앱 창에서 사용자에게 "InDesign 연결" 버튼을 한 번 눌러달라고 요청(번호 매긴 절차로) → 브릿지 서버 `/health`가 `connected:true`로 바뀌는지 Claude가 curl로 직접 확인.
+4. 성공하면 이 아키텍처 전환은 완전히 끝난 것 — Scripts Panel 수동 더블클릭 방식 폐기, ORCHESTRATOR_STATUS.md에 최종 성공 기록.
+5. 실패하면(아직도 mock으로 빠지거나 다른 에러) — **이번엔 절대 사용자와 콘솔 명령 왕복하지 말고, 바로 Codex에게 위임**해서 진단+수정([[feedback_smartlinter_delegation]] 참고 — 이번 세션에서 이 원칙을 어겨서 사용자에게 "오케스트레이터 역할 망각" 지적을 받았음).
 
-**실제로는 성공함 — 커밋 `86c5bb9`에 완성된 코드가 있고, InDesign 2026을 상대로 두 차례 라이브 검증 완료:**
-- Claude가 PowerShell `New-Object -ComObject InDesign.Application.2026`을 **직접 실행**해서 반증: 성공, 프로세스 수 1→1 유지(새 인스턴스 안 뜸), `Version` 프로퍼티 정상 반환(`21.4.1.4`). 즉 `CoCreateInstance`는 실제로 기존 실행 중 인스턴스에 attach됨(REGCLS_MULTIPLEUSE 클래스 팩토리 재사용) — "새 인스턴스를 만든다"는 917b195의 반박은 틀림.
-- `indesign_com.rs`를 `GetActiveObject`(ROT 기반, InDesign이 등록 안 해서 항상 실패) → `CoCreateInstance`(`CLSCTX_LOCAL_SERVER`) 기반으로 전환. 안전장치 2단: ① `CreateToolhelp32Snapshot`으로 InDesign.exe 프로세스가 실제로 떠 있을 때만 시도(새 인스턴스 실수 기동 방지), ② 이 컴퓨터에 InDesign 2025/2026이 동시 설치돼 있다는 걸 확인하고(agy가 지적한 리스크) `GetFileVersionInfoW`로 실행 중인 프로세스의 정확한 연도를 판별해 그 버전의 ProgID 하나로만 attach(잘못된 버전이 새로 뜨는 사고 방지).
-- `cargo run --bin`으로 만든 임시 스모크 테스트로 `detect_running_indesign()`/`inject_daemon_script()`를 직접 호출 → 브릿지 서버 `/health`가 `connected:true, activeEditor:"InDesign", sessionId:<발급됨>`으로 응답하는 것까지 확인(브릿지 서버를 한 번 재시작한 뒤 재확인까지 포함, 총 2회 성공).
-
-**⚠️ 사고 경위(원인 미확정, 다음 세션 주의사항):** 코드 작업 도중 `codex.exe`(경로: `C:\Users\user\.antigravity-ide\extensions\openai.chatgpt-*\bin\...\codex.exe app-server`) 좀비 프로세스 2개가 발견됨 — Antigravity IDE(agy)에 내장된 ChatGPT/Codex 확장의 백그라운드 서버로, 이번 세션에서 Claude가 실행한 `codex exec`/`agy -p` CLI 호출과는 별개 프로세스. 사용자는 "안티그래비티 창 두 개가 열려 있지만 agy로 직접 지시한 적 없다"고 확인함. 이 프로세스(또는 그 창의 이전 세션 잔재)가 917b195 사고의 원인일 가능성이 있으나 확정 못 함. **다음에 또 uncommitted 변경사항이 알 수 없는 이유로 사라지거나 의도하지 않은 커밋이 생기면, 가장 먼저 `tasklist`로 이 경로의 `codex.exe` 프로세스가 떠 있는지 확인하고, 사용자에게 안티그래비티 창을 닫아도 되는지 물어볼 것.** 교훈: Codex/agy에게 위임한 작업의 결과를 uncommitted 상태로 오래 두지 말고, 검증되는 대로 즉시 커밋해서 git 히스토리에 고정시킬 것(이번엔 다행히 `git stash`에 보존되어 있어 복구 가능했음).
-
-**다음 세션 진행 순서:**
-1. 백엔드는 완료·커밋됨. 프론트엔드(Header/ConnectionBanner에 "InDesign 원터치 연결" 버튼, `check_indesign_status`/`connect_indesign` 커맨드 호출, bridgeStore에 상태 추가)를 Codex에게 위임.
-2. 완료되면 사용자가 대시보드에서 버튼 클릭으로 실제 연결 확인 — 이게 성공하면 Scripts Panel 수동 더블클릭 방식은 사실상 폐기.
-3. 이 아키텍처가 자리잡으면, 그동안 미해결로 남아있던 "Scripts Panel 수동 재실행 시 재연결 안 되는 원인불명 현상"(`$.global.SmartLinterDaemonInstance.getStatus()` 결과 대기 중이었음) 디버깅은 우선순위가 낮아짐(이 수동 흐름 자체가 대체되므로). 다만 COM 방식도 결국 같은 `smartlinter_daemon.jsx`를 실행시키므로, 재연결 안 되는 증상이 COM 경로에서도 재현되면 그때 router.rs/bridge_socket.jsx 로그 추가부터.
-4. 이 전환과 무관하게 원래 남아있던 할 일: Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축.
+**이 전환과 무관하게 원래 남아있던 할 일:** Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축.
 
 ---
 
