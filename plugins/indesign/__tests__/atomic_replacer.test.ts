@@ -140,6 +140,43 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.ok(selectedPara);
             assert.equal(selectedPara!.contents, currentDocText);
         });
+
+        it('uses command.paragraphId instead of a different paragraph at the current selection', () => {
+            const targetText = 'Paragraph A is the command target.';
+            const selectedText = 'Paragraph B is selected but must remain unchanged.';
+            const replacementText = 'Paragraph A is the updated command target.';
+            const targetParagraph = env.createParagraph(targetText, 'story-500');
+            const selectedParagraph = env.createParagraph(selectedText, 'story-500');
+            targetParagraph.index = 0;
+            selectedParagraph.index = 1;
+
+            // The document contains both paragraphs, while the InDesign cursor is
+            // deliberately on B. This reproduces the stale-card disconnect case.
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'story-500'
+                    ? { paragraphs: [targetParagraph, selectedParagraph] }
+                    : null
+            };
+            env.selection = [{
+                paragraphs: [selectedParagraph],
+                texts: [{ paragraphs: [selectedParagraph] }],
+                parentStory: { id: 'story-500' }
+            }];
+
+            const sandbox = loadExtendScript(replacerScriptPath, { app: env.getApp() });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: env.getApp() });
+            const result = replacer.execute({
+                commandId: 'cmd-paragraph-id-target-001',
+                paragraphId: 'indesign-para-story-500-0',
+                baseHash: computeParagraphHash(targetText),
+                expectedHash: computeParagraphHash(replacementText),
+                hunks: extractDiffHunks(targetText, replacementText)
+            });
+
+            assert.equal(result.status, 'SUCCESS');
+            assert.equal(targetParagraph.contents, replacementText);
+            assert.equal(selectedParagraph.contents, selectedText);
+        });
     });
 
     // =========================================================================

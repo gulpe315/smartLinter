@@ -39,6 +39,56 @@
     }
 
     /**
+     * Finds a paragraph from the stable identifier emitted by TextObserver.
+     *
+     * TextObserver creates ids as `indesign-para-{storyId}-{paragraphIndex}`.
+     * Story ids are InDesign-assigned values and must be treated as opaque: split
+     * at the final dash so this also remains safe for mock/custom story ids that
+     * contain dashes.
+     *
+     * @param {Object} doc InDesign Document reference
+     * @param {string} paragraphId Stable paragraph identifier
+     * @returns {Object|null} InDesign Paragraph reference, or null when absent
+     */
+    function findParagraphById(doc, paragraphId) {
+        var prefix = 'indesign-para-';
+        if (!doc || typeof paragraphId !== 'string' || paragraphId.indexOf(prefix) !== 0) {
+            return null;
+        }
+
+        var idSuffix = paragraphId.substring(prefix.length);
+        var separator = idSuffix.lastIndexOf('-');
+        if (separator <= 0) {
+            return null;
+        }
+
+        var storyId = idSuffix.substring(0, separator);
+        var indexText = idSuffix.substring(separator + 1);
+        if (!/^\d+$/.test(indexText)) {
+            return null;
+        }
+
+        var paragraphIndex = parseInt(indexText, 10);
+        try {
+            if (!doc.stories || typeof doc.stories.itemByID !== 'function') {
+                return null;
+            }
+
+            var story = doc.stories.itemByID(storyId);
+            if (!story || story.isValid === false || !story.paragraphs ||
+                    paragraphIndex < 0 || paragraphIndex >= story.paragraphs.length) {
+                return null;
+            }
+
+            var paragraph = story.paragraphs[paragraphIndex];
+            return (!paragraph || paragraph.isValid === false) ? null : paragraph;
+        } catch (e) {
+            // itemByID and unresolved DOM specifiers can throw in InDesign.
+            return null;
+        }
+    }
+
+    /**
      * SmartLinterAtomicReplacer constructor
      * @param {Object} [config]
      */
@@ -136,6 +186,11 @@
             return contents.join('');
         }
         return (typeof contents === 'undefined' || contents === null) ? '' : String(contents);
+    };
+
+    // Public for callers/tests that need to resolve a telemetry paragraph id.
+    SmartLinterAtomicReplacer.prototype.findParagraphById = function(doc, paragraphId) {
+        return findParagraphById(doc, paragraphId);
     };
 
     /**
@@ -256,15 +311,31 @@
         var targetParagraph = null;
         var currentText = '';
 
-        if (options.adapter && typeof options.adapter.getText === 'function') {
+        var hasResolvableParagraphId = typeof command.paragraphId === 'string' &&
+            command.paragraphId.indexOf('indesign-para-') === 0 &&
+            command.paragraphId.substring('indesign-para-'.length).lastIndexOf('-') > 0;
+
+        // A command's paragraphId is authoritative.  Do not let a changed
+        // cursor/selection redirect a real command to another paragraph.
+        if (hasResolvableParagraphId) {
+            var doc = inApp ? inApp.activeDocument : null;
+            targetParagraph = findParagraphById(doc, command.paragraphId);
+            if (targetParagraph) {
+                currentText = targetParagraph.contents || '';
+            }
+        }
+
+        // These are explicit test/embedding injection paths. They intentionally
+        // remain available when DOM lookup is unavailable.
+        if (!targetParagraph && options.adapter && typeof options.adapter.getText === 'function') {
             currentText = options.adapter.getText();
-        } else if (options.paragraphRef) {
+        } else if (!targetParagraph && options.paragraphRef) {
             targetParagraph = options.paragraphRef;
             currentText = targetParagraph.contents || '';
-        } else if (options.targetParagraph) {
+        } else if (!targetParagraph && options.targetParagraph) {
             targetParagraph = options.targetParagraph;
             currentText = targetParagraph.contents || '';
-        } else {
+        } else if (!hasResolvableParagraphId) {
             var activeInfo = this.textObserver ? this.textObserver.getActiveParagraph(inApp) : null;
             if (activeInfo && activeInfo.paragraphRef) {
                 targetParagraph = activeInfo.paragraphRef;
@@ -282,6 +353,17 @@
                     currentText = targetParagraph.contents || '';
                 }
             }
+        }
+
+        if (!targetParagraph && !options.adapter && hasResolvableParagraphId) {
+            var targetIdNotFoundResult = {
+                commandId: command.commandId,
+                status: 'FAILED',
+                currentHash: '',
+                message: 'Target InDesign paragraph could not be located for paragraphId: ' + command.paragraphId
+            };
+            this.dispatchResultIfNeeded(targetIdNotFoundResult, options);
+            return targetIdNotFoundResult;
         }
 
         if (!currentText && !options.adapter && !targetParagraph) {
