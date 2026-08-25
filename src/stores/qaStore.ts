@@ -323,19 +323,50 @@ export const useQaStore = create<QAState>((set, get) => ({
   initEventListener: (service) => {
     const bridgeService = service || getBridgeService();
     const unlisteners: Array<() => void> = [];
+    const analysisRequestVersions = new Map<string, number>();
+    let nextAnalysisRequestVersion = 0;
 
     // Subscribe to incoming QA reports
     unlisteners.push(
       bridgeService.listen('qa-report-received', (payload) => {
         get().addReport(payload);
-        get().setIsAnalyzing(false);
       })
     );
 
-    // Subscribe to new paragraph detections to indicate analysis progress
+    // Analyze each detected paragraph directly.  The event is emitted faster than
+    // the LLM can respond, so only the newest request for a paragraph may update
+    // the UI or finish the shared analysis indicator.
     unlisteners.push(
-      bridgeService.listen('new-paragraph-detected', () => {
+      bridgeService.listen('new-paragraph-detected', (payload) => {
+        const requestVersion = ++nextAnalysisRequestVersion;
+        analysisRequestVersions.set(payload.paragraphId, requestVersion);
         get().setIsAnalyzing(true);
+
+        void (async () => {
+          try {
+            const report = await bridgeService.analyzeParagraph(payload);
+
+            if (analysisRequestVersions.get(payload.paragraphId) !== requestVersion) {
+              return;
+            }
+
+            get().addReport({
+              paragraphId: payload.paragraphId,
+              paragraphText: payload.text,
+              paragraphHash: payload.hash,
+              report,
+            });
+          } catch (error) {
+            if (analysisRequestVersions.get(payload.paragraphId) === requestVersion) {
+              console.warn('QA analysis failed for detected paragraph:', error);
+            }
+          } finally {
+            if (analysisRequestVersions.get(payload.paragraphId) === requestVersion) {
+              analysisRequestVersions.delete(payload.paragraphId);
+              get().setIsAnalyzing(analysisRequestVersions.size > 0);
+            }
+          }
+        })();
       })
     );
 

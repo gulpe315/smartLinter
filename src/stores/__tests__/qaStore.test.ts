@@ -256,4 +256,119 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
     unlisten();
   });
+
+  it('analyzes detected paragraphs and adds the returned report to QA cards', async () => {
+    const report: QaReport = {
+      status: 'FAIL',
+      issues: [{
+        category: 'Terminology',
+        originalSegment: 'teh',
+        suggestedSegment: 'the',
+        reason: 'Typo',
+        severity: 'LOW',
+      }],
+    };
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValueOnce(report);
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-analyze-1',
+      text: 'This is teh paragraph.',
+      hash: 'hash-analyze-1',
+      source: 'Catalog.indd',
+      timestamp: Date.now(),
+      editorType: 'InDesign',
+    });
+
+    expect(useQaStore.getState().isAnalyzing).toBe(true);
+    await vi.waitFor(() => expect(useQaStore.getState().isAnalyzing).toBe(false));
+
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      paragraphId: 'para-analyze-1',
+      text: 'This is teh paragraph.',
+    }));
+    expect(useQaStore.getState().cards).toEqual([
+      expect.objectContaining({
+        paragraphId: 'para-analyze-1',
+        paragraphHash: 'hash-analyze-1',
+        originalSegment: 'teh',
+        suggestedSegment: 'the',
+      }),
+    ]);
+
+    unlisten();
+  });
+
+  it('stops analyzing when detected paragraph analysis fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(mockBridge, 'analyzeParagraph').mockRejectedValueOnce(new Error('LLM unavailable'));
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-analyze-failure',
+      text: 'Paragraph that cannot be analyzed.',
+      hash: 'hash-analyze-failure',
+      source: 'Catalog.indd',
+      timestamp: Date.now(),
+      editorType: 'InDesign',
+    });
+
+    await vi.waitFor(() => expect(useQaStore.getState().isAnalyzing).toBe(false));
+    expect(warnSpy).toHaveBeenCalledWith(
+      'QA analysis failed for detected paragraph:',
+      expect.any(Error)
+    );
+
+    unlisten();
+  });
+
+  it('ignores an older analysis result when the same paragraph is detected again', async () => {
+    let resolveFirstAnalysis: ((report: QaReport) => void) | undefined;
+    const firstAnalysis = new Promise<QaReport>((resolve) => {
+      resolveFirstAnalysis = resolve;
+    });
+    vi.spyOn(mockBridge, 'analyzeParagraph')
+      .mockReturnValueOnce(firstAnalysis)
+      .mockResolvedValueOnce({
+        status: 'FAIL',
+        issues: [{
+          category: 'Grammar',
+          originalSegment: 'new text',
+          suggestedSegment: 'newer text',
+          reason: 'Latest result',
+          severity: 'MEDIUM',
+        }],
+      });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+    const baseParagraph = {
+      paragraphId: 'para-retyped',
+      hash: 'hash-retyped',
+      source: 'Catalog.indd',
+      timestamp: Date.now(),
+      editorType: 'InDesign' as const,
+    };
+
+    mockBridge.emit('new-paragraph-detected', { ...baseParagraph, text: 'old text' });
+    mockBridge.emit('new-paragraph-detected', { ...baseParagraph, text: 'new text', hash: 'hash-retyped-new' });
+
+    await vi.waitFor(() => expect(useQaStore.getState().cards).toHaveLength(1));
+    resolveFirstAnalysis!({
+      status: 'FAIL',
+      issues: [{
+        category: 'Grammar',
+        originalSegment: 'old text',
+        suggestedSegment: 'older text',
+        reason: 'Stale result',
+        severity: 'MEDIUM',
+      }],
+    });
+    await Promise.resolve();
+
+    expect(useQaStore.getState().isAnalyzing).toBe(false);
+    expect(useQaStore.getState().cards).toEqual([
+      expect.objectContaining({ originalSegment: 'new text', paragraphHash: 'hash-retyped-new' }),
+    ]);
+
+    unlisten();
+  });
 });
