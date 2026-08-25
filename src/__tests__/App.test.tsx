@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import App from '../App.tsx';
 import { useBridgeStore } from '../stores/bridgeStore.ts';
 import { setBridgeService, MockBridgeService } from '../services/tauriBridge.ts';
@@ -21,6 +21,25 @@ describe('SmartLinter Dashboard App Full Integration', () => {
     expect(screen.getByText('SmartLinter')).toBeInTheDocument();
     expect(screen.getByTestId('main-layout-container')).toBeInTheDocument();
     expect(screen.getByTestId('status-bar-container')).toBeInTheDocument();
+  });
+
+  it('bootstraps editor status from the current bridge health on mount', async () => {
+    mockBridge.fetchBridgeHealth = vi.fn().mockResolvedValue({
+      connected: true,
+      editorType: 'Word',
+      activeDocument: 'Startup_Document.docx',
+      sessionId: 'startup-session',
+      version: '0.1.0',
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(mockBridge.fetchBridgeHealth).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('editor-status-badge')).toHaveTextContent(
+        'Word 연결됨 (Startup_Document.docx)'
+      );
+    });
   });
 
   it('subscribes to live bridge events and updates all UI sections reactively', () => {

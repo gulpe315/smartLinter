@@ -10,8 +10,53 @@ use crate::ai::{
     GenerateOptions, MicroScopingQueue, PromptBuilder, QaParser, QaReport, QueueJobRequest,
 };
 use crate::protocol::ParagraphPayload;
+use crate::server::HealthResponse;
 use tauri::{State, WebviewWindow};
 use tracing::debug;
+
+const BRIDGE_HEALTH_URL: &str = "http://127.0.0.1:49152/health";
+
+/// Bridge connection status returned to the dashboard.
+/// Matches the TypeScript `BridgeStatusPayload` interface.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BridgeStatusDto {
+    pub connected: bool,
+    pub editor_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_document: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+}
+
+impl From<HealthResponse> for BridgeStatusDto {
+    fn from(health: HealthResponse) -> Self {
+        Self {
+            connected: health.connected,
+            editor_type: health.active_editor,
+            session_id: health.session_id,
+            active_document: None,
+            version: Some(health.version),
+        }
+    }
+}
+
+/// Fetches the current Local Bridge health state for the dashboard.
+#[tauri::command]
+pub async fn get_bridge_status() -> Result<BridgeStatusDto, String> {
+    let health = reqwest::get(BRIDGE_HEALTH_URL)
+        .await
+        .map_err(|e| format!("Failed to request bridge health: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("Bridge health request failed: {}", e))?
+        .json::<HealthResponse>()
+        .await
+        .map_err(|e| format!("Failed to decode bridge health response: {}", e))?;
+
+    Ok(health.into())
+}
 
 /// Result DTO for AI interactive natural language revision command.
 /// Matches TypeScript `AiCommandResult` interface.
@@ -222,6 +267,24 @@ fn strip_surrounding_quotes(text: &str) -> String {
 mod tests {
     use super::*;
     use crate::ai::LocalLlmProvider;
+
+    #[test]
+    fn test_get_bridge_status_maps_health_response_to_dashboard_payload() {
+        let status = BridgeStatusDto::from(HealthResponse {
+            status: "healthy".to_string(),
+            service: "SmartLinter Local Bridge".to_string(),
+            version: "0.1.0".to_string(),
+            connected: true,
+            active_editor: Some("Word".to_string()),
+            session_id: Some("session-123".to_string()),
+        });
+
+        assert_eq!(status.connected, true);
+        assert_eq!(status.editor_type.as_deref(), Some("Word"));
+        assert_eq!(status.session_id.as_deref(), Some("session-123"));
+        assert_eq!(status.active_document, None);
+        assert_eq!(status.version.as_deref(), Some("0.1.0"));
+    }
 
     #[test]
     fn test_clean_ai_suggested_text_plain() {

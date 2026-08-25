@@ -84,6 +84,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::get_bridge_status,
             commands::set_always_on_top,
             commands::analyze_paragraph,
             commands::execute_ai_command

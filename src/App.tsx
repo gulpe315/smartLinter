@@ -11,6 +11,7 @@ import { useBridgeStore } from './stores/bridgeStore.ts';
 import { useConfigStore } from './stores/configStore.ts';
 import { useQaStore } from './stores/qaStore.ts';
 import { useTmStore } from './stores/tmStore.ts';
+import { getBridgeService } from './services/tauriBridge.ts';
 
 export const App: React.FC = () => {
   const initEventListener = useBridgeStore((state) => state.initEventListener);
@@ -28,6 +29,12 @@ export const App: React.FC = () => {
     const cleanupBridge = initEventListener();
     const cleanupQa = initQaListener();
     const cleanupTm = initTmListener();
+    getBridgeService()
+      .fetchBridgeHealth()
+      .then((status) => useBridgeStore.getState().setEditorStatus(status))
+      .catch(() => {
+        // Event listeners remain active and will handle later bridge status changes.
+      });
     return () => {
       cleanupBridge();
       cleanupQa();
@@ -68,4 +75,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-
