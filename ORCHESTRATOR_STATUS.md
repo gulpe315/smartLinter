@@ -1,39 +1,55 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-25 (Task 19 시나리오 1 실검증 중 연쇄 버그 8건 발견·수정·전부 커밋 완료. 다음 세션은 클린 재기동 후 전체 흐름 재검증부터 시작.)
+마지막 업데이트: 2026-08-25 (Task 19 시나리오 1~3 사실상 전부 검증·종료. 실사용 중 발견된 버그 12건(Task A~L) 전부 수정·라이브 검증 완료. 다음 세션은 백로그 착수부터 시작.)
 
-## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-25 최종 인계)
+## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-25 최종 인계, 이 절이 최신)
 
-1. **`git log --oneline -1`로 최신 커밋이 `2852321`(Re-sync persisted model choice to backend queue on startup)인지 확인.** 아니라면 이 파일의 아래 절들을 시간순으로 훑어서 무슨 일이 있었는지 파악할 것.
-2. **협업 원칙부터 숙지할 것 (이번 세션 내내 반복 확인된 최우선 규칙, [[feedback_agy_consult_when_stuck]] 참고):**
-   - 원인 불명 현상이든 사용자의 새 제안이든, **Claude 혼자 코드를 깊게 파고들어 결론을 내리지 말 것.** 재현 여부 정도의 가벼운 확인(파일 1~2개, 몇 줄 grep 수준)만 직접 하고, 곧바로 Codex(`codex exec -C "D:\data\dev\App\SmartLinter" --approve-for-me '...'`)와 agy(`agy -p '...' --add-dir "D:\data\dev\App\SmartLinter" --print-timeout 15m --dangerously-skip-permissions --sandbox`) 양쪽에 현상을 그대로 공유해서 의견을 구하고, 두 응답을 종합해서 판단할 것.
-   - 실제 코드 수정은 Codex에게 위임. Claude는 결과를 독립 재검증(cargo test/npm test/npm run test:ui 직접 재실행)하고 `git diff`로 범위 이탈 없는지 확인한 뒤 커밋.
-   - 프롬프트에 큰따옴표(`"`)를 넣으면 PowerShell/CLI 인자가 깨짐 — 작은따옴표로만 감싸고 본문엔 큰따옴표 아예 넣지 말 것(길면 임시 `.md` 파일로 지시서를 써서 경로만 넘기는 방법 사용, 이번 세션에서 `TASK_REQUEST_FOR_CODEX_IPC_COMMANDS.md`로 실제로 이렇게 함).
-3. **앱 클린 재기동 절차(매번 필요, InDesign daemon은 소스에서 직접 주입되므로 별도 파일 동기화 불필요):**
+1. **`git log --oneline -1`로 최신 커밋이 `f6b4d1e`(Remove cross-paragraph text-matching fallback from direct-edit reconciliation)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
+2. **협업 원칙 (이번 세션에 두 번 강화됨, [[feedback_agy_consult_when_stuck]] / [[feedback_blast_radius_underestimation]] 필독):**
+   - 원인 불명 현상이든 사용자 제안이든, Claude 혼자 깊게 파고들지 말 것 — 가벼운 확인(파일 1~2개)만 하고 곧바로 Codex(`codex exec -C "D:\data\dev\App\SmartLinter" --approve-for-me '...'`)와 agy(`agy -p '...' --add-dir "D:\data\dev\App\SmartLinter" --print-timeout 15m --dangerously-skip-permissions --sandbox`) 양쪽에 공유.
+   - **(신규, 중요) 두 모델 의견이 상충하거나 한쪽만 잔여위험을 경고했을 때, Claude가 톤/확신도로 스스로 편들어 조용히 결정하지 말 것.** 그 상충/경고 차이 자체를 다시 양쪽에 명시적으로 보여주고 재조율된 답을 받는 라운드를 한 번 더 거칠 것 — 이번 세션에 이걸 안 지켜서 Task K가 Task L로 롤백되는 사고가 남(상세: [[feedback_blast_radius_underestimation]]).
+   - Codex 구현 → Claude가 `git diff`를 **파일 단위 + 라인 단위** 둘 다 확인(지시 범위 밖 변경 없는지, 같은 파일 안에서도 불필요한 부분 안 건드렸는지) → `cargo test`/`npm test`/`npm run test:ui`/`npm run build` 독립 재실행 → 통과하면 즉시 커밋(uncommitted 오래 방치 금지).
+   - **ExtendScript(`plugins/indesign/extendscript/*.jsx`) 파일엔 비ASCII 문자열(한글 등)을 절대 직접 넣지 말 것 — 반드시 `\uXXXX` 유니코드 이스케이프.** Node 테스트는 통과해도 실제 ExtendScript 엔진에서 daemon 평가 자체가 깨짐(3번째로 겪은 동일 패턴 버그, Task I). Codex에게 이 디렉토리 작업을 시킬 때마다 매번 이 제약을 지시서에 명시할 것.
+   - 프롬프트에 큰따옴표(`"`)를 넣으면 PowerShell/CLI 인자가 깨짐 — 본문에 큰따옴표 아예 넣지 말 것.
+3. **앱 클린 재기동 절차(Rust/ExtendScript 변경 후 필요, 프론트엔드 TS/React만 바뀌었으면 재기동 불필요 — Vite HMR로 충분):**
    ```
-   tasklist | grep -iE "smart-linter"          # 있으면
-   taskkill //F //IM smart-linter.exe //T       # 트리 전체 종료
-   netstat -ano | grep ":5173" | grep LISTENING  # 좀비 vite 프로세스 남아있는지 확인(자주 남음)
-   taskkill //F //PID <해당PID>                  # 있으면 같이 종료
+   tasklist | grep -iE "smart-linter"
+   taskkill //F //IM smart-linter.exe //T
+   netstat -ano | grep ":5173" | grep LISTENING   # 좀비 vite 프로세스 자주 남음
+   taskkill //F //PID <해당PID>
    cd "D:\data\dev\App\SmartLinter" && npx tauri dev --no-watch   # run_in_background:true로
    ```
-   `Local Bridge server listening on 127.0.0.1:49152` 로그가 뜰 때까지 대기 후, 사용자에게 InDesign 창에서 "InDesign 연결" 버튼을 눌러달라고 요청 → `curl http://127.0.0.1:49152/health`로 `connected:true` 확인.
-4. **다음 라이브 재검증 순서 (이번 세션 마지막에 미완료 상태로 끝남 — 여기부터 이어갈 것):**
-   - InDesign에 포커스 유지한 채 오타 문장 입력(예: "라인을 연길하세요") → 타이핑 멈춘 뒤 약 1초 뒤에 카드가 **정확히 하나만** 뜨는지(디바운스+안정 문단ID 수정 확인).
-   - 이번엔 실제로 오타가 잡히는지(monolingual 프롬프트 분기 + 모델 재동기화 수정이 실제 라이브에서 작동하는지 — 코드 수정만 됐고 아직 라이브로 확인 못함).
-   - LLM 상태 배지가 앱 켜자마자 자동으로 Ready로 뜨는지(수동으로 모델 바꿨다 되돌리는 우회 없이).
-   - QA 카드 [적용] → InDesign 문서에 실제로 텍스트가 바뀌는지(atomic_replacer.jsx 수정 이후 아직 최종 확인 못함).
-   - 전부 통과하면 Task 19 시나리오 1 완전히 종료 — 시나리오 2(Stale 재스캔)/3(롤백)으로 진행.
-5. **밀린 신규 기능 백엔로그 (agy+Codex 검토는 끝났고 구현 착수 전, 우선순위 1→3→2 권장):**
-   - QA 카드 "위치 보기" 버튼(InDesign에서 해당 문단으로 이동)
-   - 적용 전 인라인 수정 (가장 쉬움, 프론트엔드만)
-   - 동일 이슈 일괄 적용 (1번 이후)
-   - 수정 이력 캐시 + 무시 이력 억제 (TM과 별도 저장소 vs TM tier 통합, agy/Codex 의견 갈림 — 실제 설계 착수 시 다시 물어볼 것)
-   - `start_batch_scan`/`abort_batch_scan`(문서 전체 일괄 스캔): InDesign/Word 어느 쪽에도 "전체 문단 열거" 기능 자체가 없어서 별도 설계 필요, 아직 미착수. **설계 메모(2026-08-25, agy+Codex 교차검증 완료, FEATURE_REVIEW2_CODEX.md/AGY.md 참고):**
-     - "상시 실시간 전체 감시"는 로컬 LLM 처리량 한계로 기각됨(둘 다 강하게 반대) — 대신 ①포커스 즉시분석(유지) ②명시적 "전체 검사" 버튼(진행률·중단 가능, 이미 검사한 문단은 해시로 스킵) ③유휴 시간 점진적 백그라운드 크롤러(훨씬 나중 단계)의 3단계 구조로.
-     - **카드 정합성(2026-08-25, 사용자 제안 + Codex 교차검증 반영):** 전체 검사가 "훑은 문단들"에 한해서는 그 결과를 권위 있는 최신 상태로 삼아 기존 pending 카드를 교체할 것(스캔 범위 밖 카드, 이미 무시한 카드, 적용 진행 중인 카드는 절대 건드리지 말 것 — Codex가 명시적으로 경고). 전체 스캔은 문서의 모든 문단을 직접 열거하므로, 포커스 텔레메트리 기반 Task F(addReport)가 겪던 "같은 문단인지 추측해야 하는" 애매함 자체가 스캔 범위 안에서는 구조적으로 발생하지 않음(장점).
-     - 순서(Codex 권장): Task F 라이브 검증 → 위치보기/문단 재식별 안정화 → `start_batch_scan` 구현(문단 열거+해시캐시+우선순위큐+범위기반 정합성) → 그 다음에야 백그라운드 상시 감시 확장.
-   - **완료(2026-08-25, agy/Codex 교차검증 끝남, FEATURE_REVIEW_CODEX.md/AGY.md 참고):** [적용]으로 치환 완료된 카드를 목록에서 완전히 지우지 말고 "완료" 상태로 숨겨뒀다가, "완료 보이기" 토글로 다시 꺼내서 확인·재수정할 수 있게 할 것. 이미 `appliedCards` 배열이 있어 착수 용이 — 재수정은 과거 명령 재전송이 아니라 최신 문단 재조회 후 새 명령으로 처리해야 함(둘 다 동의). 실제 구현은 아직 착수 전.
+   `Local Bridge server listening on 127.0.0.1:49152` 로그 확인 후, 사용자에게 InDesign 창에서 "InDesign 연결" 버튼을 눌러달라고 요청(ExtendScript는 이 클릭 한 번으로 `$.evalFile`이 디스크에서 새로 읽어오므로 별도 동기화 불필요) → `curl http://127.0.0.1:49152/health`로 `connected:true` 확인.
+   **`cargo test` 전에는 반드시 `smart-linter.exe`를 먼저 종료할 것**(실행 중이면 파일 잠금으로 빌드 실패) — 종료 후 테스트 끝나면 다시 위 명령으로 재기동해서 사용자에게 돌려줄 것.
+4. **Task 19는 사실상 종료됨** — 시나리오 1(기본 QA 사이클) 라이브 확인 완료, 시나리오 2(Stale 재스캔)는 이번 세션의 광범위한 버그헌팅으로 충분히 검증됨, 시나리오 3(롤백 안전망)은 라이브 재현 방법 자체가 잘못됐었다는 걸 확인(잠금은 ExtendScript 쓰기를 안 막음) 후 기존 `simulateErrorAtHunk` 자동테스트로 이미 검증되고 있다고 결론. 재검증이 더 필요하다고 판단되면 그때 다시 논의.
+5. **다음 착수할 백로그 (우선순위, 아래 "참고" 절의 상세 설계 메모 함께 볼 것):**
+   1. `start_batch_scan`/`abort_batch_scan`(문서 전체 일괄 검사 버튼) — agy+Codex 설계 합의 완료(3단계 구조), 아직 미착수. 인프라(문단 열거)가 없어서 새로 설계 필요.
+   2. 동일 이슈 일괄 적용 — 인라인 수정(Task J, 완료) 위에 자연스럽게 얹을 수 있음.
+   3. 완료 카드 아카이브 UI — agy+Codex 교차검증 끝남(`appliedCards` 이미 존재, 재수정은 새 명령으로 처리), 착수 전.
+   4. 수정 이력 캐시 + 무시 이력 억제 — 설계 방향 agy/Codex 의견 갈림, 착수 시 다시 물어볼 것.
+   5. Word taskpane 인프라 — 완전 미착수.
+
+## 이번 세션(2026-08-25) 요약 — Task A~L, 총 12건 수정, 전부 라이브 검증 완료
+
+Task 19 시나리오 1 실검증 중 발견된 8건(2852321까지, 이전 세션) 이후 이 세션에서 이어서:
+
+| Task | 커밋 | 내용 |
+| :--- | :--- | :--- |
+| A | `56a20f0` | Stale 카드 오연결(엉뚱한 카드가 stale 처리됨) → commandId 기반 pendingCommands 레지스트리 도입 |
+| B | `b5210e3` | InDesign 치환이 활성 선택에 의존 → command.paragraphId로 직접 문단 조회 |
+| C | `899363e` | 문단 인덱스 밀림 시 엉뚱한 문단/실패 → 인덱스 우선+해시 검증, 불일치 시 Story 재탐색 |
+| D | `0c8ef4d` | 실패 원인이 항상 "서식이 복잡하여..."로만 표시 → 실제 errorMessage를 Error Details로 노출 |
+| E | `e0a4f80` | QA 카드 "위치 보기" 기능 신규 구현(문서 안 수정, 선택/스크롤만) |
+| F | `4c45130` | 해결된 카드 자동 미정리(직접수정/AI커맨드로 고친 경우) → 직접수정 감지 추가(**이후 오탐 버그의 씨앗이 됨, K/L 참고**) |
+| G+G2 | `9d0579c` | 잠긴 InDesign 프레임/레이어 방어(치환 전 잠금 확인, 위치보기는 예외) |
+| H | `781b283` | daemon 재주입 실패 시 실제 ExtendScript 예외 메시지 노출(진단용) |
+| I | `8b9306a` | **Task G 직후 "InDesign 연결" 완전 불능 회귀 → 원인: atomic_replacer.jsx의 한글 리터럴이 ExtendScript 파싱 자체를 깨뜨림(3번째 인코딩버그)** → `\uXXXX` 이스케이프로 수정 |
+| J | `7c5b810` | 적용 전 인라인 수정(연필→textarea→저장/취소) |
+| K→L | `85ef197`→`f6b4d1e` | **Task F의 직접수정 감지가 실사용에서 오탐(무관한 카드가 포커스 이동만으로 삭제됨) 2연속 발견** → 1차 완화(전체 문단 일치)도 짧은 문단 우연 일치로 재현됨 → 최종적으로 다른 문단 텍스트 추정 매칭(Tier 2) 완전 제거, 정확히 같은 paragraphId일 때만(Tier 1) 자동 정리 |
+
+**중요 사고 2건 (교훈은 각각 [[feedback_blast_radius_underestimation]] 참고):**
+- Task G→I: ExtendScript 공유 파일이 통째로 로드되는 구조 때문에, 무관해 보이는 새 코드(잠금 체크)의 인코딩 결함이 완전히 다른 기능(연결)까지 깨뜨림.
+- Task F→K→L: "같은 문단인지" 매칭 범위를 필요 이상으로 넓게(Story 단위, 텍스트 유사도 기반) 잡아서 무관한 카드를 오삭제. 게다가 이 버그를 고치는 과정에서 Codex의 "아예 제거하라"는 신중한 권고와 agy의 "완전일치로 강화" 확신에 찬 절충안이 갈렸는데, Claude가 재조율 라운드 없이 agy 쪽으로 임의로 판단해서 예견된 실패가 재현됨.
 
 ---
 
