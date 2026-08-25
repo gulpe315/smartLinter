@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { listen as listenTauriEvent } from '@tauri-apps/api/event';
 import {
   TauriBridgeService,
   MockBridgeService,
@@ -7,17 +8,24 @@ import {
 } from '../tauriBridge.ts';
 import { type ReplacementCommand } from '../../../shared/protocol/types.ts';
 
+vi.mock('@tauri-apps/api/event', () => ({
+  emit: vi.fn(),
+  listen: vi.fn(),
+}));
+
 describe('TauriBridgeService & IPC Integration', () => {
   beforeEach(() => {
-    // Reset window.__TAURI__
-    delete (window as any).__TAURI__;
+    delete (window as any).isTauri;
+    delete (window as any).__TAURI_INTERNALS__;
+    vi.mocked(listenTauriEvent).mockReset();
   });
 
   afterEach(() => {
-    delete (window as any).__TAURI__;
+    delete (window as any).isTauri;
+    delete (window as any).__TAURI_INTERNALS__;
   });
 
-  it('delegates to fallback MockBridgeService when window.__TAURI__ is absent', async () => {
+  it('delegates to fallback MockBridgeService when the Tauri runtime is absent', async () => {
     const service = new TauriBridgeService();
 
     const isPinned = await service.setAlwaysOnTop(true);
@@ -42,18 +50,15 @@ describe('TauriBridgeService & IPC Integration', () => {
     service.destroy();
   });
 
-  it('invokes Tauri command set_always_on_top when window.__TAURI__.core.invoke is present', async () => {
+  it('invokes Tauri command set_always_on_top through the official API bindings', async () => {
     const invokeMock = vi.fn().mockResolvedValue(true);
-    (window as any).__TAURI__ = {
-      core: {
-        invoke: invokeMock,
-      },
-    };
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
 
     const service = new TauriBridgeService();
     const isPinned = await service.setAlwaysOnTop(true);
 
-    expect(invokeMock).toHaveBeenCalledWith('set_always_on_top', { pinned: true });
+    expect(invokeMock).toHaveBeenCalledWith('set_always_on_top', { pinned: true }, undefined);
     expect(isPinned).toBe(true);
 
     service.destroy();
@@ -64,39 +69,33 @@ describe('TauriBridgeService & IPC Integration', () => {
       .fn()
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(undefined);
-    (window as any).__TAURI__ = {
-      core: {
-        invoke: invokeMock,
-      },
-    };
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
 
     const service = new TauriBridgeService();
 
     expect(await service.checkIndesignStatus()).toBe(true);
     await expect(service.connectIndesign()).resolves.toBeUndefined();
-    expect(invokeMock).toHaveBeenNthCalledWith(1, 'check_indesign_status');
-    expect(invokeMock).toHaveBeenNthCalledWith(2, 'connect_indesign');
+    expect(invokeMock).toHaveBeenNthCalledWith(1, 'check_indesign_status', {}, undefined);
+    expect(invokeMock).toHaveBeenNthCalledWith(2, 'connect_indesign', {}, undefined);
 
     service.destroy();
   });
 
-  it('invokes Tauri command get_bridge_status when window.__TAURI__.core.invoke is present', async () => {
+  it('invokes Tauri command get_bridge_status through the official API bindings', async () => {
     const invokeMock = vi.fn().mockResolvedValue({
       connected: true,
       editorType: 'Word',
       sessionId: 'sess-abc',
       version: '0.1.0',
     });
-    (window as any).__TAURI__ = {
-      core: {
-        invoke: invokeMock,
-      },
-    };
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
 
     const service = new TauriBridgeService();
     const status = await service.fetchBridgeHealth();
 
-    expect(invokeMock).toHaveBeenCalledWith('get_bridge_status');
+    expect(invokeMock).toHaveBeenCalledWith('get_bridge_status', {}, undefined);
     expect(status.connected).toBe(true);
     expect(status.editorType).toBe('Word');
 
@@ -106,23 +105,18 @@ describe('TauriBridgeService & IPC Integration', () => {
   it('listens to Tauri events and transforms BridgeStatusEvent from Rust session', async () => {
     let capturedHandler: ((evt: { payload: any }) => void) | null = null;
     const unlistenFn = vi.fn();
-    const listenMock = vi.fn().mockImplementation((_event, cb) => {
+    vi.mocked(listenTauriEvent).mockImplementation((_event, cb) => {
       capturedHandler = cb;
       return Promise.resolve(unlistenFn);
     });
-
-    (window as any).__TAURI__ = {
-      event: {
-        listen: listenMock,
-      },
-    };
+    (window as any).isTauri = true;
 
     const service = new TauriBridgeService();
     const statusHandler = vi.fn();
 
     const unlisten = service.listen('bridge-status-changed', statusHandler);
 
-    expect(listenMock).toHaveBeenCalledWith('bridge-status-changed', expect.any(Function));
+    expect(listenTauriEvent).toHaveBeenCalledWith('bridge-status-changed', expect.any(Function));
 
     // Simulate event payload from Rust BridgeStatusEvent
     if (capturedHandler) {

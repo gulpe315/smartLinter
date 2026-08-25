@@ -23,6 +23,8 @@ import {
   parseGuidelineContent,
   parseTmContent,
 } from '../utils/parserUtils.ts';
+import { invoke, isTauri } from '@tauri-apps/api/core';
+import { emit as emitTauriEvent, listen as listenTauriEvent } from '@tauri-apps/api/event';
 
 /** Bridge status event payload */
 export interface BridgeStatusPayload {
@@ -540,14 +542,15 @@ export class MockBridgeService implements IBridgeService {
 }
 
 /**
- * Tauri IPC Bridge Service (delegates to window.__TAURI__ when running in Tauri webview)
+ * Tauri IPC Bridge Service. Uses Tauri's npm API bindings so it does not require
+ * the optional window.__TAURI__ global to be enabled.
  */
 export class TauriBridgeService implements IBridgeService {
   private fallbackService = new MockBridgeService();
   private unlisteners: Array<() => void> = [];
 
   private isTauriAvailable(): boolean {
-    return typeof window !== 'undefined' && '__TAURI__' in window;
+    return isTauri();
   }
 
   listen<K extends BridgeEventName>(event: K, handler: BridgeEventHandler<K>): () => void {
@@ -556,13 +559,10 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.event?.listen) {
-        let active = true;
-        let tauriUnlisten: (() => void) | null = null;
+      let active = true;
+      let tauriUnlisten: (() => void) | null = null;
 
-        tauri.event
-          .listen(event, (evt: { payload: any }) => {
+      listenTauriEvent(event, (evt) => {
             if (active) {
               if (event === 'bridge-status-changed' && evt.payload?.state) {
                 const state = evt.payload.state;
@@ -579,26 +579,25 @@ export class TauriBridgeService implements IBridgeService {
               }
             }
           })
-          .then((unlistenFn: () => void) => {
-            if (!active) {
-              unlistenFn();
-            } else {
-              tauriUnlisten = unlistenFn;
-            }
-          })
-          .catch((err: unknown) => {
-            console.warn(`Failed to attach Tauri event listener for ${event}:`, err);
-          });
-
-        const unlisten = () => {
-          active = false;
-          if (tauriUnlisten) {
-            tauriUnlisten();
+        .then((unlistenFn) => {
+          if (!active) {
+            unlistenFn();
+          } else {
+            tauriUnlisten = unlistenFn;
           }
-        };
-        this.unlisteners.push(unlisten);
-        return unlisten;
-      }
+        })
+        .catch((err: unknown) => {
+          console.warn(`Failed to attach Tauri event listener for ${event}:`, err);
+        });
+
+      const unlisten = () => {
+        active = false;
+        if (tauriUnlisten) {
+          tauriUnlisten();
+        }
+      };
+      this.unlisteners.push(unlisten);
+      return unlisten;
     } catch (e) {
       console.warn('Tauri event listen invocation failed, using fallback:', e);
     }
@@ -613,11 +612,8 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.event?.emit) {
-        tauri.event.emit(event, payload);
-        return;
-      }
+      void emitTauriEvent(event, payload);
+      return;
     } catch (e) {
       console.warn('Tauri event emit failed:', e);
     }
@@ -631,10 +627,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('send_replacement_command', { command });
-      }
+      return await invoke('send_replacement_command', { command });
     } catch (e) {
       console.warn('Tauri invoke send_replacement_command failed, using fallback:', e);
     }
@@ -648,10 +641,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('get_bridge_status');
-      }
+      return await invoke('get_bridge_status');
     } catch (e) {
       console.warn('Tauri invoke get_bridge_status failed:', e);
     }
@@ -665,10 +655,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('analyze_paragraph', { paragraph });
-      }
+      return await invoke('analyze_paragraph', { paragraph });
     } catch (e) {
       console.warn('Tauri invoke analyze_paragraph failed, using fallback:', e);
     }
@@ -682,10 +669,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('execute_ai_command', { instruction, paragraph });
-      }
+      return await invoke('execute_ai_command', { instruction, paragraph });
     } catch (e) {
       console.warn('Tauri invoke execute_ai_command failed, using fallback:', e);
     }
@@ -730,10 +714,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('list_ollama_models', { host });
-      }
+      return await invoke('list_ollama_models', { host });
     } catch (e) {
       console.warn('Tauri invoke list_ollama_models failed, using fallback:', e);
     }
@@ -747,10 +728,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('set_ollama_model', { modelName });
-      }
+      return await invoke('set_ollama_model', { modelName });
     } catch (e) {
       console.warn('Tauri invoke set_ollama_model failed, using fallback:', e);
     }
@@ -764,10 +742,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('load_guideline_content', { content, filename });
-      }
+      return await invoke('load_guideline_content', { content, filename });
     } catch (e) {
       console.warn('Tauri invoke load_guideline_content failed, using fallback:', e);
     }
@@ -781,10 +756,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('load_tm_content', { content, filename });
-      }
+      return await invoke('load_tm_content', { content, filename });
     } catch (e) {
       console.warn('Tauri invoke load_tm_content failed, using fallback:', e);
     }
@@ -798,11 +770,8 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        await tauri.core.invoke('start_batch_scan', { total });
-        return;
-      }
+      await invoke('start_batch_scan', { total });
+      return;
     } catch (e) {
       console.warn('Tauri invoke start_batch_scan failed, using fallback:', e);
     }
@@ -816,10 +785,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('abort_batch_scan');
-      }
+      return await invoke('abort_batch_scan');
     } catch (e) {
       console.warn('Tauri invoke abort_batch_scan failed:', e);
     }
@@ -833,13 +799,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      const tauri = (window as any).__TAURI__;
-      if (tauri?.core?.invoke) {
-        return await tauri.core.invoke('set_always_on_top', { pinned });
-      } else if (tauri?.window?.getCurrentWindow) {
-        await tauri.window.getCurrentWindow().setAlwaysOnTop(pinned);
-        return true;
-      }
+      return await invoke('set_always_on_top', { pinned });
     } catch (e) {
       console.warn('Tauri invoke set_always_on_top failed, using fallback:', e);
     }
@@ -852,8 +812,12 @@ export class TauriBridgeService implements IBridgeService {
       return this.fallbackService.checkIndesignStatus();
     }
 
-    const tauri = (window as any).__TAURI__;
-    return tauri.core.invoke('check_indesign_status');
+    try {
+      return await invoke('check_indesign_status');
+    } catch (e) {
+      console.warn('Tauri invoke check_indesign_status failed, using fallback:', e);
+      return this.fallbackService.checkIndesignStatus();
+    }
   }
 
   async connectIndesign(): Promise<void> {
@@ -861,8 +825,12 @@ export class TauriBridgeService implements IBridgeService {
       return this.fallbackService.connectIndesign();
     }
 
-    const tauri = (window as any).__TAURI__;
-    await tauri.core.invoke('connect_indesign');
+    try {
+      await invoke('connect_indesign');
+    } catch (e) {
+      console.warn('Tauri invoke connect_indesign failed, using fallback:', e);
+      await this.fallbackService.connectIndesign();
+    }
   }
 
   destroy(): void {

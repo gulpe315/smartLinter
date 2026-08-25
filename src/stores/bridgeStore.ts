@@ -220,7 +220,7 @@ export const useBridgeStore = create<BridgeState>((set, get) => ({
       const status = await bridgeService.fetchBridgeHealth();
       get().setEditorStatus(status);
     } catch (err) {
-      console.warn('Failed to connect to InDesign:', err);
+      console.error('Failed to connect to InDesign:', err);
     } finally {
       set({ isConnectingIndesign: false });
     }
