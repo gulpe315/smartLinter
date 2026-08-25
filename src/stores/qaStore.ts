@@ -159,53 +159,16 @@ export const useQaStore = create<QAState>((set, get) => ({
       )
     );
 
-    // A new report is authoritative for idle cards in this paragraph. Keep
-    // applying/refreshing cards intact: they belong to an in-flight command.
-    // InDesign paragraph IDs include a positional index, which changes after
-    // manual editing. Reconcile only an unambiguous candidate, and archive it
-    // rather than silently discarding it.
-    const getInDesignStoryId = (paragraphId: string): string | null => {
-      const match = /^indesign-para-(.+)-(\d+)$/.exec(paragraphId);
-      return match?.[1] ?? null;
-    };
-    const storyId = getInDesignStoryId(payload.paragraphId);
+    // A new report is authoritative for idle cards in this exact paragraph.
+    // Keep applying/refreshing cards intact: they belong to an in-flight command.
 
     set((state) => {
-      const directEditCandidates = state.cards.filter((card) => {
-        if (card.status !== 'pending') {
-          return false;
-        }
-
-        // Tier 1: a report for the same paragraph can safely use segment
-        // matching because the paragraph identity is stable.
-        if (card.paragraphId === payload.paragraphId) {
-          return !payload.paragraphText.includes(card.originalSegment) &&
-            payload.paragraphText.includes(card.suggestedSegment);
-        }
-
-        // Tier 2: after an InDesign paragraph index changes, only reconcile
-        // when applying this card's first original segment produces the exact
-        // newly reported paragraph. This avoids archiving a card because its
-        // suggestion merely appears coincidentally in another paragraph.
-        if (storyId === null || getInDesignStoryId(card.paragraphId) !== storyId) {
-          return false;
-        }
-
-        if (!card.paragraphText) {
-          return false;
-        }
-
-        const originalIndex = card.paragraphText.indexOf(card.originalSegment);
-        if (originalIndex === -1) {
-          return false;
-        }
-
-        const expectedParagraphText =
-          card.paragraphText.slice(0, originalIndex) +
-          card.suggestedSegment +
-          card.paragraphText.slice(originalIndex + card.originalSegment.length);
-        return expectedParagraphText === payload.paragraphText;
-      });
+      const directEditCandidates = state.cards.filter((card) =>
+        card.status === 'pending' &&
+        card.paragraphId === payload.paragraphId &&
+        !payload.paragraphText.includes(card.originalSegment) &&
+        payload.paragraphText.includes(card.suggestedSegment)
+      );
       const obsoleteCardIds = directEditCandidates.length === 1
         ? new Set([directEditCandidates[0].id])
         : new Set<string>();

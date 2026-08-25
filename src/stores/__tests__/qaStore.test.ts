@@ -155,23 +155,6 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(cards.find((card) => card.id === remainingCardId)).toBeDefined();
   });
 
-  it('archives one unambiguous InDesign card resolved by a direct edit in the same story', () => {
-    const cardId = useQaStore.getState().addCard({
-      paragraphId: 'indesign-para-story-42-0', paragraphText: 'The colour is blue.',
-      category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
-    });
-
-    useQaStore.getState().addReport({
-      paragraphId: 'indesign-para-story-42-1', paragraphText: 'The color is blue.', paragraphHash: 'new-hash',
-      report: { status: 'PASS', issues: [] },
-    });
-
-    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeUndefined();
-    expect(useQaStore.getState().dismissedCards).toEqual([
-      expect.objectContaining({ id: cardId, status: 'stale_obsolete' }),
-    ]);
-  });
-
   it('does not archive a card when its suggestion merely appears in another InDesign paragraph', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'indesign-para-story-42-0', paragraphText: 'The colour is blue.',
@@ -187,7 +170,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().dismissedCards).toEqual([]);
   });
 
-  it('archives a card after an InDesign paragraph index changes when the full replacement result matches', () => {
+  it('keeps a card pending when a direct edit is reported with a different paragraph ID', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'indesign-para-story-42-0', paragraphText: 'The colour is blue.',
       category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
@@ -198,10 +181,10 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
       report: { status: 'PASS', issues: [] },
     });
 
-    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeUndefined();
-    expect(useQaStore.getState().dismissedCards).toEqual([
-      expect.objectContaining({ id: cardId, status: 'stale_obsolete' }),
-    ]);
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toEqual(
+      expect.objectContaining({ status: 'pending' })
+    );
+    expect(useQaStore.getState().dismissedCards).toEqual([]);
   });
 
   it('does not reconcile an InDesign card without its original paragraph text', () => {
