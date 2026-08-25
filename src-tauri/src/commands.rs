@@ -11,7 +11,7 @@ use crate::ai::{
     QaReport, QueueJobRequest,
 };
 use crate::protocol::{EditorType, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
-use crate::server::{HealthResponse, SessionManager};
+use crate::server::{HealthResponse, ServerHandle};
 use crate::tm::{parse_tm_content, GuidelineLoader, GuidelineSet, TmEntry};
 use tauri::{State, WebviewWindow};
 use tracing::debug;
@@ -190,8 +190,9 @@ pub async fn execute_ai_command(
 #[tauri::command]
 pub async fn send_replacement_command(
     command: ReplacementCommand,
-    session_manager: State<'_, std::sync::Arc<SessionManager>>,
+    server_handle: State<'_, ServerHandle>,
 ) -> Result<ReplacementResult, String> {
+    let session_manager = server_handle.session_manager();
     let session = session_manager
         .get_snapshot()
         .await

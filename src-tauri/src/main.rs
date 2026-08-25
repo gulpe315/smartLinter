@@ -66,7 +66,7 @@ fn main() {
             let handle = tauri::async_runtime::block_on(server.start())
                 .map_err(|e| format!("Failed to start Local Bridge Server: {e}"))?;
             tracing::info!("Local Bridge Server listening on {}", handle.http_url());
-            app.manage(handle.session_manager());
+            app.manage(handle);
 
             Ok(())
         })
