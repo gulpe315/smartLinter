@@ -217,9 +217,48 @@
     SmartLinterTextObserver.prototype.computeHash = computeParagraphHash;
 
     /**
+     * Returns whether a paragraph is displayed by a locked text frame or layer.
+     * Text content can still be changed through InDesign's scripting DOM while
+     * its frame is locked, so this is an explicit SmartLinter safety policy.
+     *
+     * @param {Object} paragraph InDesign Paragraph reference
+     * @returns {boolean}
+     */
+    function isParagraphLocked(paragraph) {
+        if (!paragraph || paragraph.isValid === false) {
+            return false;
+        }
+
+        try {
+            var frames = paragraph.parentTextFrames;
+            if (!frames || frames.length === 0) {
+                return false;
+            }
+
+            for (var i = 0; i < frames.length; i++) {
+                var frame = frames[i];
+                if (!frame || frame.isValid === false) {
+                    continue;
+                }
+                if (frame.locked === true ||
+                        (frame.itemLayer && frame.itemLayer.locked === true)) {
+                    return true;
+                }
+            }
+        } catch (e) {
+            // Unresolved DOM specifiers must not prevent ordinary telemetry.
+            return false;
+        }
+
+        return false;
+    }
+
+    SmartLinterTextObserver.prototype.isParagraphLocked = isParagraphLocked;
+
+    /**
      * Extracts active paragraph info from InDesign application selection.
      * @param {Object} appInstance InDesign `app` object
-     * @returns {Object|null} { text, paragraphId, hash, source, storyId, paragraphRef }
+     * @returns {Object|null} { text, paragraphId, hash, source, storyId, isLocked, paragraphRef }
      */
     SmartLinterTextObserver.prototype.getActiveParagraph = function(appInstance) {
         try {
@@ -278,6 +317,7 @@
                 hash: hash,
                 source: docName,
                 storyId: storyId,
+                isLocked: isParagraphLocked(targetParagraph),
                 paragraphRef: targetParagraph
             };
         } catch (err) {
@@ -309,7 +349,8 @@
             source: extracted.source,
             target: this.targetLanguage || undefined,
             timestamp: (new Date()).getTime(),
-            editorType: 'InDesign'
+            editorType: 'InDesign',
+            isLocked: extracted.isLocked
         };
 
         this.lastSentParagraphId = extracted.paragraphId;
@@ -337,6 +378,7 @@
     // Register globally in ExtendScript
     if (typeof $ !== 'undefined' && $.global) {
         $.global.SmartLinterTextObserver = SmartLinterTextObserver;
+        $.global.SmartLinterLockUtil = { isParagraphLocked: isParagraphLocked };
         $.global.SmartLinterHashUtil = {
             normalizeParagraph: normalizeParagraph,
             computeParagraphHash: computeParagraphHash,
@@ -345,6 +387,7 @@
         };
     } else if (typeof global !== 'undefined') {
         global.SmartLinterTextObserver = SmartLinterTextObserver;
+        global.SmartLinterLockUtil = { isParagraphLocked: isParagraphLocked };
         global.SmartLinterHashUtil = {
             normalizeParagraph: normalizeParagraph,
             computeParagraphHash: computeParagraphHash,

@@ -65,6 +65,19 @@ describe('QACardItem Component', () => {
     expect(handleAccept).toHaveBeenCalledWith('card-101');
   });
 
+  it('shows a lock indicator and prevents applying a locked card while keeping locate and dismiss enabled', () => {
+    const handleAccept = vi.fn();
+    render(<QACardItem card={{ ...sampleCard, isLocked: true }} onAccept={handleAccept} />);
+
+    expect(screen.getByTestId('qa-card-locked-badge')).toHaveTextContent('잠김');
+    expect(screen.getByTestId('qa-accept-action-btn')).toBeDisabled();
+    expect(screen.getByTestId('qa-accept-action-btn')).toHaveAttribute('title', '잠긴 프레임 또는 레이어입니다');
+    expect(screen.getByTestId('qa-locate-paragraph-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('qa-dismiss-action-btn')).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId('qa-accept-action-btn'));
+    expect(handleAccept).not.toHaveBeenCalled();
+  });
+
   it('locates the card paragraph through the bridge service', async () => {
     const service = new MockBridgeService();
     const locateParagraph = vi.spyOn(service, 'locateParagraph');

@@ -39,6 +39,8 @@ export interface ParagraphPayload {
     timestamp: number;
     /** Host editor platform originating this paragraph */
     editorType: EditorType;
+    /** Whether the source paragraph is in a locked editor container. */
+    isLocked?: boolean;
 }
 
 /** Replacement command sent from the Dashboard to an editor plugin */
@@ -148,6 +150,7 @@ export function isParagraphPayload(val: unknown): val is ParagraphPayload {
         typeof obj.hash === 'string' &&
         typeof obj.source === 'string' &&
         (obj.target === undefined || typeof obj.target === 'string') &&
+        (obj.isLocked === undefined || typeof obj.isLocked === 'boolean') &&
         typeof obj.timestamp === 'number' &&
         isEditorType(obj.editorType)
     );

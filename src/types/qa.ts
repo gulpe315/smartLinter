@@ -43,6 +43,8 @@ export interface QACardData {
   staleMessage?: string;
   rollbackStatus?: 'FAILED' | 'ROLLBACK_ABORTED' | 'ROLLED_BACK';
   rollbackMessage?: string;
+  /** Whether the source editor frame/layer is locked. */
+  isLocked?: boolean;
 }
 
 /** Severity filter options for the QA Card List */

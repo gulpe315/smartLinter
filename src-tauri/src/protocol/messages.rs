@@ -75,6 +75,9 @@ pub struct ParagraphPayload {
     /// Target language code or target context (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<String>,
+    /// Whether the source paragraph is in a locked editor container (optional).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_locked: Option<bool>,
     /// Millisecond Unix epoch timestamp when captured.
     pub timestamp: i64,
     /// Host editor type originating this paragraph.

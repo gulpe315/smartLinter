@@ -38,6 +38,14 @@
         throw new Error('SmartLinterHashUtil / SmartLinterTextObserver is not available');
     }
 
+    function isParagraphLocked(paragraph) {
+        var lockUtil = (typeof SmartLinterLockUtil !== 'undefined')
+            ? SmartLinterLockUtil
+            : (global && global.SmartLinterLockUtil);
+        return !!(lockUtil && typeof lockUtil.isParagraphLocked === 'function' &&
+            lockUtil.isParagraphLocked(paragraph));
+    }
+
     /**
      * Finds a paragraph from the telemetry identifier emitted by TextObserver.
      *
@@ -450,6 +458,20 @@
             };
             this.dispatchResultIfNeeded(notFoundResult, options);
             return notFoundResult;
+        }
+
+        // InDesign permits scripted Story/Text mutations even when the owning
+        // frame or layer is locked. Respect that authoring lock before a
+        // transaction is opened; locateParagraph intentionally remains usable.
+        if (targetParagraph && isParagraphLocked(targetParagraph)) {
+            var lockedResult = {
+                commandId: command.commandId,
+                status: 'FAILED',
+                currentHash: '',
+                message: '해당 텍스트 프레임 또는 레이어가 잠겨 있어 수정할 수 없습니다. InDesign에서 잠금을 해제한 후 다시 시도해 주세요.'
+            };
+            this.dispatchResultIfNeeded(lockedResult, options);
+            return lockedResult;
         }
 
         // 2. Base Hash Verification (Stale Conflict Defense)

@@ -228,6 +228,50 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(targetParagraph.contents, paragraphText);
         });
 
+        it('rejects replacement before opening a transaction when the text frame is locked', () => {
+            const text = 'This approved copy must remain unchanged.';
+            const paragraph = env.getSelectedParagraph()!;
+            paragraph.contents = text;
+            paragraph.parentTextFrames = [{ isValid: true, locked: true, itemLayer: { locked: false } }];
+            const sandbox = loadExtendScript(replacerScriptPath, { app: env.getApp() });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: env.getApp() });
+
+            const result = replacer.execute({
+                commandId: 'cmd-locked-frame-001',
+                paragraphId: 'manual-test-target',
+                baseHash: computeParagraphHash(text),
+                expectedHash: computeParagraphHash('This approved copy changed.'),
+                hunks: extractDiffHunks(text, 'This approved copy changed.')
+            });
+
+            assert.equal(result.status, 'FAILED');
+            assert.match(result.message, /잠겨/);
+            assert.equal(paragraph.contents, text);
+            assert.equal(env.doScriptHistory.length, 0);
+        });
+
+        it('rejects replacement before opening a transaction when the frame layer is locked', () => {
+            const text = 'Layer-protected legal notice.';
+            const paragraph = env.getSelectedParagraph()!;
+            paragraph.contents = text;
+            paragraph.parentTextFrames = [{ isValid: true, locked: false, itemLayer: { locked: true } }];
+            const sandbox = loadExtendScript(replacerScriptPath, { app: env.getApp() });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: env.getApp() });
+
+            const result = replacer.execute({
+                commandId: 'cmd-locked-layer-001',
+                paragraphId: 'manual-test-target',
+                baseHash: computeParagraphHash(text),
+                expectedHash: computeParagraphHash('Layer-protected legal copy.'),
+                hunks: extractDiffHunks(text, 'Layer-protected legal copy.')
+            });
+
+            assert.equal(result.status, 'FAILED');
+            assert.match(result.message, /잠겨/);
+            assert.equal(paragraph.contents, text);
+            assert.equal(env.doScriptHistory.length, 0);
+        });
+
         it('finds a moved paragraph by its unique baseHash and uses a numeric story id lookup', () => {
             const targetText = 'The original paragraph must still be found.';
             const replacementText = 'The original paragraph was found after insertion.';

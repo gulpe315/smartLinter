@@ -67,6 +67,7 @@ export interface QaReportPayload {
   paragraphId: string;
   paragraphText: string;
   paragraphHash: string;
+  isLocked?: boolean;
   report: QaReport;
 }
 

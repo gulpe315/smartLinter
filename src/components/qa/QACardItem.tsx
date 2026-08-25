@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Clock,
   MapPin,
+  Lock,
 } from 'lucide-react';
 import { type QACardData } from '../../types/qa.ts';
 import { getBridgeService } from '../../services/tauriBridge.ts';
@@ -53,7 +54,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isObsolete = card.status === 'stale_obsolete';
   const isApplying = propIsApplying || card.status === 'applying' || isStale;
-  const isAcceptDisabled = isApplying || isObsolete;
+  const isAcceptDisabled = isApplying || isObsolete || card.isLocked === true;
 
   const categoryStyle = getCategoryBadgeClasses(card.category);
   const severityStyle = getSeverityBadgeClasses(card.severity);
@@ -135,6 +136,17 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           {card.paragraphId && (
             <span className="text-[10px] font-mono text-slate-500 hidden sm:inline-block px-1.5 py-0.5 rounded bg-slate-950/60 border border-slate-800/60">
               #{card.paragraphId.slice(-6)}
+            </span>
+          )}
+
+          {card.isLocked && (
+            <span
+              data-testid="qa-card-locked-badge"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border border-amber-700/70 bg-amber-950/50 text-amber-200"
+              title="잠긴 프레임 또는 레이어입니다"
+            >
+              <Lock className="w-3 h-3" />
+              <span>잠김</span>
             </span>
           )}
         </div>
@@ -275,8 +287,14 @@ export const QACardItem: React.FC<QACardItemProps> = ({
             disabled={isAcceptDisabled}
             onClick={() => onAccept?.(card.id)}
             className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border border-indigo-500 shadow-sm shadow-indigo-950/50 transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+            title={card.isLocked ? '잠긴 프레임 또는 레이어입니다' : undefined}
           >
-            {isObsolete ? (
+            {card.isLocked ? (
+              <>
+                <Lock className="w-3.5 h-3.5 text-amber-200" />
+                <span className="text-amber-100">잠겨 있음</span>
+              </>
+            ) : isObsolete ? (
               <>
                 <AlertCircle className="w-3.5 h-3.5 text-slate-300" />
                 <span>적용할 수 없음</span>

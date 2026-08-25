@@ -115,6 +115,7 @@ export const useQaStore = create<QAState>((set, get) => ({
       status: cardInput.status || 'pending',
       createdAt: cardInput.createdAt || Date.now(),
       errorMessage: cardInput.errorMessage,
+      isLocked: cardInput.isLocked,
     };
 
     set((state) => {
@@ -203,6 +204,7 @@ export const useQaStore = create<QAState>((set, get) => ({
         paragraphId: payload.paragraphId,
         paragraphHash: payload.paragraphHash,
         paragraphText: payload.paragraphText,
+        isLocked: payload.isLocked,
         category: issue.category,
         originalSegment: issue.originalSegment,
         suggestedSegment: issue.suggestedSegment,
@@ -491,6 +493,7 @@ export const useQaStore = create<QAState>((set, get) => ({
               paragraphId: payload.paragraphId,
               paragraphText: payload.text,
               paragraphHash: payload.hash,
+              isLocked: payload.isLocked,
               report,
             });
           } catch (error) {

@@ -44,6 +44,7 @@ export interface MockCharacterRange {
 export interface MockParagraph {
     contents: string;
     parentStory?: { id: string };
+    parentTextFrames?: Array<{ isValid?: boolean; locked?: boolean; itemLayer?: { locked?: boolean } }>;
     /** Matches InDesign Paragraph.index: the paragraph's text position in its parent story. */
     index?: number;
     appliedParagraphStyle?: MockParagraphStyle;

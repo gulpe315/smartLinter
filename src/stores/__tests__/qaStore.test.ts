@@ -88,6 +88,21 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().cards.length).toBe(2);
   });
 
+  it('preserves a locked telemetry state on cards created from QA reports', () => {
+    useQaStore.getState().addReport({
+      paragraphId: 'para-locked',
+      paragraphText: 'Approved legal copy.',
+      paragraphHash: 'locked-hash',
+      isLocked: true,
+      report: {
+        status: 'FAIL',
+        issues: [{ category: 'Grammar', originalSegment: 'copy.', suggestedSegment: 'copy!', reason: 'Test', severity: 'LOW' }],
+      },
+    });
+
+    expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({ isLocked: true }));
+  });
+
   it('removes pending cards that are no longer present when a paragraph re-analysis is clean', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'para-cleaned',
