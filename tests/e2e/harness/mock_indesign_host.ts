@@ -167,8 +167,11 @@ export class MockInDesignHost {
         const text = this.getParagraphText();
         const hash = this.getParagraphHash();
         const docName = this.env.activeDocument?.name || 'InDesign_Story.indd';
+        const paragraph = this.getParagraph();
+        const storyId = paragraph?.parentStory?.id || 'story-0';
+        const paragraphIndex = paragraph?.index ?? 0;
         return {
-            paragraphId: paragraphId || `indesign-para-${hash.slice(0, 12)}`,
+            paragraphId: paragraphId || `indesign-para-${storyId}-${paragraphIndex}`,
             text,
             hash,
             source: docName,

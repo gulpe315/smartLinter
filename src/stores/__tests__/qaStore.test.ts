@@ -260,6 +260,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
   });
 
   it('analyzes detected paragraphs and adds the returned report to QA cards', async () => {
+    vi.useFakeTimers();
     const report: QaReport = {
       status: 'FAIL',
       issues: [{
@@ -283,6 +284,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     });
 
     expect(useQaStore.getState().isAnalyzing).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(useQaStore.getState().isAnalyzing).toBe(false));
 
     expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({
@@ -299,9 +301,11 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     ]);
 
     unlisten();
+    vi.useRealTimers();
   });
 
   it('uses the best TM source for analysis without changing the document payload source', async () => {
+    vi.useFakeTimers();
     const tmSource = 'Click the Settings button to configure bridge preferences.';
     vi.spyOn(useTmStore.getState(), 'search').mockResolvedValueOnce([{
       source: tmSource,
@@ -326,14 +330,17 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
     mockBridge.emit('new-paragraph-detected', payload);
 
+    await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
     expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ source: tmSource }));
     expect(payload.source).toBe('SLinter.indd');
 
     unlisten();
+    vi.useRealTimers();
   });
 
   it('stops analyzing when detected paragraph analysis fails', async () => {
+    vi.useFakeTimers();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     vi.spyOn(mockBridge, 'analyzeParagraph').mockRejectedValueOnce(new Error('LLM unavailable'));
     const unlisten = useQaStore.getState().initEventListener(mockBridge);
@@ -347,6 +354,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
       editorType: 'InDesign',
     });
 
+    await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(useQaStore.getState().isAnalyzing).toBe(false));
     expect(warnSpy).toHaveBeenCalledWith(
       'QA analysis failed for detected paragraph:',
@@ -354,9 +362,11 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     );
 
     unlisten();
+    vi.useRealTimers();
   });
 
   it('ignores an older analysis result when the same paragraph is detected again', async () => {
+    vi.useFakeTimers();
     let resolveFirstAnalysis: ((report: QaReport) => void) | undefined;
     const firstAnalysis = new Promise<QaReport>((resolve) => {
       resolveFirstAnalysis = resolve;
@@ -383,7 +393,9 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     };
 
     mockBridge.emit('new-paragraph-detected', { ...baseParagraph, text: 'old text' });
+    await vi.advanceTimersByTimeAsync(1000);
     mockBridge.emit('new-paragraph-detected', { ...baseParagraph, text: 'new text', hash: 'hash-retyped-new' });
+    await vi.advanceTimersByTimeAsync(1000);
 
     await vi.waitFor(() => expect(useQaStore.getState().cards).toHaveLength(1));
     resolveFirstAnalysis!({
@@ -404,5 +416,32 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     ]);
 
     unlisten();
+    vi.useRealTimers();
+  });
+
+  it('debounces consecutive edits of one stable paragraph and analyzes only the final text', async () => {
+    vi.useFakeTimers();
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+    const basePayload = {
+      paragraphId: 'indesign-para-story-100-0',
+      source: 'Catalog.indd',
+      editorType: 'InDesign' as const,
+    };
+
+    mockBridge.emit('new-paragraph-detected', { ...basePayload, text: 'a', hash: 'hash-a', timestamp: Date.now() });
+    await vi.advanceTimersByTimeAsync(400);
+    mockBridge.emit('new-paragraph-detected', { ...basePayload, text: 'ab', hash: 'hash-ab', timestamp: Date.now() });
+    await vi.advanceTimersByTimeAsync(400);
+    mockBridge.emit('new-paragraph-detected', { ...basePayload, text: 'abc', hash: 'hash-abc', timestamp: Date.now() });
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(analyzeSpy).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(analyzeSpy).toHaveBeenCalledTimes(1);
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ text: 'abc', hash: 'hash-abc' }));
+
+    unlisten();
+    vi.useRealTimers();
   });
 });

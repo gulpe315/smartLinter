@@ -263,7 +263,13 @@
             var storyId = targetParagraph.parentStory ? (targetParagraph.parentStory.id || 'story-0') : 'story-0';
             var normalizedText = normalizeParagraph(rawText);
             var hash = computeParagraphHash(rawText, true);
-            var pId = 'indesign-para-' + hash.substring(0, 12);
+            // A paragraph id identifies its location, not its contents.  `Story.id` is
+            // unique within the document and Paragraph.index identifies the paragraph's
+            // text position in that story while its own text is edited. Keeping the SHA-256 value separate
+            // lets downstream stale-result handling notice text changes without turning
+            // every keystroke into a new paragraph.
+            var paragraphIndex = (typeof targetParagraph.index === 'number') ? targetParagraph.index : 0;
+            var pId = 'indesign-para-' + storyId + '-' + paragraphIndex;
 
             return {
                 text: rawText,

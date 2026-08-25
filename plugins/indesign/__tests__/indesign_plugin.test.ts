@@ -616,7 +616,7 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             assert.ok(extracted);
             assert.equal(extracted.text, 'Adobe InDesign typography with pristine kerning and layout.');
             assert.equal(extracted.source, 'Catalog_Autumn_2026.indd');
-            assert.ok(extracted.paragraphId.startsWith('indesign-para-'));
+            assert.equal(extracted.paragraphId, 'indesign-para-story-100-0');
 
             const expectedHash = nodeComputeParagraphHash('Adobe InDesign typography with pristine kerning and layout.');
             assert.equal(extracted.hash, expectedHash);
@@ -652,6 +652,7 @@ describe('Task 9: Adobe InDesign Plugin (ExtendScript Persistent Daemon & Bridge
             const payload3 = observer.captureActiveParagraph(env.getApp(), mockBridgeSocket);
             assert.ok(payload3);
             assert.equal(dispatched.length, 2);
+            assert.equal(payload3!.paragraphId, payload1!.paragraphId, 'Editing must retain the paragraph location id');
             assert.equal(dispatched[1].text, 'Modified InDesign paragraph text.');
             assert.equal(dispatched[1].hash, nodeComputeParagraphHash('Modified InDesign paragraph text.'));
         });

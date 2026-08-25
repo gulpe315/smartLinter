@@ -325,6 +325,7 @@ export const useQaStore = create<QAState>((set, get) => ({
     const bridgeService = service || getBridgeService();
     const unlisteners: Array<() => void> = [];
     const analysisRequestVersions = new Map<string, number>();
+    const pendingAnalysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
     let nextAnalysisRequestVersion = 0;
 
     // Subscribe to incoming QA reports
@@ -334,16 +335,21 @@ export const useQaStore = create<QAState>((set, get) => ({
       })
     );
 
-    // Analyze each detected paragraph directly.  The event is emitted faster than
-    // the LLM can respond, so only the newest request for a paragraph may update
-    // the UI or finish the shared analysis indicator.
+    // Wait for a pause in typing before analyzing.  A new payload for the same
+    // stable paragraph id invalidates both its pending timer and any in-flight
+    // result, so only the newest text may update the UI.
     unlisteners.push(
       bridgeService.listen('new-paragraph-detected', (payload) => {
         const requestVersion = ++nextAnalysisRequestVersion;
         analysisRequestVersions.set(payload.paragraphId, requestVersion);
+        const pendingTimer = pendingAnalysisTimers.get(payload.paragraphId);
+        if (pendingTimer !== undefined) {
+          clearTimeout(pendingTimer);
+        }
         get().setIsAnalyzing(true);
 
-        void (async () => {
+        const timer = setTimeout(() => void (async () => {
+          pendingAnalysisTimers.delete(payload.paragraphId);
           try {
             const tmMatches = await useTmStore.getState().search(payload.text);
             // `payload.source` identifies the document, not the source-language text.
@@ -374,7 +380,8 @@ export const useQaStore = create<QAState>((set, get) => ({
               get().setIsAnalyzing(analysisRequestVersions.size > 0);
             }
           }
-        })();
+        })(), 1000);
+        pendingAnalysisTimers.set(payload.paragraphId, timer);
       })
     );
 
@@ -389,6 +396,10 @@ export const useQaStore = create<QAState>((set, get) => ({
     );
 
     return () => {
+      pendingAnalysisTimers.forEach((timer) => clearTimeout(timer));
+      pendingAnalysisTimers.clear();
+      analysisRequestVersions.clear();
+      get().setIsAnalyzing(false);
       unlisteners.forEach((u) => u());
     };
   },

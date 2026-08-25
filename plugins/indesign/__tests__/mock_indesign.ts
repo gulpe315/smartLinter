@@ -44,6 +44,8 @@ export interface MockCharacterRange {
 export interface MockParagraph {
     contents: string;
     parentStory?: { id: string };
+    /** Matches InDesign Paragraph.index: the paragraph's text position in its parent story. */
+    index?: number;
     appliedParagraphStyle?: MockParagraphStyle;
     characterRuns?: MockStyledRun[];
     hyperlinks?: MockHyperlink[];
@@ -194,6 +196,7 @@ export class MockInDesignEnvironment {
         const paragraph: MockParagraph = {
             contents: text,
             parentStory: { id: storyId },
+            index: 0,
             appliedParagraphStyle: paraStyle,
             characterRuns: characterRuns,
             hyperlinks: hyperlinks
@@ -310,6 +313,17 @@ export class MockInDesignEnvironment {
     ): MockParagraph {
         if (docName && this.activeDocument) {
             this.activeDocument.name = docName;
+        }
+
+        const currentParagraph = this.getSelectedParagraph();
+        // Editing an existing paragraph mutates the same InDesign Paragraph object;
+        // it does not create a new paragraph or change Paragraph.index.
+        if (currentParagraph && currentParagraph.parentStory?.id === storyId) {
+            currentParagraph.contents = text;
+            if (options.paragraphStyle) currentParagraph.appliedParagraphStyle = { name: options.paragraphStyle };
+            if (options.characterRuns) currentParagraph.characterRuns = JSON.parse(JSON.stringify(options.characterRuns));
+            if (options.hyperlinks) currentParagraph.hyperlinks = JSON.parse(JSON.stringify(options.hyperlinks));
+            return currentParagraph;
         }
 
         const paragraph = this.createParagraph(text, storyId, options);
