@@ -202,14 +202,28 @@ pub enum SessionError {
 pub struct SessionManager {
     active_session: Arc<RwLock<Option<EditorSession>>>,
     event_sink: Arc<dyn BridgeEventSink>,
+    result_sender: broadcast::Sender<ReplacementResult>,
 }
 
 impl SessionManager {
     pub fn new(event_sink: Arc<dyn BridgeEventSink>) -> Self {
+        let (result_sender, _) = broadcast::channel(128);
         Self {
             active_session: Arc::new(RwLock::new(None)),
             event_sink,
+            result_sender,
         }
+    }
+
+    /// Subscribes to replacement results received from the active editor.
+    pub fn subscribe_result(&self) -> broadcast::Receiver<ReplacementResult> {
+        self.result_sender.subscribe()
+    }
+
+    /// Publishes an editor replacement result to both the dashboard and IPC waiters.
+    pub async fn emit_replacement_result(&self, result: &ReplacementResult) {
+        self.event_sink.emit_replacement_result(result).await;
+        let _ = self.result_sender.send(result.clone());
     }
 
     /// Attempts to acquire the single active editor session lock.

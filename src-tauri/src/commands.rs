@@ -7,10 +7,12 @@
 
 use serde::{Deserialize, Serialize};
 use crate::ai::{
-    GenerateOptions, MicroScopingQueue, PromptBuilder, QaParser, QaReport, QueueJobRequest,
+    GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
+    QaReport, QueueJobRequest,
 };
-use crate::protocol::ParagraphPayload;
-use crate::server::HealthResponse;
+use crate::protocol::{EditorType, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
+use crate::server::{HealthResponse, SessionManager};
+use crate::tm::{parse_tm_content, GuidelineLoader, GuidelineSet, TmEntry};
 use tauri::{State, WebviewWindow};
 use tracing::debug;
 
@@ -182,6 +184,105 @@ pub async fn execute_ai_command(
         model: Some(job_result.model_used),
         error: None,
     })
+}
+
+/// Sends a replacement command to the active editor and waits for its final result.
+#[tauri::command]
+pub async fn send_replacement_command(
+    command: ReplacementCommand,
+    session_manager: State<'_, std::sync::Arc<SessionManager>>,
+) -> Result<ReplacementResult, String> {
+    let session = session_manager
+        .get_snapshot()
+        .await
+        .ok_or_else(|| "No active editor session".to_string())?;
+
+    if session.editor_type == EditorType::InDesign {
+        let command_for_com = command.clone();
+        return tokio::task::spawn_blocking(move || crate::indesign_com::execute_replacement(command_for_com))
+            .await
+            .map_err(|error| format!("InDesign replacement task failed: {error}"))?;
+    }
+
+    let mut results = session_manager.subscribe_result();
+    session_manager
+        .send_command(command.clone())
+        .await
+        .map_err(|error| format!("Failed to dispatch replacement command: {error}"))?;
+
+    let command_id = command.command_id.clone();
+    match tokio::time::timeout(std::time::Duration::from_secs(15), async move {
+        loop {
+            match results.recv().await {
+                Ok(result) if result.command_id == command_id => return result,
+                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                    return ReplacementResult {
+                        command_id,
+                        status: ReplacementStatus::Failed,
+                        current_hash: String::new(),
+                        message: Some("Replacement result channel closed".to_string()),
+                    };
+                }
+            }
+        }
+    }).await {
+        Ok(result) => Ok(result),
+        Err(_) => Ok(ReplacementResult {
+            command_id: command.command_id,
+            status: ReplacementStatus::Failed,
+            current_hash: String::new(),
+            message: Some("Timed out waiting 15 seconds for the editor replacement result".to_string()),
+        }),
+    }
+}
+
+/// Lists models available from the configured Ollama host or the queue's provider.
+#[tauri::command]
+pub async fn list_ollama_models(
+    host: Option<String>,
+    queue: State<'_, MicroScopingQueue>,
+) -> Result<Vec<crate::ai::ModelInfo>, String> {
+    let provider: std::sync::Arc<dyn LocalLlmProvider> = match host.filter(|value| !value.trim().is_empty()) {
+        Some(host) => std::sync::Arc::new(OllamaProvider::new(host)),
+        None => queue.provider(),
+    };
+    provider.list_models().await.map_err(|error| format!("Failed to list Ollama models: {error}"))
+}
+
+/// Selects the default model used by subsequent queued AI jobs.
+#[tauri::command]
+pub async fn set_ollama_model(model_name: String, queue: State<'_, MicroScopingQueue>) -> Result<bool, String> {
+    if model_name.trim().is_empty() {
+        return Err("Model name must not be empty".to_string());
+    }
+    queue.set_model(model_name.trim().to_string()).await;
+    Ok(true)
+}
+
+/// Parses guideline content supplied by the configuration UI.
+#[tauri::command]
+pub fn load_guideline_content(content: String, filename: Option<String>) -> Result<GuidelineSet, String> {
+    GuidelineLoader::load_from_str(&content, filename.as_deref())
+        .map_err(|error| format!("Failed to load guideline content: {error}"))
+}
+
+/// Parses TMX or JSON translation-memory content supplied by the configuration UI.
+#[tauri::command]
+pub fn load_tm_content(content: String, filename: Option<String>) -> Result<TmContentDto, String> {
+    let format_hint = filename.as_deref().and_then(|name| {
+        std::path::Path::new(name).extension().and_then(|extension| extension.to_str())
+    });
+    let entries = parse_tm_content(&content, format_hint)
+        .map_err(|error| format!("Failed to load translation-memory content: {error}"))?;
+    Ok(TmContentDto { count: entries.len(), entries })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TmContentDto {
+    pub count: usize,
+    pub entries: Vec<TmEntry>,
 }
 
 /// Extracts and sanitizes the proposed replacement text from raw LLM output.

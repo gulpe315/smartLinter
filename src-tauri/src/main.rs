@@ -61,25 +61,12 @@ fn main() {
             });
             app.manage(queue);
 
-            // Launch Local Bridge Server (Task 3) in background runtime
-            tauri::async_runtime::spawn(async move {
-                let server = BridgeServer::with_defaults(event_sink);
-                match server.start().await {
-                    Ok(_handle) => {
-                        tracing::info!(
-                            "Local Bridge Server listening on {}",
-                            _handle.http_url()
-                        );
-                        // Hold server handle to maintain active server lifetime
-                        loop {
-                            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to start Local Bridge Server: {}", e);
-                    }
-                }
-            });
+            // Start the bridge before exposing IPC so its session manager is available.
+            let server = BridgeServer::with_defaults(event_sink);
+            let handle = tauri::async_runtime::block_on(server.start())
+                .map_err(|e| format!("Failed to start Local Bridge Server: {e}"))?;
+            tracing::info!("Local Bridge Server listening on {}", handle.http_url());
+            app.manage(handle.session_manager());
 
             Ok(())
         })
@@ -89,7 +76,12 @@ fn main() {
             commands::connect_indesign,
             commands::set_always_on_top,
             commands::analyze_paragraph,
-            commands::execute_ai_command
+            commands::execute_ai_command,
+            commands::send_replacement_command,
+            commands::list_ollama_models,
+            commands::set_ollama_model,
+            commands::load_guideline_content,
+            commands::load_tm_content
         ])
         .run(tauri::generate_context!())
         .expect("error while running SmartLinter tauri application");

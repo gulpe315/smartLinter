@@ -173,7 +173,7 @@ async fn handle_websocket_connection(
                     }
                     Ok(BridgeMessage::ReplacementResult(result)) => {
                         info!("Received replacement result: {} ({})", result.command_id, result.status);
-                        event_sink.emit_replacement_result(&result).await;
+                        session_mgr.emit_replacement_result(&result).await;
                     }
                     Ok(BridgeMessage::AuthHandshake(_)) => {
                         // Handshake already processed

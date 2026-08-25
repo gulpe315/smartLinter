@@ -14,7 +14,8 @@ mod platform {
     use std::thread;
     use std::time::Duration;
 
-    use windows::core::{GUID, PCWSTR, VARIANT};
+    use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
+    use crate::protocol::{ReplacementCommand, ReplacementResult};
     use windows::Win32::Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, RPC_E_CALL_REJECTED,
         RPC_E_CHANGED_MODE, RPC_E_SERVERCALL_RETRYLATER,
@@ -302,6 +303,10 @@ mod platform {
     }
 
     fn do_script(dispatch: &IDispatch, script: &str) -> Result<(), windows::core::Error> {
+        invoke_script(dispatch, script).map(|_| ())
+    }
+
+    fn invoke_script(dispatch: &IDispatch, script: &str) -> Result<VARIANT, windows::core::Error> {
         let name: Vec<u16> = "DoScript".encode_utf16().chain(Some(0)).collect();
         let name_pointer = PCWSTR(name.as_ptr());
         let mut dispid = 0;
@@ -335,8 +340,16 @@ mod platform {
                 Some(&mut result),
                 Some(&mut exception),
                 Some(&mut argument_error),
-            )
+            )?;
         }
+
+        Ok(result)
+    }
+
+    fn do_script_with_result(dispatch: &IDispatch, script: &str) -> Result<String, windows::core::Error> {
+        let result = invoke_script(dispatch, script)?;
+        let output = BSTR::try_from(&result)?;
+        Ok(output.to_string())
     }
 
     fn is_transient_busy(error: &windows::core::Error) -> bool {
@@ -381,10 +394,29 @@ mod platform {
 
         unreachable!("the retry loop always returns")
     }
+
+    pub fn execute_replacement(command: ReplacementCommand) -> Result<ReplacementResult, String> {
+        if !is_indesign_process_running()? {
+            return Err("InDesign is not running".to_string());
+        }
+        let command_json = serde_json::to_string(&command)
+            .map_err(|error| format!("Cannot serialize replacement command: {error}"))?;
+        let command_id = serde_json::to_string(&command.command_id)
+            .map_err(|error| format!("Cannot serialize command ID: {error}"))?;
+        let script = format!(
+            "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{\n    var res = $.global.SmartLinterDaemonInstance.executeReplacement({command_json});\n    return JSON.stringify(res);\n  }}\n  return JSON.stringify({{ commandId: {command_id}, status: 'FAILED', currentHash: '', message: 'InDesign SmartLinterDaemonInstance is not initialized' }});\n}})();"
+        );
+        let _com = ComApartment::initialize()?;
+        let dispatch = active_indesign()?;
+        let output = do_script_with_result(&dispatch, &script)
+            .map_err(|error| format!("InDesign DoScript failed: {error}"))?;
+        serde_json::from_str(&output)
+            .map_err(|error| format!("Cannot decode InDesign replacement result: {error}"))
+    }
 }
 
 #[cfg(windows)]
-pub use platform::{detect_running_indesign, inject_daemon_script};
+pub use platform::{detect_running_indesign, execute_replacement, inject_daemon_script};
 
 #[cfg(not(windows))]
 pub fn detect_running_indesign() -> Result<bool, String> {
@@ -393,5 +425,10 @@ pub fn detect_running_indesign() -> Result<bool, String> {
 
 #[cfg(not(windows))]
 pub fn inject_daemon_script(_daemon_script_path: &Path) -> Result<(), String> {
+    Err("InDesign COM automation is only supported on Windows".to_string())
+}
+
+#[cfg(not(windows))]
+pub fn execute_replacement(_command: crate::protocol::ReplacementCommand) -> Result<crate::protocol::ReplacementResult, String> {
     Err("InDesign COM automation is only supported on Windows".to_string())
 }
