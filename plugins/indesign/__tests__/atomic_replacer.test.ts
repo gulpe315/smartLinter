@@ -198,6 +198,30 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(lastDoScript.rolledBack, false);
         });
 
+        it('should normalize plural Characters.contents arrays before validating and write through Text.contents', () => {
+            const initialText = 'Replace the old phrase.';
+            const targetText = 'Replace the new phrase.';
+            const env = new MockInDesignEnvironment(initialText);
+            const paragraph = env.getSelectedParagraph()!;
+            const range = paragraph.characters!.itemByRange(12, 14);
+
+            // InDesign ExtendScript returns an array from a plural Characters specifier.
+            assert.deepEqual(range.contents, ['old']);
+
+            const sandbox = loadExtendScript(replacerScriptPath, { app: env.getApp() });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: env.getApp() });
+            const result = replacer.execute({
+                commandId: 'cmd-plural-contents-002a',
+                paragraphId: 'indesign-para-2a',
+                baseHash: computeParagraphHash(initialText),
+                expectedHash: computeParagraphHash(targetText),
+                hunks: [{ start: 12, end: 15, oldText: 'old', newText: 'new' }]
+            });
+
+            assert.equal(result.status, 'SUCCESS');
+            assert.equal(paragraph.contents, targetText);
+        });
+
         it('should handle pure insertions and deletions in InDesign paragraph', () => {
             const initialText = 'Start middle finish.';
             const targetText = 'Start inserted middle finish.'; // pure insertion

@@ -30,8 +30,15 @@ export interface MockStyledRun {
 }
 
 export interface MockCharacterRange {
-    contents: string;
+    contents: string[];
     appliedCharacterStyle?: MockCharacterStyle;
+    texts: {
+        everyItem: () => {
+            getElements: () => Array<{
+                contents: string;
+            }>;
+        };
+    };
 }
 
 export interface MockParagraph {
@@ -216,8 +223,6 @@ export class MockInDesignEnvironment {
         // Characters & itemByRange
         paragraph.characters = {
             itemByRange: (start: number, end: number) => {
-                const slice = paragraph.contents.substring(start, end + 1);
-
                 // Find predominant character style in range
                 let foundStyle = '[None]';
                 if (paragraph.characterRuns) {
@@ -231,7 +236,9 @@ export class MockInDesignEnvironment {
 
                 return {
                     get contents() {
-                        return paragraph.contents.substring(start, end + 1);
+                        // ExtendScript returns an array when `.contents` is read
+                        // from the plural Characters specifier returned by itemByRange.
+                        return [paragraph.contents.substring(start, end + 1)];
                     },
                     set contents(val: string) {
                         const before = paragraph.contents.substring(0, start);
@@ -254,6 +261,35 @@ export class MockInDesignEnvironment {
                     },
                     get appliedCharacterStyle() {
                         return { name: foundStyle };
+                    },
+                    texts: {
+                        everyItem: () => ({
+                            // Resolving the singular Text object mirrors the documented
+                            // Text.contents String read/write API used by the replacer.
+                            getElements: () => [{
+                                get contents() {
+                                    return paragraph.contents.substring(start, end + 1);
+                                },
+                                set contents(val: string) {
+                                    const before = paragraph.contents.substring(0, start);
+                                    const after = paragraph.contents.substring(end + 1);
+                                    paragraph.contents = before + val + after;
+
+                                    if (paragraph.characterRuns) {
+                                        const oldLen = end - start + 1;
+                                        const diff = val.length - oldLen;
+                                        for (const run of paragraph.characterRuns) {
+                                            if (run.start > end) {
+                                                run.start += diff;
+                                                run.end += diff;
+                                            } else if (run.end >= end) {
+                                                run.end += diff;
+                                            }
+                                        }
+                                    }
+                                }
+                            }]
+                        })
                     }
                 };
             }

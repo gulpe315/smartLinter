@@ -123,6 +123,22 @@
     };
 
     /**
+     * Converts an InDesign text contents value to a string.
+     *
+     * A plural Characters specifier returns an array of strings from `.contents`
+     * in ExtendScript, whereas a resolved singular Text object returns a string.
+     *
+     * @param {String|Array} contents
+     * @returns {string}
+     */
+    SmartLinterAtomicReplacer.prototype.normalizeContents = function(contents) {
+        if (contents && typeof contents === 'object' && typeof contents.join === 'function') {
+            return contents.join('');
+        }
+        return (typeof contents === 'undefined' || contents === null) ? '' : String(contents);
+    };
+
+    /**
      * Applies a single hunk mutation to an InDesign Paragraph DOM element.
      * Preserves character styles, paragraph styles, hyperlinks, and special elements.
      * 
@@ -155,14 +171,29 @@
         if (paragraph.characters && paragraph.characters.itemByRange) {
             // InDesign itemByRange is 0-based inclusive for both start and end
             var charRange = paragraph.characters.itemByRange(start, end - 1);
-            var currentContent = charRange.contents;
+            var currentContent = this.normalizeContents(charRange.contents);
 
             if (currentContent !== oldText) {
                 throw new Error('InDesign DOM range mismatch: expected "' + oldText + '" at [' + start + ':' + end + '], found "' + currentContent + '"');
             }
 
-            // Direct assignment replaces characters while preserving run styles / paragraph styles
-            charRange.contents = newText;
+            // `charRange` is a plural Characters specifier. Resolve its single Text
+            // object before assigning so the documented String `Text.contents` API is
+            // used rather than relying on plural-specifier assignment semantics.
+            var rangeText = null;
+            if (charRange.texts && charRange.texts.everyItem) {
+                var resolvedTexts = charRange.texts.everyItem().getElements();
+                if (resolvedTexts && resolvedTexts.length > 0) {
+                    rangeText = resolvedTexts[0];
+                }
+            }
+
+            if (rangeText) {
+                rangeText.contents = newText;
+            } else {
+                // Compatibility fallback for lightweight DOM adapters.
+                charRange.contents = newText;
+            }
             return;
         }
 
