@@ -55,6 +55,10 @@ SUCCESS만 반환했을 가능성이 높았음.
 - LLM 상태 배지(Header의 "qwen2.5:7b" 표시)가 실제 헬스체크와 배선 안 됨(항상 Standby, 설정에서 모델 수동 선택할 때만 낙관적으로 true) — 아직 미수정, 별도 태스크로 처리 필요.
 - **실제 InDesign에서 [적용] 클릭 시 치환 실패 → 자동 롤백 확인(2026-08-25).** agy 진단: COM DoScript/데몬 통신/JSON/해시검증은 전부 정상, 실패 지점은 `atomic_replacer.jsx`의 DOM 조작부로 좁혀짐 — 유력 후보 (1) `Characters.itemByRange().contents`가 문자열이 아니라 문자 배열을 반환해서 `oldText !== currentContent` 불일치로 예외 발생, (2) `indesign_com.rs`가 이미 `DoScript`로 스크립트를 실행 중인데 그 안에서 `transaction_runner.jsx`가 또 `UndoModes.ENTIRE_SCRIPT`로 중첩 `doScript` 호출 — InDesign이 이 중첩을 거부할 가능성(신규 COM 아키텍처 특유의 문제, 기존 Scripts Panel 방식에선 없었던 경로). Codex 교차검증 응답 대기 중, 다음 세션 이어서 처리.
 - **신규 기능 요청 (사용자, 2026-08-25):** QA 카드에 "위치 보기" 버튼 — 치환 여부 판단 전에 InDesign 문서에서 해당 문단 위치로 이동/선택해서 보여주는 기능. agy가 지적한 `atomic_replacer.jsx`의 `paragraphId` 추적 개선(현재는 `inApp.selection[0]`에 의존)과 같은 기반으로 구현 가능 — 치환 실패 수정과 묶어서 다음 태스크로 진행할 것.
+- **신규 기능 요청 3건 (사용자, 2026-08-25, 아직 설계 착수 안 함):**
+  1. **적용 전 인라인 수정:** QA 카드의 제안(suggestedSegment)이 부분적으로만 맞을 때, 사용자가 직접 고친 뒤 그 수정본으로 치환할 수 있어야 함 — 프론트엔드 UI만으로 가능해 보임(acceptCard가 card.suggestedSegment를 그대로 쓰므로, 편집 모드 UI만 추가하면 나머지 파이프라인은 그대로 재사용 가능).
+  2. **수정 이력 별도 캐시 저장:** 사용자가 확정한 교정(원문→수정본)을 TM과 별개의 저장소에 남겨서, 동일 문장이 나중에 재발견되면 그 교정본을 재사용(LLM 재호출 없이 자동 제안 또는 자동 적용). 저장 위치/조회 시점(분석 파이프라인 어디에 끼워넣을지)을 새로 설계해야 하는 제법 큰 기능 — 별도 설계 필요.
+  3. **동일 이슈 일괄 적용:** 같은 오류 패턴(category+originalSegment+suggestedSegment)이 여러 문단에 반복될 때 한 번에 일괄 치환하는 기능 — 각 문단마다 별도 ReplacementCommand(paragraphId/baseHash 다름)를 순차 적용해야 하므로 프론트 오케스트레이션 + UI(일괄 적용 버튼) 필요.
 
 **이 전환과 무관하게 원래 남아있던 할 일:** Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축.
 
