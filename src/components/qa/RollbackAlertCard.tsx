@@ -29,6 +29,8 @@ export interface RollbackAlertCardProps {
   status: RollbackAlertStatus | string;
   /** Custom notification or error message */
   message?: string;
+  /** Actual error returned by the editor host or server, shown separately from the user-facing notice */
+  technicalMessage?: string;
   /** Suggested replacement text for one-click clipboard copying */
   suggestedText?: string;
   /** Original text segment (optional context) */
@@ -57,6 +59,7 @@ export const ROLLED_BACK_DEFAULT_ALERT_MESSAGE =
 export const RollbackAlertCard: React.FC<RollbackAlertCardProps> = ({
   status,
   message,
+  technicalMessage,
   suggestedText,
   originalText: _originalText,
   className = '',
@@ -80,6 +83,11 @@ export const RollbackAlertCard: React.FC<RollbackAlertCardProps> = ({
       : isRolledBack
       ? ROLLED_BACK_DEFAULT_ALERT_MESSAGE
       : FAILED_DEFAULT_ALERT_MESSAGE);
+
+  const normalizedTechnicalMessage = technicalMessage?.trim();
+  const shouldShowTechnicalMessage =
+    Boolean(normalizedTechnicalMessage) &&
+    normalizedTechnicalMessage !== displayMessage.trim();
 
   // Determine whether copy button should be shown
   const shouldShowCopy =
@@ -155,6 +163,23 @@ export const RollbackAlertCard: React.FC<RollbackAlertCardProps> = ({
           </div>
         </div>
       </div>
+
+      {shouldShowTechnicalMessage && (
+        <details
+          data-testid="rollback-alert-technical-details"
+          className="rounded-md border border-current/15 bg-slate-950/20 px-2.5 py-2 text-[11px]"
+        >
+          <summary className="cursor-pointer select-none font-medium text-current/90">
+            Error details
+          </summary>
+          <p
+            data-testid="rollback-alert-technical-message"
+            className="mt-1.5 whitespace-pre-wrap break-words font-mono leading-relaxed text-current/80"
+          >
+            {normalizedTechnicalMessage}
+          </p>
+        </details>
+      )}
 
       {/* Action Footer: Copy Suggested Text / Retry / Dismiss */}
       {(shouldShowCopy || onRetry || onDismiss) && (

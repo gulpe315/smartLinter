@@ -79,6 +79,40 @@ describe('RollbackAlertCard Component (Task 17 UX)', () => {
     expect(screen.getByTestId('rollback-alert-message')).toHaveTextContent(customMessage);
   });
 
+  it('renders a technical error detail separately from the friendly FAILED notice', () => {
+    render(
+      <RollbackAlertCard
+        status="FAILED"
+        technicalMessage="Target paragraph could not be found"
+      />
+    );
+
+    expect(screen.getByTestId('rollback-alert-message')).toHaveTextContent(
+      FAILED_DEFAULT_ALERT_MESSAGE
+    );
+    expect(screen.getByTestId('rollback-alert-technical-details')).toBeInTheDocument();
+    expect(screen.getByTestId('rollback-alert-technical-message')).toHaveTextContent(
+      'Target paragraph could not be found'
+    );
+  });
+
+  it('does not render technical details when the technical message is empty or duplicates the notice', () => {
+    const { rerender } = render(
+      <RollbackAlertCard status="FAILED" technicalMessage="   " />
+    );
+
+    expect(screen.queryByTestId('rollback-alert-technical-details')).not.toBeInTheDocument();
+
+    rerender(
+      <RollbackAlertCard
+        status="FAILED"
+        technicalMessage={FAILED_DEFAULT_ALERT_MESSAGE}
+      />
+    );
+
+    expect(screen.queryByTestId('rollback-alert-technical-details')).not.toBeInTheDocument();
+  });
+
   it('triggers onRetry and onDismiss callbacks when corresponding buttons are clicked', () => {
     const handleRetry = vi.fn();
     const handleDismiss = vi.fn();

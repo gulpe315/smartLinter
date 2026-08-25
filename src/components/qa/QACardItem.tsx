@@ -191,7 +191,8 @@ export const QACardItem: React.FC<QACardItemProps> = ({
                 ? 'ROLLED_BACK'
                 : 'FAILED')
             }
-            message={card.rollbackMessage || card.errorMessage}
+            message={card.rollbackMessage}
+            technicalMessage={card.errorMessage}
             suggestedText={card.suggestedSegment}
             originalText={card.originalSegment}
           />

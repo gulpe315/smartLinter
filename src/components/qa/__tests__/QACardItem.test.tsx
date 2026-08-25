@@ -138,6 +138,25 @@ describe('QACardItem Component', () => {
     expect(screen.getByTestId('clipboard-copy-button')).toBeInTheDocument();
   });
 
+  it('passes the actual rollback failure reason to the alert detail area', () => {
+    const failedRollbackCard: QACardData = {
+      ...sampleCard,
+      status: 'failed',
+      rollbackStatus: 'FAILED',
+      rollbackMessage: '?좑툘 ?쒖떇??蹂듭옟?섏뿬 ?먮룞 援먯껜???ㅽ뙣?덉뒿?덈떎. ?섎룞?쇰줈 ?뺤씤??二쇱꽭??',
+      errorMessage: 'Hunk mismatch at paragraph 12',
+    };
+
+    render(<QACardItem card={failedRollbackCard} />);
+
+    expect(screen.getByTestId('rollback-alert-message')).toHaveTextContent(
+      failedRollbackCard.rollbackMessage!
+    );
+    expect(screen.getByTestId('rollback-alert-technical-message')).toHaveTextContent(
+      'Hunk mismatch at paragraph 12'
+    );
+  });
+
   it('renders RollbackAlertCard with safe abort notice when rollbackStatus is ROLLBACK_ABORTED', () => {
     const abortedCard: QACardData = {
       ...sampleCard,
