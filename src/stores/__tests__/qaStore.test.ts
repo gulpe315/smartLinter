@@ -88,6 +88,98 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().cards.length).toBe(2);
   });
 
+  it('removes pending cards that are no longer present when a paragraph re-analysis is clean', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-cleaned',
+      category: 'Grammar',
+      originalSegment: 'teh',
+      suggestedSegment: 'the',
+      reason: 'Typo',
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-cleaned',
+      paragraphText: 'The paragraph is now clean.',
+      paragraphHash: 'hash-clean',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeUndefined();
+  });
+
+  it('removes only resolved pending cards when a paragraph re-analysis still has other issues', () => {
+    const resolvedCardId = useQaStore.getState().addCard({
+      paragraphId: 'para-partially-cleaned',
+      category: 'Grammar',
+      originalSegment: 'teh',
+      suggestedSegment: 'the',
+      reason: 'Typo',
+    });
+    const remainingCardId = useQaStore.getState().addCard({
+      paragraphId: 'para-partially-cleaned',
+      category: 'Style',
+      originalSegment: 'very',
+      suggestedSegment: '',
+      reason: 'Wordiness',
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-partially-cleaned',
+      paragraphText: 'The very clear paragraph.',
+      paragraphHash: 'hash-partial',
+      report: {
+        status: 'FAIL',
+        issues: [{
+          category: 'Style', originalSegment: 'very', suggestedSegment: '', reason: 'Wordiness', severity: 'LOW',
+        }],
+      },
+    });
+
+    const cards = useQaStore.getState().cards;
+    expect(cards.find((card) => card.id === resolvedCardId)).toBeUndefined();
+    expect(cards.find((card) => card.id === remainingCardId)).toBeDefined();
+  });
+
+  it('maps a replacement result to its commandId target instead of another applying card', async () => {
+    const intendedCardId = useQaStore.getState().addCard({
+      paragraphId: 'para-command-target', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+    });
+    const otherCardId = useQaStore.getState().addCard({
+      paragraphId: 'para-unrelated', category: 'Style', originalSegment: 'very', suggestedSegment: '', reason: 'Wordiness',
+    });
+    useQaStore.setState((state) => ({
+      cards: state.cards.map((card) => card.id === otherCardId ? { ...card, status: 'applying' } : card),
+      pendingCommands: new Map([['cmd-target', {
+        cardId: intendedCardId, paragraphId: 'para-command-target', baseHash: 'base-target',
+      }]]),
+    }));
+
+    await useQaStore.getState().processReplacementResult({
+      commandId: 'cmd-target', status: 'FAILED', currentHash: 'current-target', message: 'Host failed',
+    }, mockBridge);
+
+    const cards = useQaStore.getState().cards;
+    expect(cards.find((card) => card.id === intendedCardId)?.status).toBe('failed');
+    expect(cards.find((card) => card.id === otherCardId)?.status).toBe('applying');
+    expect(useQaStore.getState().pendingCommands.has('cmd-target')).toBe(false);
+  });
+
+  it('consumes a command after the first result so a duplicate result cannot apply twice', async () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-duplicate-result', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+    });
+    useQaStore.setState({
+      pendingCommands: new Map([['cmd-duplicate', {
+        cardId, paragraphId: 'para-duplicate-result', baseHash: 'base-duplicate',
+      }]]),
+    });
+    const result = { commandId: 'cmd-duplicate', status: 'SUCCESS' as const, currentHash: 'hash-applied' };
+
+    expect(await useQaStore.getState().processReplacementResult(result, mockBridge)).toBe(true);
+    expect(await useQaStore.getState().processReplacementResult(result, mockBridge)).toBe(false);
+    expect(useQaStore.getState().appliedCards.filter((card) => card.id === cardId)).toHaveLength(1);
+  });
+
   it('warns when the backend reports an unrecoverable QA parser error', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 

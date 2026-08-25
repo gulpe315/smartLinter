@@ -289,21 +289,7 @@ export class RollbackGuard {
           result.status === 'ROLLBACK_ABORTED' ||
           result.status === 'ROLLED_BACK'
         ) {
-          const cards = useQaStore.getState().cards;
-          const targetCard =
-            cards.find((c) => c.status === 'applying') ||
-            cards.find((c) => c.id === result.commandId);
-
-          if (targetCard) {
-            await this.handleReplacementResult({
-              cardId: targetCard.id,
-              result,
-              suggestedText: targetCard.suggestedSegment,
-              originalText: targetCard.originalSegment,
-              paragraphId: targetCard.paragraphId,
-              service: bridgeService,
-            });
-          }
+          await useQaStore.getState().processReplacementResult(result, bridgeService);
         }
       })
     );

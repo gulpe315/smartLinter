@@ -296,20 +296,9 @@ export class StaleConflictResolver {
     unlisteners.push(
       bridgeService.listen('replacement-result', async (result: ReplacementResult) => {
         if (result.status === 'STALE_REJECTED') {
-          // Find any card in applying state
-          const cards = useQaStore.getState().cards;
-          const applyingCard =
-            cards.find((c) => c.status === 'applying') ||
-            cards.find((c) => c.paragraphHash !== result.currentHash);
-
-          if (applyingCard) {
-            await this.resolveStaleConflict({
-              cardId: applyingCard.id,
-              paragraphId: applyingCard.paragraphId,
-              currentHash: result.currentHash,
-              service: bridgeService,
-            });
-          }
+          await useQaStore.getState().processReplacementResult(result, bridgeService, {
+            autoResolveStale: true,
+          });
         }
       })
     );
