@@ -468,7 +468,7 @@
                 commandId: command.commandId,
                 status: 'FAILED',
                 currentHash: '',
-                message: '해당 텍스트 프레임 또는 레이어가 잠겨 있어 수정할 수 없습니다. InDesign에서 잠금을 해제한 후 다시 시도해 주세요.'
+                message: '\uD574\uB2F9 \uD14D\uC2A4\uD2B8 \uD504\uB808\uC784 \uB610\uB294 \uB808\uC774\uC5B4\uAC00 \uC7A0\uACA8 \uC788\uC5B4 \uC218\uC815\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. InDesign\uC5D0\uC11C \uC7A0\uAE08\uC744 \uD574\uC81C\uD55C \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.'
             };
             this.dispatchResultIfNeeded(lockedResult, options);
             return lockedResult;
