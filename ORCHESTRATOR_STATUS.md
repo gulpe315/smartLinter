@@ -1,6 +1,41 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-24 (Task 19: 헤드리스 하네스 완료 + 실제 InDesign 페어링/인증 확인 완료, QA/TM/롤백 시나리오 실검증은 다음 단계, Word는 taskpane 인프라 부재로 보류)
+마지막 업데이트: 2026-08-25 (아키텍처 전환 진행 중 — 아래 "진행 중인 작업(세션 이어받기용)" 절부터 읽을 것)
+
+## 진행 중인 작업 (세션 이어받기용, 2026-08-25 최종)
+
+**새 세션 시작 시 가장 먼저 할 일:**
+1. `git log --oneline -5`로 아래 나열된 커밋(`1181769`가 최신이어야 함) 이후 새 커밋이 있는지 확인 — 있다면 Codex의 COM 자동화 백엔드 작업이 완료·커밋된 것이므로 그 커밋 메시지와 diff를 먼저 검토.
+2. 새 커밋이 없다면, 이전 세션에서 백그라운드로 돌리던 Codex 작업(아래 설명)이 완료 못 하고 세션이 끝난 것 — 처음부터 다시 지시할 것(이어받기 불가, codex exec는 세션 종료와 함께 background task 핸들도 사라짐. 단 codex CLI 자체의 프로세스가 살아있었다면 `D:\data\dev\App\SmartLinter`에서 변경사항이 이미 디스크에 있을 수 있으니 `git status`로 먼저 확인).
+
+**진행 중이던 작업 — 아키텍처 전환: InDesign 연결 방식을 "사용자 수동 실행"에서 "대시보드 주도 자동 연결"로 변경**
+
+배경: 사용자가 "InDesign Scripts Panel에서 매번 수동으로 스크립트 더블클릭해야 하는 게 맞냐"고 문제 제기 → 대안으로 "대시보드가 실행 중인 에디터를 감지하고, TM 로드나 모델 선택처럼 대시보드에서 버튼 클릭으로 연결"하는 방식을 제안함(2026-08-25). 범위는 **Windows 우선, Mac은 나중**으로 사용자가 확정.
+
+agy가 실현 가능성 조사 및 설계안 작성 완료(코드 수정 없이 조사만, 아래 요약):
+- **결론: 실현 가능성 매우 높음.** Windows InDesign은 COM 자동화(`InDesign.Application` ProgID + `DoScript` 메서드)를 공식 지원. Rust `windows` 크레이트로 구현.
+- 기존 `smartlinter_daemon.jsx`의 데몬 로직(#targetengine 영속 엔진, IdleTask, 이벤트 리스너, 소켓 통신)은 **코드 수정 없이 100% 재사용** 가능 — 누가 최초 트리거하는지(사용자 더블클릭 vs Rust의 COM `DoScript` 호출)만 바뀜.
+- 핵심 구현 포인트: `GetActiveObject`로 **이미 실행 중인** InDesign 인스턴스에만 attach(`CoCreateInstance`로 새 인스턴스를 띄우면 안 됨). `DoScript`에 파일 내용을 직접 넘기지 말고, `#targetengine "smartlinter_persistent_engine"` + `$.evalFile(File("절대경로/smartlinter_daemon.jsx"))` 형태의 부트스트랩 한 줄만 넘겨서 `#include` 상대경로가 정상 해석되게 할 것.
+- 리스크 대응: 복수 InDesign 버전(ProgID 폴백 체인), 모달/Busy 상태(지수 백오프 재시도), 미실행 상태(억지로 새로 안 띄우고 "대기 중" 표시), 중복클릭(이미 오늘 고친 좀비 인스턴스 방지 로직이 처리).
+- 향후 Mac 확장은 `EditorConnector` 트레이트로 추상화해서 Windows(`WindowsComConnector`)/Mac(`MacAppleScriptConnector`, AppleScript `do script`) 분기 제안.
+
+**Codex에게 위임한 작업 (2026-08-25, 결과 미확인 — 세션 종료로 확인 못함):**
+백엔드만 우선 구현 지시함(프론트엔드 UI는 아직 손 안 댐):
+1. `src-tauri/Cargo.toml`에 Windows 전용 `windows` 크레이트 의존성 추가.
+2. `src-tauri/src/indesign_com.rs`(또는 유사 모듈) 신규 — `detect_running_indesign()`, `inject_daemon_script()` 구현.
+3. `commands.rs`에 `check_indesign_status`/`connect_indesign` Tauri 커맨드 추가, `main.rs`에 등록.
+4. **중요 — Codex에게 실제 라이브 검증까지 요청함:** 이 작업 지시 시점에 실제 InDesign이 켜져 있고 브릿지 서버도 떠 있었으므로, 컴파일/단위테스트뿐 아니라 실제로 `inject_daemon_script`를 지금 켜져 있는 InDesign에 대고 호출해서 `/health`가 `connected:true`로 바뀌는지까지 확인하도록 지시함. **이 라이브 검증 결과가 이 아키텍처 전환의 실질적 성패를 좌우함** — 다음 세션에서 가장 먼저 확인할 것.
+
+**다음 세션 진행 순서:**
+1. (위 "새 세션 시작 시 가장 먼저 할 일" 확인)
+2. 백엔드 커밋이 있고 라이브 검증도 성공했다고 보고돼 있으면 → `cargo test`/`npm test` 독립 재검증 → git diff로 범위 이탈 확인 → (이미 커밋돼 있지 않다면) 커밋.
+3. 백엔드가 성공했으면 프론트엔드(Header/ConnectionBanner에 "InDesign 원터치 연결" 버튼, bridgeStore에 상태 추가)를 Codex에게 위임.
+4. 프론트엔드까지 완료되면 사용자가 대시보드에서 버튼 클릭으로 실제 연결 확인 — 이게 성공하면 Scripts Panel 수동 더블클릭 방식은 사실상 폐기.
+5. 이 아키텍처가 자리잡으면, 그동안 미해결로 남아있던 "Scripts Panel 수동 재실행 시 재연결 안 되는 원인불명 현상"(agy+Codex 교차진단까지 했으나 미확정 — `$.global.SmartLinterDaemonInstance.getStatus()` 결과 대기 중이었음) 디버깅은 우선순위가 낮아짐(어차피 이 수동 흐름 자체가 대체될 예정이었기 때문). 다만 COM 방식도 결국 내부적으로 같은 `smartlinter_daemon.jsx`를 실행시키는 것이므로, 만약 COM 방식도 똑같이 재연결 안 되는 증상을 보이면 그 원인 규명은 다시 필요함 — 이땐 서버/InDesign 양쪽에 로그를 추가하라는 agy/Codex 공통 제안(router.rs의 auth_handshake_handler, bridge_socket.jsx의 handshake())부터 적용할 것.
+6. 이 전환과 무관하게 원래 남아있던 할 일: Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축.
+
+---
+
 
 ## 역할 및 협업 구조 (2026-08-25 개편)
 
