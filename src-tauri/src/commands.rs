@@ -238,6 +238,28 @@ pub async fn send_replacement_command(
     }
 }
 
+/// Selects a QA paragraph in an active InDesign document without editing it.
+#[tauri::command]
+pub async fn locate_paragraph_in_editor(
+    paragraph_id: String,
+    base_hash: Option<String>,
+    server_handle: State<'_, ServerHandle>,
+) -> Result<crate::indesign_com::LocateParagraphResult, String> {
+    let session = server_handle
+        .session_manager()
+        .get_snapshot()
+        .await
+        .ok_or_else(|| "No active editor session".to_string())?;
+
+    if session.editor_type != EditorType::InDesign {
+        return Err("Locate paragraph is supported only for InDesign".to_string());
+    }
+
+    tokio::task::spawn_blocking(move || indesign_com::locate_paragraph(paragraph_id, base_hash))
+        .await
+        .map_err(|error| format!("InDesign paragraph location task failed: {error}"))?
+}
+
 /// Lists models available from the configured Ollama host or the queue's provider.
 #[tauri::command]
 pub async fn list_ollama_models(

@@ -6,9 +6,20 @@
 
 #[cfg(not(windows))]
 use std::path::Path;
+use serde::{Deserialize, Serialize};
+
+/// Minimal response returned by InDesign's read-only paragraph locator.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocateParagraphResult {
+    pub command_id: String,
+    pub status: String,
+    pub message: String,
+}
 
 #[cfg(windows)]
 mod platform {
+    use super::LocateParagraphResult;
     use std::ffi::c_void;
     use std::path::Path;
     use std::thread;
@@ -413,10 +424,32 @@ mod platform {
         serde_json::from_str(&output)
             .map_err(|error| format!("Cannot decode InDesign replacement result: {error}"))
     }
+
+    pub fn locate_paragraph(paragraph_id: String, base_hash: Option<String>) -> Result<LocateParagraphResult, String> {
+        if !is_indesign_process_running()? {
+            return Err("InDesign is not running".to_string());
+        }
+        let command_id = format!("locate-{paragraph_id}");
+        let command_json = serde_json::json!({
+            "commandId": command_id,
+            "paragraphId": paragraph_id,
+            "baseHash": base_hash,
+        });
+        let script = format!(
+            "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{\n    var res = $.global.SmartLinterDaemonInstance.locateParagraph({command_json});\n    return JSON.stringify(res);\n  }}\n  return JSON.stringify({{ commandId: {}, status: 'NOT_FOUND', message: 'InDesign SmartLinterDaemonInstance is not initialized' }});\n}})();",
+            serde_json::to_string(&command_id).map_err(|error| format!("Cannot serialize locator command ID: {error}"))?
+        );
+        let _com = ComApartment::initialize()?;
+        let dispatch = active_indesign()?;
+        let output = do_script_with_result(&dispatch, &script)
+            .map_err(|error| format!("InDesign DoScript failed: {error}"))?;
+        serde_json::from_str(&output)
+            .map_err(|error| format!("Cannot decode InDesign paragraph locator result: {error}"))
+    }
 }
 
 #[cfg(windows)]
-pub use platform::{detect_running_indesign, execute_replacement, inject_daemon_script};
+pub use platform::{detect_running_indesign, execute_replacement, inject_daemon_script, locate_paragraph};
 
 #[cfg(not(windows))]
 pub fn detect_running_indesign() -> Result<bool, String> {
@@ -430,5 +463,10 @@ pub fn inject_daemon_script(_daemon_script_path: &Path) -> Result<(), String> {
 
 #[cfg(not(windows))]
 pub fn execute_replacement(_command: crate::protocol::ReplacementCommand) -> Result<crate::protocol::ReplacementResult, String> {
+    Err("InDesign COM automation is only supported on Windows".to_string())
+}
+
+#[cfg(not(windows))]
+pub fn locate_paragraph(_paragraph_id: String, _base_hash: Option<String>) -> Result<LocateParagraphResult, String> {
     Err("InDesign COM automation is only supported on Windows".to_string())
 }

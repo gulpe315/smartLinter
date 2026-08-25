@@ -178,6 +178,56 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(selectedParagraph.contents, selectedText);
         });
 
+        it('locates and selects a paragraph by its id and base hash without editing it', () => {
+            const paragraphText = 'Locate this paragraph without changing it.';
+            const targetParagraph = env.createParagraph(paragraphText, 'locate-story');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'locate-story'
+                    ? { paragraphs: [targetParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            let selected: unknown = null;
+            app.select = (value: unknown) => { selected = value; };
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.locateParagraph({
+                commandId: 'locate-001',
+                paragraphId: 'indesign-para-locate-story-0',
+                baseHash: computeParagraphHash(paragraphText)
+            });
+
+            assert.equal(result.status, 'FOUND');
+            assert.equal(selected, targetParagraph);
+            assert.equal(targetParagraph.contents, paragraphText);
+        });
+
+        it('does not select a paragraph when its locator hash is stale', () => {
+            const paragraphText = 'This paragraph has changed.';
+            const targetParagraph = env.createParagraph(paragraphText, 'locate-stale');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'locate-stale'
+                    ? { paragraphs: [targetParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            let selected = false;
+            app.select = () => { selected = true; };
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.locateParagraph({
+                commandId: 'locate-stale-001',
+                paragraphId: 'indesign-para-locate-stale-0',
+                baseHash: computeParagraphHash('Original paragraph text.')
+            });
+
+            assert.equal(result.status, 'NOT_FOUND');
+            assert.equal(selected, false);
+            assert.equal(targetParagraph.contents, paragraphText);
+        });
+
         it('finds a moved paragraph by its unique baseHash and uses a numeric story id lookup', () => {
             const targetText = 'The original paragraph must still be found.';
             const replacementText = 'The original paragraph was found after insertion.';

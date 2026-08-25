@@ -230,6 +230,45 @@
     };
 
     /**
+     * Locates and selects a QA paragraph without changing document contents.
+     * @param {{commandId: string, paragraphId: string, baseHash?: string}} command
+     * @param {Object} [options]
+     * @returns {{commandId: string, status: 'FOUND'|'NOT_FOUND', message: string}}
+     */
+    SmartLinterAtomicReplacer.prototype.locateParagraph = function(command, options) {
+        options = options || {};
+        var commandId = command && command.commandId ? command.commandId : 'unknown';
+        if (!command || typeof command.paragraphId !== 'string') {
+            return { commandId: commandId, status: 'NOT_FOUND', message: 'Invalid paragraph location command' };
+        }
+
+        var inApp = options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null);
+        var doc = inApp ? inApp.activeDocument : null;
+        var paragraph = findParagraphById(doc, command.paragraphId, command.baseHash);
+        if (!paragraph) {
+            return {
+                commandId: commandId,
+                status: 'NOT_FOUND',
+                message: 'The paragraph could not be found. The document may have changed.'
+            };
+        }
+
+        try {
+            // Make the owning document/window active before selecting its text range.
+            if (doc.windows && doc.windows.length > 0 && typeof doc.windows[0].activate === 'function') {
+                doc.windows[0].activate();
+            }
+            if (!inApp || typeof inApp.select !== 'function') {
+                throw new Error('InDesign selection API is unavailable');
+            }
+            inApp.select(paragraph.texts && paragraph.texts.length > 0 ? paragraph.texts[0] : paragraph);
+            return { commandId: commandId, status: 'FOUND', message: 'Paragraph selected in InDesign' };
+        } catch (e) {
+            return { commandId: commandId, status: 'NOT_FOUND', message: 'Unable to select the located paragraph: ' + e.message };
+        }
+    };
+
+    /**
      * Applies a single hunk mutation to an InDesign Paragraph DOM element.
      * Preserves character styles, paragraph styles, hyperlinks, and special elements.
      * 

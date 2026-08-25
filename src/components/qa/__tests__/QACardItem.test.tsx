@@ -1,8 +1,9 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QACardItem } from '../QACardItem.tsx';
 import { type QACardData } from '../../../types/qa.ts';
+import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
 
 describe('QACardItem Component', () => {
   const sampleCard: QACardData = {
@@ -62,6 +63,32 @@ describe('QACardItem Component', () => {
 
     expect(handleAccept).toHaveBeenCalledTimes(1);
     expect(handleAccept).toHaveBeenCalledWith('card-101');
+  });
+
+  it('locates the card paragraph through the bridge service', async () => {
+    const service = new MockBridgeService();
+    const locateParagraph = vi.spyOn(service, 'locateParagraph');
+    setBridgeService(service);
+    render(<QACardItem card={sampleCard} />);
+
+    fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
+
+    await waitFor(() => {
+      expect(locateParagraph).toHaveBeenCalledWith('para-word-1', 'hash-abc-123');
+    });
+  });
+
+  it('shows a clear notice when the paragraph cannot be located', async () => {
+    const service = new MockBridgeService();
+    vi.spyOn(service, 'locateParagraph').mockResolvedValue({ found: false });
+    setBridgeService(service);
+    render(<QACardItem card={sampleCard} />);
+
+    fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
+
+    expect(await screen.findByTestId('qa-locate-error')).toHaveTextContent(
+      '문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.'
+    );
   });
 
   it('shows loading spinner and disables buttons when isApplying is true', () => {

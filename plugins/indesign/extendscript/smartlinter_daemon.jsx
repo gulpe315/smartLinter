@@ -433,6 +433,25 @@
         };
     };
 
+    /** Locates a QA paragraph in InDesign without editing the document. */
+    SmartLinterDaemon.prototype.locateParagraph = function(command, options) {
+        options = options || {};
+        if (!this.replacer) {
+            var ReplacerClass = (typeof SmartLinterAtomicReplacer !== 'undefined')
+                ? SmartLinterAtomicReplacer
+                : (global.SmartLinterAtomicReplacer || null);
+            if (ReplacerClass) {
+                this.replacer = new ReplacerClass({ appInstance: this.appInstance });
+            }
+        }
+        if (!this.replacer || typeof this.replacer.locateParagraph !== 'function') {
+            return { commandId: command ? (command.commandId || 'unknown') : 'unknown', status: 'NOT_FOUND', message: 'AtomicReplacer not initialized in daemon' };
+        }
+        return this.replacer.locateParagraph(command, {
+            appInstance: options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null)
+        });
+    };
+
     // Auto-instantiate singleton in ExtendScript environment
     var daemonInstance = null;
     if (typeof $ !== 'undefined' && $.global) {

@@ -17,8 +17,10 @@ import {
   Sparkles,
   ArrowRight,
   Clock,
+  MapPin,
 } from 'lucide-react';
 import { type QACardData } from '../../types/qa.ts';
+import { getBridgeService } from '../../services/tauriBridge.ts';
 import {
   getCategoryBadgeClasses,
   getSeverityBadgeClasses,
@@ -44,12 +46,29 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   className = '',
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [locateError, setLocateError] = useState<string | null>(null);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isApplying = propIsApplying || card.status === 'applying' || isStale;
 
   const categoryStyle = getCategoryBadgeClasses(card.category);
   const severityStyle = getSeverityBadgeClasses(card.severity);
   const normSeverity = normalizeSeverity(card.severity);
+
+  const handleLocate = async () => {
+    setIsLocating(true);
+    setLocateError(null);
+    try {
+      const result = await getBridgeService().locateParagraph(card.paragraphId, card.paragraphHash);
+      if (!result.found) {
+        setLocateError(result.message || '문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.');
+      }
+    } catch (_error) {
+      setLocateError('문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   const renderSeverityIcon = () => {
     switch (normSeverity) {
@@ -199,6 +218,12 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         </div>
       )}
 
+      {locateError && (
+        <div data-testid="qa-locate-error" role="alert" className="mb-3 px-3 py-2 rounded-lg border border-amber-800/70 bg-amber-950/30 text-xs text-amber-200">
+          {locateError}
+        </div>
+      )}
+
       {/* Bottom Action Footer */}
       <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
         <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono truncate">
@@ -209,6 +234,17 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-none">
+          <button
+            type="button"
+            data-testid="qa-locate-paragraph-btn"
+            disabled={isLocating || !card.paragraphId}
+            onClick={() => void handleLocate()}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-sky-300 hover:text-sky-100 bg-sky-950/40 hover:bg-sky-900/50 border border-sky-800/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            title="문단 위치 보기"
+          >
+            {isLocating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+            <span>위치 보기</span>
+          </button>
           {/* Dismiss (무시) Action Button */}
           <button
             type="button"
