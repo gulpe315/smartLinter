@@ -33,6 +33,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     setSeverityFilter,
     setSearchQuery,
     dismissCard,
+    markCardObsolete,
     acceptCard,
     dismissAll,
     getFilteredCards,
@@ -178,6 +179,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
                   card={card}
                   onAccept={(id) => acceptCard(id, undefined, { autoResolveStale: true })}
                   onDismiss={(id) => dismissCard(id)}
+                  onMarkObsolete={(id) => markCardObsolete(id)}
                 />
               </div>
             ))}

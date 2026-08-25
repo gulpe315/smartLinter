@@ -140,6 +140,54 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(cards.find((card) => card.id === remainingCardId)).toBeDefined();
   });
 
+  it('archives one unambiguous InDesign card resolved by a direct edit in the same story', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'indesign-para-story-42-0', paragraphText: 'The colour is blue.',
+      category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'indesign-para-story-42-1', paragraphText: 'The color is blue.', paragraphHash: 'new-hash',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeUndefined();
+    expect(useQaStore.getState().dismissedCards).toEqual([
+      expect.objectContaining({ id: cardId, status: 'stale_obsolete' }),
+    ]);
+  });
+
+  it('does not reconcile direct edits when multiple cards are plausible in one InDesign story', () => {
+    const firstId = useQaStore.getState().addCard({
+      paragraphId: 'indesign-para-story-42-0', category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
+    });
+    const secondId = useQaStore.getState().addCard({
+      paragraphId: 'indesign-para-story-42-3', category: 'Terminology', originalSegment: 'centre', suggestedSegment: 'center', reason: 'US terminology',
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'indesign-para-story-42-7', paragraphText: 'The color is at the center.', paragraphHash: 'new-hash',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.map((card) => card.id)).toEqual(expect.arrayContaining([firstId, secondId]));
+    expect(useQaStore.getState().dismissedCards).toEqual([]);
+  });
+
+  it('does not reconcile a plausible direct edit from another InDesign story', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'indesign-para-story-a-0', category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'indesign-para-story-b-0', paragraphText: 'The color is blue.', paragraphHash: 'new-hash',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeDefined();
+    expect(useQaStore.getState().dismissedCards).toEqual([]);
+  });
+
   it('maps a replacement result to its commandId target instead of another applying card', async () => {
     const intendedCardId = useQaStore.getState().addCard({
       paragraphId: 'para-command-target', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',

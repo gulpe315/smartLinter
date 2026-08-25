@@ -34,6 +34,7 @@ export interface QACardItemProps {
   card: QACardData;
   onAccept?: (cardId: string) => void;
   onDismiss?: (cardId: string) => void;
+  onMarkObsolete?: (cardId: string) => void;
   isApplying?: boolean;
   className?: string;
 }
@@ -42,6 +43,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   card,
   onAccept,
   onDismiss,
+  onMarkObsolete,
   isApplying: propIsApplying,
   className = '',
 }) => {
@@ -49,7 +51,9 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const [isLocating, setIsLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
+  const isObsolete = card.status === 'stale_obsolete';
   const isApplying = propIsApplying || card.status === 'applying' || isStale;
+  const isAcceptDisabled = isApplying || isObsolete;
 
   const categoryStyle = getCategoryBadgeClasses(card.category);
   const severityStyle = getSeverityBadgeClasses(card.severity);
@@ -62,6 +66,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
       const result = await getBridgeService().locateParagraph(card.paragraphId, card.paragraphHash);
       if (!result.found) {
         setLocateError(result.message || '문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.');
+        onMarkObsolete?.(card.id);
       }
     } catch (_error) {
       setLocateError('문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.');
@@ -87,7 +92,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     <article
       data-testid={`qa-card-item-${card.id}`}
       className={`group relative rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 shadow-md p-4 transition-all duration-300 ease-out hover:shadow-indigo-950/20 hover:shadow-lg ${
-        isStale ? 'ring-1 ring-amber-500/50 border-amber-500/40 bg-slate-900' : card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
+        isObsolete ? 'ring-1 ring-slate-500/60 border-slate-500/60 bg-slate-950/90 opacity-85' : isStale ? 'ring-1 ring-amber-500/50 border-amber-500/40 bg-slate-900' : card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
       } ${
         card.status === 'failed' ? 'border-rose-900/80 bg-rose-950/20' : ''
       } ${className}`}
@@ -96,6 +101,12 @@ export const QACardItem: React.FC<QACardItemProps> = ({
       {isStale && (
         <div className="mb-3">
           <StaleNotificationBadge message={card.staleMessage} />
+        </div>
+      )}
+
+      {isObsolete && (
+        <div data-testid="qa-card-obsolete-notice" role="status" className="mb-3 px-3 py-2 rounded-lg border border-slate-600/70 bg-slate-800/70 text-xs text-slate-300">
+          이 문단은 더 이상 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.
         </div>
       )}
 
@@ -261,11 +272,16 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           <button
             type="button"
             data-testid="qa-accept-action-btn"
-            disabled={isApplying}
+            disabled={isAcceptDisabled}
             onClick={() => onAccept?.(card.id)}
             className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 border border-indigo-500 shadow-sm shadow-indigo-950/50 transition-all flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isStale ? (
+            {isObsolete ? (
+              <>
+                <AlertCircle className="w-3.5 h-3.5 text-slate-300" />
+                <span>적용할 수 없음</span>
+              </>
+            ) : isStale ? (
               <>
                 <Loader2
                   data-testid="accept-spinner"

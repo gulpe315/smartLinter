@@ -80,15 +80,28 @@ describe('QACardItem Component', () => {
 
   it('shows a clear notice when the paragraph cannot be located', async () => {
     const service = new MockBridgeService();
+    const markObsolete = vi.fn();
     vi.spyOn(service, 'locateParagraph').mockResolvedValue({ found: false });
     setBridgeService(service);
-    render(<QACardItem card={sampleCard} />);
+    render(<QACardItem card={sampleCard} onMarkObsolete={markObsolete} />);
 
     fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
 
     expect(await screen.findByTestId('qa-locate-error')).toHaveTextContent(
       '문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.'
     );
+    expect(markObsolete).toHaveBeenCalledWith('card-101');
+  });
+
+  it('visually distinguishes an obsolete card, disables apply, and still allows dismissal', () => {
+    const handleDismiss = vi.fn();
+    render(<QACardItem card={{ ...sampleCard, status: 'stale_obsolete' }} onDismiss={handleDismiss} />);
+
+    expect(screen.getByTestId('qa-card-obsolete-notice')).toHaveTextContent('이 문단은 더 이상 찾을 수 없습니다');
+    expect(screen.getByTestId('qa-accept-action-btn')).toBeDisabled();
+    expect(screen.getByTestId('qa-dismiss-action-btn')).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId('qa-dismiss-action-btn'));
+    expect(handleDismiss).toHaveBeenCalledWith('card-101');
   });
 
   it('shows loading spinner and disables buttons when isApplying is true', () => {

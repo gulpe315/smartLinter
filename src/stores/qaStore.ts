@@ -60,6 +60,7 @@ export interface QAState {
   addCard: (card: Partial<QACardData> & { category: string; originalSegment: string; suggestedSegment: string; reason: string }) => string;
   addReport: (payload: QaReportPayload) => void;
   dismissCard: (cardId: string) => void;
+  markCardObsolete: (cardId: string) => void;
   acceptCard: (cardId: string, service?: IBridgeService, options?: AcceptCardOptions) => Promise<ReplacementResult | null>;
   processReplacementResult: (result: ReplacementResult, service?: IBridgeService, options?: AcceptCardOptions) => Promise<boolean>;
   retryCard: (cardId: string) => void;
@@ -156,15 +157,46 @@ export const useQaStore = create<QAState>((set, get) => ({
       )
     );
 
-    // A new report is authoritative for idle cards in this paragraph.  Keep
+    // A new report is authoritative for idle cards in this paragraph. Keep
     // applying/refreshing cards intact: they belong to an in-flight command.
-    set((state) => ({
-      cards: state.cards.filter((card) =>
-        card.paragraphId !== payload.paragraphId ||
-        card.status !== 'pending' ||
-        issueKeys.has(`${card.category}\u0000${card.originalSegment}\u0000${card.suggestedSegment}`)
-      ),
-    }));
+    // InDesign paragraph IDs include a positional index, which changes after
+    // manual editing. Reconcile only an unambiguous candidate in the same
+    // story, and archive it rather than silently discarding it.
+    const getInDesignStoryId = (paragraphId: string): string | null => {
+      const match = /^indesign-para-(.+)-(\d+)$/.exec(paragraphId);
+      return match?.[1] ?? null;
+    };
+    const storyId = getInDesignStoryId(payload.paragraphId);
+
+    set((state) => {
+      const directEditCandidates = storyId === null
+        ? []
+        : state.cards.filter((card) =>
+            card.status === 'pending' &&
+            getInDesignStoryId(card.paragraphId) === storyId &&
+            !payload.paragraphText.includes(card.originalSegment) &&
+            payload.paragraphText.includes(card.suggestedSegment)
+          );
+      const obsoleteCardIds = directEditCandidates.length === 1
+        ? new Set([directEditCandidates[0].id])
+        : new Set<string>();
+      const newlyObsolete = state.cards
+        .filter((card) => obsoleteCardIds.has(card.id))
+        .map((card) => ({ ...card, status: 'stale_obsolete' as QACardStatus }));
+
+      return {
+        cards: state.cards.filter((card) =>
+          !obsoleteCardIds.has(card.id) && (
+            card.paragraphId !== payload.paragraphId ||
+            card.status !== 'pending' ||
+            issueKeys.has(`${card.category}\u0000${card.originalSegment}\u0000${card.suggestedSegment}`)
+          )
+        ),
+        dismissedCards: newlyObsolete.length > 0
+          ? [...newlyObsolete, ...state.dismissedCards]
+          : state.dismissedCards,
+      };
+    });
 
     payload.report.issues.forEach((issue) => {
       get().addCard({
@@ -195,9 +227,19 @@ export const useQaStore = create<QAState>((set, get) => ({
     });
   },
 
+  markCardObsolete: (cardId) => {
+    set((state) => ({
+      cards: state.cards.map((card) =>
+        card.id === cardId
+          ? { ...card, status: 'stale_obsolete', errorMessage: undefined }
+          : card
+      ),
+    }));
+  },
+
   acceptCard: async (cardId, service, options) => {
     const card = get().cards.find((c) => c.id === cardId);
-    if (!card || card.status === 'applying') {
+    if (!card || card.status === 'applying' || card.status === 'stale_obsolete') {
       return null;
     }
 

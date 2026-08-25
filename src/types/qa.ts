@@ -20,6 +20,7 @@ export type QACardStatus =
   | 'failed'
   | 'stale_refreshing'
   | 'stale_rejected'
+  | 'stale_obsolete'
   | 'rollback_aborted'
   | 'rolled_back';
 

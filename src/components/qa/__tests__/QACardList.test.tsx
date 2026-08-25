@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QACardList } from '../QACardList.tsx';
 import { useQaStore } from '../../../stores/qaStore.ts';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
@@ -140,5 +140,20 @@ describe('QACardList Component', () => {
 
     expect(screen.getByTestId('qa-analyzing-indicator')).toBeInTheDocument();
     expect(screen.getByText('LLM 분석 중...')).toBeInTheDocument();
+  });
+
+  it('marks a card obsolete and disables apply when its paragraph cannot be located', async () => {
+    useQaStore.getState().addCard({
+      id: 'missing-paragraph-card', paragraphId: 'para-missing', paragraphHash: 'old-hash',
+      category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+    });
+    vi.spyOn(mockBridge, 'locateParagraph').mockResolvedValue({ found: false });
+
+    render(<QACardList />);
+    fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
+
+    await waitFor(() => expect(useQaStore.getState().cards[0].status).toBe('stale_obsolete'));
+    expect(screen.getByTestId('qa-card-obsolete-notice')).toBeInTheDocument();
+    expect(screen.getByTestId('qa-accept-action-btn')).toBeDisabled();
   });
 });
