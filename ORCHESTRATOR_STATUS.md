@@ -18,6 +18,38 @@
 
 **다음 세션 진행할 일:** 이 전환과 무관하게 원래 남아있던 Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축으로 진행.
 
+---
+
+## ⚠️ 2026-08-25 후속 세션 — Task 19 시나리오 1 실검증 중 중대 발견·수정 (커밋 `7b08af6`)
+
+Task 19 시나리오 1(기본 QA 사이클: 문단 작성 → TM/LLM 분석 → [적용] → 치환) 실검증을 시작하자마자 발견:
+**프론트엔드(tauriBridge.ts)가 호출하는 Tauri invoke 커맨드 13개 중 7개가 main.rs에 아예 등록 안 돼 있어서
+조용히 MockBridgeService(가짜 성공)로 폴백되고 있었음.** 그중 하나가 QA 카드의 **[적용] 버튼**
+(`send_replacement_command`) 자체 — 즉 지금까지 [적용]을 눌러도 실제로는 InDesign을 안 건드리고 가짜
+SUCCESS만 반환했을 가능성이 높았음.
+
+**원인 조사 과정에서 부수적으로 확인한 사실 (버그 아님):** InDesign 창이 OS 포커스를 잃으면 daemon의
+`onIdleTick`(하트비트+문단감지 전부 담당)이 멈춤 — 재포커스하면 곧 재개됨. 기존에 이미 파악된 InDesign
+엔진 특성 그대로, 새 버그 아님.
+
+**협업 절차(agy 설계검증 → Codex 구현 → Claude 독립검증) 그대로 진행해 수정 완료:**
+- agy에게 Word(WebSocket)/InDesign(HTTP-only) 통신 방식 차이를 근거로 `send_replacement_command`
+  분기 설계 검토 요청 → InDesign은 COM `DoScript` 동기 호출로 이미 준비만 되고 미사용이던
+  `smartlinter_daemon.jsx`의 `executeReplacement()`를 실행, Word는 WebSocket 전송 후 **실제 결과를
+  기다리는 방식**(가짜 즉시 SUCCESS 반환 금지 — `ReplacementStatus`엔 PENDING류 중간 상태가 없어서
+  잘못하면 이번에 고치려는 것과 똑같은 "조용한 가짜 성공" 버그를 새로 심는 꼴이 됨)으로 결론.
+- Codex에게 5개 커맨드(`send_replacement_command`, `list_ollama_models`, `set_ollama_model`,
+  `load_guideline_content`, `load_tm_content`) 구현 위임(`TASK_REQUEST_FOR_CODEX_IPC_COMMANDS.md`에
+  전체 설계 문서화). `SessionManager`를 Tauri managed state로 신규 노출(main.rs), WS 치환 결과를
+  IPC 대기자에게 broadcast하는 경로 추가(session.rs).
+- Claude가 프로세스 완전 재기동 후 독립 재검증: `cargo test` 98/98, `npm test` 151/151,
+  `npm run test:ui` 181/181, `npm run build` 성공. `git diff`로 범위 이탈 없음 확인 후 커밋(`7b08af6`).
+
+**남은 것 (이번 세션 최우선):** `start_batch_scan`/`abort_batch_scan` 2개는 이번 범위에서 제외됨 —
+문서 전체 문단을 열거하는 기능 자체가 Word/InDesign 플러그인 어느 쪽에도 아직 없어서 별도 설계 필요.
+그리고 **실제 InDesign에서 [적용] 버튼 라이브 재테스트가 아직 안 됨**(코드 수정만 완료) — 앱 클린
+재기동 후 QA 카드 [적용] → InDesign 문서에 실제로 텍스트가 바뀌는지 확인 필요.
+
 **이 전환과 무관하게 원래 남아있던 할 일:** Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축.
 
 ---
