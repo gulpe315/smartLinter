@@ -172,6 +172,56 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     ]);
   });
 
+  it('does not archive a card when its suggestion merely appears in another InDesign paragraph', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'indesign-para-story-42-0', paragraphText: 'The colour is blue.',
+      category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'indesign-para-story-42-1', paragraphText: 'Choose a color carefully.', paragraphHash: 'new-hash',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeDefined();
+    expect(useQaStore.getState().dismissedCards).toEqual([]);
+  });
+
+  it('archives a card after an InDesign paragraph index changes when the full replacement result matches', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'indesign-para-story-42-0', paragraphText: 'The colour is blue.',
+      category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'indesign-para-story-42-1', paragraphText: 'The color is blue.', paragraphHash: 'new-hash',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeUndefined();
+    expect(useQaStore.getState().dismissedCards).toEqual([
+      expect.objectContaining({ id: cardId, status: 'stale_obsolete' }),
+    ]);
+  });
+
+  it('does not reconcile an InDesign card without its original paragraph text', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'indesign-para-story-42-0', paragraphText: 'The colour is blue.',
+      category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
+    });
+    useQaStore.setState((state) => ({
+      cards: state.cards.map((card) => card.id === cardId ? { ...card, paragraphText: '' } : card),
+    }));
+
+    useQaStore.getState().addReport({
+      paragraphId: 'indesign-para-story-42-1', paragraphText: 'The color is blue.', paragraphHash: 'new-hash',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeDefined();
+    expect(useQaStore.getState().dismissedCards).toEqual([]);
+  });
+
   it('does not reconcile direct edits when multiple cards are plausible in one InDesign story', () => {
     const firstId = useQaStore.getState().addCard({
       paragraphId: 'indesign-para-story-42-0', category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'US spelling',
