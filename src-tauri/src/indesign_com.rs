@@ -313,10 +313,6 @@ mod platform {
         value.replace('\\', "/").replace('"', "\\\"")
     }
 
-    fn do_script(dispatch: &IDispatch, script: &str) -> Result<(), windows::core::Error> {
-        invoke_script(dispatch, script).map(|_| ())
-    }
-
     fn invoke_script(dispatch: &IDispatch, script: &str) -> Result<VARIANT, windows::core::Error> {
         let name: Vec<u16> = "DoScript".encode_utf16().chain(Some(0)).collect();
         let name_pointer = PCWSTR(name.as_ptr());
@@ -383,7 +379,7 @@ mod platform {
         let _com = ComApartment::initialize()?;
         let dispatch = active_indesign()?;
         let bootstrap = format!(
-            "#targetengine \"smartlinter_persistent_engine\"\n$.evalFile(File(\"{}\"));",
+            "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  try {{\n    $.evalFile(File(\"{}\"));\n    return \"OK\";\n  }} catch (e) {{\n    return \"ERROR: \" + e.message + \" (file: \" + (e.fileName || 'unknown') + \", line: \" + (e.line || 'unknown') + \")\";\n  }}\n}})();",
             escape_extendscript_string(&daemon_script_path.to_string_lossy())
         );
 
@@ -391,8 +387,9 @@ mod platform {
         // 100ms pause also gives InDesign a brief chance to finish registering its object.
         for (attempt, delay) in [100_u64, 300, 900].into_iter().enumerate() {
             thread::sleep(Duration::from_millis(delay));
-            match do_script(&dispatch, &bootstrap) {
-                Ok(()) => return Ok(()),
+            match do_script_with_result(&dispatch, &bootstrap) {
+                Ok(output) if output.starts_with("ERROR:") => return Err(output),
+                Ok(_) => return Ok(()),
                 Err(error) if is_transient_busy(&error) && attempt < 2 => continue,
                 Err(error) if is_transient_busy(&error) => {
                     return Err(format!(

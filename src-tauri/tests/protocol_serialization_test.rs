@@ -25,6 +25,7 @@ fn test_paragraph_payload_serialization_roundtrip() {
         hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
         source: "Document.docx".to_string(),
         target: Some("ko-KR".to_string()),
+        is_locked: Some(true),
         timestamp: 1724490000000,
         editor_type: EditorType::Word,
     };
@@ -33,6 +34,7 @@ fn test_paragraph_payload_serialization_roundtrip() {
     assert!(json_str.contains("\"paragraphId\": \"p-001\""));
     assert!(json_str.contains("\"editorType\": \"Word\""));
     assert!(json_str.contains("\"target\": \"ko-KR\""));
+    assert!(json_str.contains("\"isLocked\": true"));
 
     let deserialized: ParagraphPayload =
         serde_json::from_str(&json_str).expect("Deserialization failed");
@@ -47,17 +49,20 @@ fn test_paragraph_payload_optional_target_omitted() {
         hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
         source: "Book.indd".to_string(),
         target: None,
+        is_locked: None,
         timestamp: 1724490001000,
         editor_type: EditorType::InDesign,
     };
 
     let json_str = serde_json::to_string(&payload).expect("Serialization failed");
     assert!(!json_str.contains("target"));
+    assert!(!json_str.contains("isLocked"));
 
     let deserialized: ParagraphPayload =
         serde_json::from_str(&json_str).expect("Deserialization failed");
     assert_eq!(payload, deserialized);
     assert_eq!(deserialized.target, None);
+    assert_eq!(deserialized.is_locked, None);
 }
 
 #[test]
@@ -176,6 +181,7 @@ fn test_bridge_message_multiplex_envelope() {
         hash: "hash123".to_string(),
         source: "Doc.docx".to_string(),
         target: None,
+        is_locked: None,
         timestamp: 1724490000000,
         editor_type: EditorType::Word,
     });

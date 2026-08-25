@@ -155,6 +155,7 @@ async fn test_rest_telemetry_authentication_and_event_dispatch() {
         hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
         source: "Document1.docx".to_string(),
         target: Some("ko-KR".to_string()),
+        is_locked: None,
         timestamp: 1724450000000,
         editor_type: EditorType::Word,
     };
@@ -337,6 +338,7 @@ async fn test_bidirectional_websocket_messaging_and_commands() {
         hash: "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".to_string(),
         source: "guide.docx".to_string(),
         target: None,
+        is_locked: None,
         timestamp: 1724450010000,
         editor_type: EditorType::Word,
     };

@@ -552,6 +552,7 @@ mod tests {
             hash: "dummyhash".to_string(),
             source: "Document.docx".to_string(),
             target: None,
+            is_locked: None,
             timestamp: 1000,
             editor_type: crate::protocol::EditorType::Word,
         };
@@ -581,6 +582,7 @@ mod tests {
             hash: "dummyhash".to_string(),
             source: "Document.docx".to_string(),
             target: None,
+            is_locked: None,
             timestamp: 1000,
             editor_type: crate::protocol::EditorType::Word,
         };
@@ -626,6 +628,7 @@ mod tests {
             hash: "livehash".to_string(),
             source: "The database snapshot is automatically created every 24 hours and backed up.".to_string(),
             target: None,
+            is_locked: None,
             timestamp: 1000,
             editor_type: crate::protocol::EditorType::Word,
         };
