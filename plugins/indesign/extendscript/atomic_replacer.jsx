@@ -39,18 +39,18 @@
     }
 
     /**
-     * Finds a paragraph from the stable identifier emitted by TextObserver.
+     * Finds a paragraph from the telemetry identifier emitted by TextObserver.
      *
      * TextObserver creates ids as `indesign-para-{storyId}-{paragraphIndex}`.
-     * Story ids are InDesign-assigned values and must be treated as opaque: split
-     * at the final dash so this also remains safe for mock/custom story ids that
-     * contain dashes.
+     * The paragraph index is a fast lookup hint, not a durable identity. Split
+     * at the final dash so mock/custom story ids containing dashes remain safe.
      *
      * @param {Object} doc InDesign Document reference
      * @param {string} paragraphId Stable paragraph identifier
+     * @param {string} [baseHash] Hash of the paragraph when the command was created
      * @returns {Object|null} InDesign Paragraph reference, or null when absent
      */
-    function findParagraphById(doc, paragraphId) {
+    function findParagraphById(doc, paragraphId, baseHash) {
         var prefix = 'indesign-para-';
         if (!doc || typeof paragraphId !== 'string' || paragraphId.indexOf(prefix) !== 0) {
             return null;
@@ -74,14 +74,50 @@
                 return null;
             }
 
-            var story = doc.stories.itemByID(storyId);
-            if (!story || story.isValid === false || !story.paragraphs ||
-                    paragraphIndex < 0 || paragraphIndex >= story.paragraphs.length) {
+            // InDesign's itemByID expects a Number.  Preserve the string lookup
+            // only for non-numeric/custom ids used by compatible DOM adapters.
+            var numericStoryId = parseInt(storyId, 10);
+            var story = isNaN(numericStoryId)
+                ? doc.stories.itemByID(storyId)
+                : doc.stories.itemByID(numericStoryId);
+            if (!story || story.isValid === false || !story.paragraphs) {
                 return null;
             }
 
-            var paragraph = story.paragraphs[paragraphIndex];
-            return (!paragraph || paragraph.isValid === false) ? null : paragraph;
+            // Fast path: the stored index still identifies the original
+            // paragraph. Verify the hash before accepting it, as an index can
+            // point at a different paragraph after edits to the Story.
+            var paragraph = null;
+            if (paragraphIndex >= 0 && paragraphIndex < story.paragraphs.length) {
+                paragraph = story.paragraphs[paragraphIndex];
+                if (paragraph && paragraph.isValid !== false) {
+                    if (!baseHash || getHashUtil().computeParagraphHash(paragraph.contents || '', true)
+                            .toLowerCase() === baseHash.toLowerCase()) {
+                        return paragraph;
+                    }
+                }
+            }
+
+            // Slow path: paragraph indices are positional, so locate the
+            // original paragraph by its creation-time hash when it moved. A
+            // duplicate is unsafe to choose automatically.
+            if (!baseHash) {
+                return null;
+            }
+
+            var matches = [];
+            for (var i = 0; i < story.paragraphs.length; i++) {
+                paragraph = story.paragraphs[i];
+                if (paragraph && paragraph.isValid !== false &&
+                        getHashUtil().computeParagraphHash(paragraph.contents || '', true)
+                            .toLowerCase() === baseHash.toLowerCase()) {
+                    matches.push(paragraph);
+                    if (matches.length > 1) {
+                        return null;
+                    }
+                }
+            }
+            return matches.length === 1 ? matches[0] : null;
         } catch (e) {
             // itemByID and unresolved DOM specifiers can throw in InDesign.
             return null;
@@ -189,8 +225,8 @@
     };
 
     // Public for callers/tests that need to resolve a telemetry paragraph id.
-    SmartLinterAtomicReplacer.prototype.findParagraphById = function(doc, paragraphId) {
-        return findParagraphById(doc, paragraphId);
+    SmartLinterAtomicReplacer.prototype.findParagraphById = function(doc, paragraphId, baseHash) {
+        return findParagraphById(doc, paragraphId, baseHash);
     };
 
     /**
@@ -319,7 +355,7 @@
         // cursor/selection redirect a real command to another paragraph.
         if (hasResolvableParagraphId) {
             var doc = inApp ? inApp.activeDocument : null;
-            targetParagraph = findParagraphById(doc, command.paragraphId);
+            targetParagraph = findParagraphById(doc, command.paragraphId, command.baseHash);
             if (targetParagraph) {
                 currentText = targetParagraph.contents || '';
             }

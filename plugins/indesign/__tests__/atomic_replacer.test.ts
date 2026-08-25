@@ -177,6 +177,88 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(targetParagraph.contents, replacementText);
             assert.equal(selectedParagraph.contents, selectedText);
         });
+
+        it('finds a moved paragraph by its unique baseHash and uses a numeric story id lookup', () => {
+            const targetText = 'The original paragraph must still be found.';
+            const replacementText = 'The original paragraph was found after insertion.';
+            const insertedParagraph = env.createParagraph('A new paragraph was inserted before it.', '700');
+            const targetParagraph = env.createParagraph(targetText, '700');
+            const itemByIDArguments: unknown[] = [];
+
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: unknown) => {
+                    itemByIDArguments.push(storyId);
+                    return storyId === 700 ? { paragraphs: [insertedParagraph, targetParagraph] } : null;
+                }
+            };
+
+            const sandbox = loadExtendScript(replacerScriptPath, { app: env.getApp() });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: env.getApp() });
+            const result = replacer.execute({
+                commandId: 'cmd-moved-paragraph-001',
+                paragraphId: 'indesign-para-700-0',
+                baseHash: computeParagraphHash(targetText),
+                expectedHash: computeParagraphHash(replacementText),
+                hunks: extractDiffHunks(targetText, replacementText)
+            });
+
+            assert.equal(result.status, 'SUCCESS');
+            assert.deepEqual(itemByIDArguments, [700]);
+            assert.equal(insertedParagraph.contents, 'A new paragraph was inserted before it.');
+            assert.equal(targetParagraph.contents, replacementText);
+        });
+
+        it('fails safely when the original paragraph was deleted from its Story', () => {
+            const deletedText = 'This paragraph was deleted.';
+            const untouchedParagraph = env.createParagraph('A remaining paragraph must not change.', '701');
+            const otherParagraph = env.createParagraph('Another remaining paragraph must not change.', '701');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: unknown) => storyId === 701
+                    ? { paragraphs: [untouchedParagraph, otherParagraph] }
+                    : null
+            };
+
+            const sandbox = loadExtendScript(replacerScriptPath, { app: env.getApp() });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: env.getApp() });
+            const result = replacer.execute({
+                commandId: 'cmd-deleted-paragraph-002',
+                paragraphId: 'indesign-para-701-0',
+                baseHash: computeParagraphHash(deletedText),
+                expectedHash: computeParagraphHash('This paragraph would change.'),
+                hunks: [{ start: 0, end: 4, oldText: 'This', newText: 'That' }]
+            });
+
+            assert.equal(result.status, 'FAILED');
+            assert.equal(untouchedParagraph.contents, 'A remaining paragraph must not change.');
+            assert.equal(otherParagraph.contents, 'Another remaining paragraph must not change.');
+        });
+
+        it('fails safely when multiple Story paragraphs match the baseHash', () => {
+            const duplicateText = 'Duplicate paragraph text.';
+            const currentIndexParagraph = env.createParagraph('The old index now identifies another paragraph.', '702');
+            const firstDuplicate = env.createParagraph(duplicateText, '702');
+            const secondDuplicate = env.createParagraph(duplicateText, '702');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: unknown) => storyId === 702
+                    ? { paragraphs: [currentIndexParagraph, firstDuplicate, secondDuplicate] }
+                    : null
+            };
+
+            const sandbox = loadExtendScript(replacerScriptPath, { app: env.getApp() });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: env.getApp() });
+            const result = replacer.execute({
+                commandId: 'cmd-ambiguous-paragraph-003',
+                paragraphId: 'indesign-para-702-0',
+                baseHash: computeParagraphHash(duplicateText),
+                expectedHash: computeParagraphHash('Changed duplicate paragraph text.'),
+                hunks: [{ start: 0, end: 9, oldText: 'Duplicate', newText: 'Changed' }]
+            });
+
+            assert.equal(result.status, 'FAILED');
+            assert.equal(currentIndexParagraph.contents, 'The old index now identifies another paragraph.');
+            assert.equal(firstDuplicate.contents, duplicateText);
+            assert.equal(secondDuplicate.contents, duplicateText);
+        });
     });
 
     // =========================================================================
