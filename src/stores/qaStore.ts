@@ -133,6 +133,13 @@ export const useQaStore = create<QAState>((set, get) => ({
       return;
     }
 
+    if (payload.report.parserError) {
+      console.warn('QA report parser error:', payload.report.parserError, {
+        paragraphId: payload.paragraphId,
+        rawResponse: payload.report.rawResponse,
+      });
+    }
+
     payload.report.issues.forEach((issue) => {
       get().addCard({
         paragraphId: payload.paragraphId,

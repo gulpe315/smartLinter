@@ -262,6 +262,8 @@ export interface QaReport {
     issues: QaIssue[];
     /** Optional raw LLM completion text retained for diagnostics */
     rawResponse?: string;
+    /** Parser diagnostic when the LLM response could not be recovered as QA JSON */
+    parserError?: string;
 }
 
 export function isQaSeverity(val: unknown): val is QaSeverity {
@@ -291,7 +293,7 @@ export function isQaReport(val: unknown): val is QaReport {
         isQaStatus(obj.status) &&
         Array.isArray(obj.issues) &&
         obj.issues.every(isQaIssue) &&
-        (obj.rawResponse === undefined || typeof obj.rawResponse === 'string')
+        (obj.rawResponse === undefined || typeof obj.rawResponse === 'string') &&
+        (obj.parserError === undefined || typeof obj.parserError === 'string')
     );
 }
-

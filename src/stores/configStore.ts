@@ -62,6 +62,7 @@ export interface ConfigState {
   fetchModels: () => Promise<void>;
   refreshLlmHealth: () => Promise<void>;
   setSelectedModel: (modelName: string) => Promise<void>;
+  syncSelectedModel: () => Promise<void>;
 
   // --- Actions: Guidelines Management ---
   loadGuidelineFile: (fileOrData: File | { name: string; content: string }) => Promise<void>;
@@ -187,6 +188,19 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
     } catch (err) {
       console.warn('Failed to switch Ollama model on backend:', err);
+    } finally {
+      await get().refreshLlmHealth();
+    }
+  },
+
+  // The backend queue is recreated with its Rust default at every app launch.
+  // Restore the browser-persisted selection into that queue during application startup.
+  syncSelectedModel: async () => {
+    const selectedModel = get().selectedModel;
+    try {
+      await getBridgeService().setOllamaModel(selectedModel);
+    } catch (err) {
+      console.warn('Failed to synchronize selected Ollama model on backend startup:', err);
     } finally {
       await get().refreshLlmHealth();
     }

@@ -46,6 +46,16 @@ describe('useConfigStore', () => {
     expect(useBridgeStore.getState().llmAlive).toBe(true);
   });
 
+  it('synchronizes the restored selected model to the backend queue on startup', async () => {
+    useConfigStore.setState({ selectedModel: 'gemma2:latest' });
+    const setModelSpy = vi.spyOn(mockBridge, 'setOllamaModel');
+
+    await useConfigStore.getState().syncSelectedModel();
+
+    expect(setModelSpy).toHaveBeenCalledWith('gemma2:latest');
+    expect(useBridgeStore.getState().llmModel).toBe('gemma2:latest');
+  });
+
   it('keeps the newest Ollama health result when requests resolve out of order', async () => {
     let resolveFirst!: (value: any) => void;
     let resolveSecond!: (value: any) => void;

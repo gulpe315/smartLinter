@@ -88,6 +88,32 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().cards.length).toBe(2);
   });
 
+  it('warns when the backend reports an unrecoverable QA parser error', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-parser-error',
+      paragraphText: 'Unparseable paragraph',
+      paragraphHash: 'hash-parser-error',
+      report: {
+        status: 'PASS',
+        issues: [],
+        parserError: 'LLM response could not be parsed as QA JSON',
+        rawResponse: 'not JSON',
+      },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      'QA report parser error:',
+      'LLM response could not be parsed as QA JSON',
+      expect.objectContaining({
+        paragraphId: 'para-parser-error',
+        rawResponse: 'not JSON',
+      })
+    );
+    expect(useQaStore.getState().cards).toHaveLength(0);
+  });
+
   it('dismisses a card from active list and archives it in dismissedCards', () => {
     const id1 = useQaStore.getState().addCard({
       category: '맞춤법',
