@@ -118,11 +118,13 @@ export class StaleConflictResolver {
         options
       );
 
-      // 4. Background Immediate Re-analysis (Micro-Scoping QA + TM Search)
-      // Task 15.5 analyze_paragraph Tauri command + Task 14 tmStore.search()
-      const [qaReportResult, _tmMatches] = await Promise.allSettled([
-        bridgeService.analyzeParagraph(targetPayload),
-        useTmStore.getState().search(targetPayload.text),
+      // 4. Search TM first, then re-analyze with the matched source-language context.
+      const tmMatches = await useTmStore.getState().search(targetPayload.text);
+      const [qaReportResult] = await Promise.allSettled([
+        bridgeService.analyzeParagraph({
+          ...targetPayload,
+          source: tmMatches[0]?.source ?? '',
+        }),
       ]);
 
       if (qaReportResult.status === 'rejected') {

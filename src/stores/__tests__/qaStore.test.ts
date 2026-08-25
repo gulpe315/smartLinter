@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useQaStore } from '../qaStore.ts';
+import { useTmStore } from '../tmStore.ts';
 import { MockBridgeService, setBridgeService } from '../../services/tauriBridge.ts';
 import { type QaReport } from '../../../shared/protocol/types.ts';
 
@@ -8,6 +9,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
   beforeEach(() => {
     useQaStore.getState().reset();
+    useTmStore.getState().reset();
     mockBridge = new MockBridgeService();
     setBridgeService(mockBridge);
   });
@@ -295,6 +297,38 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
         suggestedSegment: 'the',
       }),
     ]);
+
+    unlisten();
+  });
+
+  it('uses the best TM source for analysis without changing the document payload source', async () => {
+    const tmSource = 'Click the Settings button to configure bridge preferences.';
+    vi.spyOn(useTmStore.getState(), 'search').mockResolvedValueOnce([{
+      source: tmSource,
+      target: '설정 버튼을 클릭하여 브리지 환경설정을 구성합니다.',
+      score: 1,
+      scorePercent: 100,
+      grade: 'EXACT',
+    }]);
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValueOnce({
+      status: 'PASS',
+      issues: [],
+    });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+    const payload = {
+      paragraphId: 'para-tm-source',
+      text: '설정 버튼을 클릭하여 브리지 환경설정을 구성합니다.',
+      hash: 'hash-tm-source',
+      source: 'SLinter.indd',
+      timestamp: Date.now(),
+      editorType: 'InDesign' as const,
+    };
+
+    mockBridge.emit('new-paragraph-detected', payload);
+
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ source: tmSource }));
+    expect(payload.source).toBe('SLinter.indd');
 
     unlisten();
   });

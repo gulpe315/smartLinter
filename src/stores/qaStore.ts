@@ -31,6 +31,7 @@ import {
 } from '../types/qa.ts';
 import { getStaleConflictResolver } from '../services/stale_conflict_resolver.ts';
 import { getRollbackGuard } from '../services/rollback_guard.ts';
+import { useTmStore } from './tmStore.ts';
 
 export interface AcceptCardOptions {
   autoResolveStale?: boolean;
@@ -344,7 +345,14 @@ export const useQaStore = create<QAState>((set, get) => ({
 
         void (async () => {
           try {
-            const report = await bridgeService.analyzeParagraph(payload);
+            const tmMatches = await useTmStore.getState().search(payload.text);
+            // `payload.source` identifies the document, not the source-language text.
+            // Keep the telemetry payload unchanged because other stores use that identifier.
+            const analysisPayload = {
+              ...payload,
+              source: tmMatches[0]?.source ?? '',
+            };
+            const report = await bridgeService.analyzeParagraph(analysisPayload);
 
             if (analysisRequestVersions.get(payload.paragraphId) !== requestVersion) {
               return;

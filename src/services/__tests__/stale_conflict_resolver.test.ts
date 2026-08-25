@@ -128,6 +128,48 @@ describe('Task 16: StaleConflictResolver & Auto-Rescan UX', () => {
     expect(analyzedPayload.hash).toBe(latestHash);
   });
 
+  it('uses the best TM source for stale re-analysis without mutating the paragraph payload', async () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-stale-tm-source',
+      paragraphText: '업데이트된 문단',
+      category: 'Terminology',
+      originalSegment: '업데이트',
+      suggestedSegment: '갱신',
+      reason: 'Terminology preference',
+      severity: 'MEDIUM',
+    });
+    const tmSource = 'Updated paragraph';
+    vi.spyOn(useTmStore.getState(), 'search').mockResolvedValueOnce([{
+      source: tmSource,
+      target: '업데이트된 문단',
+      score: 1,
+      scorePercent: 100,
+      grade: 'EXACT',
+    }]);
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValueOnce({
+      status: 'PASS',
+      issues: [],
+    });
+    const latestParagraph: ParagraphPayload = {
+      paragraphId: 'para-stale-tm-source',
+      text: '업데이트된 문단',
+      hash: 'hash-stale-tm-source',
+      source: 'SLinter.indd',
+      timestamp: Date.now(),
+      editorType: 'InDesign',
+    };
+
+    await resolver.resolveStaleConflict({
+      cardId,
+      paragraphId: latestParagraph.paragraphId,
+      latestParagraph,
+      service: mockBridge,
+    });
+
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ source: tmSource }));
+    expect(latestParagraph.source).toBe('SLinter.indd');
+  });
+
   it('Criterion (4): seamlessly dismisses/resolves card when manual edit fixed the violation', async () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'para-fixed-by-user',
