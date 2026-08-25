@@ -85,6 +85,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_bridge_status,
+            commands::check_indesign_status,
+            commands::connect_indesign,
             commands::set_always_on_top,
             commands::analyze_paragraph,
             commands::execute_ai_command

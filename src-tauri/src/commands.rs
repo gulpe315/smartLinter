@@ -14,6 +14,8 @@ use crate::server::HealthResponse;
 use tauri::{State, WebviewWindow};
 use tracing::debug;
 
+use crate::indesign_com;
+
 const BRIDGE_HEALTH_URL: &str = "http://127.0.0.1:49152/health";
 
 /// Bridge connection status returned to the dashboard.
@@ -56,6 +58,25 @@ pub async fn get_bridge_status() -> Result<BridgeStatusDto, String> {
         .map_err(|e| format!("Failed to decode bridge health response: {}", e))?;
 
     Ok(health.into())
+}
+
+/// Returns whether a running InDesign instance is registered for COM automation.
+#[tauri::command]
+pub fn check_indesign_status() -> Result<bool, String> {
+    indesign_com::detect_running_indesign()
+}
+
+/// Attaches to the running InDesign instance and starts the persistent bridge daemon.
+#[tauri::command]
+pub fn connect_indesign() -> Result<(), String> {
+    let daemon_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("plugins")
+        .join("indesign")
+        .join("extendscript")
+        .join("smartlinter_daemon.jsx");
+
+    indesign_com::inject_daemon_script(&daemon_path)
 }
 
 /// Result DTO for AI interactive natural language revision command.
