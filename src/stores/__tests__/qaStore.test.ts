@@ -297,6 +297,36 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(state.dismissedCards[0].status).toBe('dismissed');
   });
 
+  it('updates only a pending card suggested segment', () => {
+    const cardId = useQaStore.getState().addCard({
+      category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+    });
+    const before = useQaStore.getState().cards[0];
+
+    useQaStore.getState().updateSuggestedSegment(cardId, 'the revised');
+
+    expect(useQaStore.getState().cards[0]).toEqual({
+      ...before,
+      suggestedSegment: 'the revised',
+    });
+  });
+
+  it.each(['applying', 'stale_obsolete', 'stale_refreshing'] as const)(
+    'does not update a %s card suggested segment',
+    (status) => {
+      const cardId = useQaStore.getState().addCard({
+        category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', status,
+      });
+
+      useQaStore.getState().updateSuggestedSegment(cardId, 'the revised');
+
+      expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({
+        status,
+        suggestedSegment: 'the',
+      }));
+    }
+  );
+
   it('accepts a card, calculates diff hunks, sends ReplacementCommand, and archives applied card', async () => {
     const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
 

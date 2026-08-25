@@ -1,9 +1,10 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QACardItem } from '../QACardItem.tsx';
 import { type QACardData } from '../../../types/qa.ts';
 import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
+import { useQaStore } from '../../../stores/qaStore.ts';
 
 describe('QACardItem Component', () => {
   const sampleCard: QACardData = {
@@ -19,6 +20,14 @@ describe('QACardItem Component', () => {
     status: 'pending',
     createdAt: Date.now(),
   };
+
+  beforeEach(() => {
+    useQaStore.getState().reset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('renders category badge, severity badge, and violation reason correctly', () => {
     render(<QACardItem card={sampleCard} />);
@@ -63,6 +72,55 @@ describe('QACardItem Component', () => {
 
     expect(handleAccept).toHaveBeenCalledTimes(1);
     expect(handleAccept).toHaveBeenCalledWith('card-101');
+  });
+
+  it('edits the suggested segment and saves it through the QA store', () => {
+    useQaStore.getState().addCard(sampleCard);
+    render(<QACardItem card={useQaStore.getState().cards[0]} />);
+
+    fireEvent.click(screen.getByTestId('qa-edit-suggestion-btn'));
+    const editor = screen.getByTestId('qa-suggestion-editor');
+    expect(editor).toHaveValue(sampleCard.suggestedSegment);
+    fireEvent.change(editor, { target: { value: 'Custom replacement' } });
+    fireEvent.click(screen.getByTestId('qa-suggestion-save-btn'));
+
+    expect(useQaStore.getState().cards[0].suggestedSegment).toBe('Custom replacement');
+    expect(screen.queryByTestId('qa-suggestion-editor')).not.toBeInTheDocument();
+  });
+
+  it('cancels suggestion editing without calling the QA store', () => {
+    useQaStore.getState().addCard(sampleCard);
+    render(<QACardItem card={useQaStore.getState().cards[0]} />);
+
+    fireEvent.click(screen.getByTestId('qa-edit-suggestion-btn'));
+    fireEvent.change(screen.getByTestId('qa-suggestion-editor'), { target: { value: 'Discard me' } });
+    fireEvent.click(screen.getByTestId('qa-suggestion-cancel-btn'));
+
+    expect(useQaStore.getState().cards[0].suggestedSegment).toBe(sampleCard.suggestedSegment);
+    expect(screen.queryByTestId('qa-suggestion-editor')).not.toBeInTheDocument();
+  });
+
+  it('prevents saving an empty or whitespace-only suggestion', () => {
+    useQaStore.getState().addCard(sampleCard);
+    render(<QACardItem card={useQaStore.getState().cards[0]} />);
+
+    fireEvent.click(screen.getByTestId('qa-edit-suggestion-btn'));
+    fireEvent.change(screen.getByTestId('qa-suggestion-editor'), { target: { value: '   ' } });
+
+    expect(screen.getByTestId('qa-suggestion-save-btn')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('qa-suggestion-save-btn'));
+    expect(useQaStore.getState().cards[0].suggestedSegment).toBe(sampleCard.suggestedSegment);
+  });
+
+  it('hides suggestion editing while a card is applying or stale', () => {
+    const { rerender } = render(<QACardItem card={{ ...sampleCard, status: 'applying' }} />);
+    expect(screen.queryByTestId('qa-edit-suggestion-btn')).not.toBeInTheDocument();
+
+    rerender(<QACardItem card={{ ...sampleCard, status: 'stale_obsolete' }} />);
+    expect(screen.queryByTestId('qa-edit-suggestion-btn')).not.toBeInTheDocument();
+
+    rerender(<QACardItem card={{ ...sampleCard, status: 'stale_refreshing' }} />);
+    expect(screen.queryByTestId('qa-edit-suggestion-btn')).not.toBeInTheDocument();
   });
 
   it('shows a lock indicator and prevents applying a locked card while keeping locate and dismiss enabled', () => {

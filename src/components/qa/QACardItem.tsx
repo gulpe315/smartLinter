@@ -19,6 +19,7 @@ import {
   Clock,
   MapPin,
   Lock,
+  Pencil,
 } from 'lucide-react';
 import { type QACardData } from '../../types/qa.ts';
 import { getBridgeService } from '../../services/tauriBridge.ts';
@@ -30,6 +31,7 @@ import {
 import { InlineDiffViewer } from './InlineDiffViewer.tsx';
 import { StaleNotificationBadge } from './StaleNotificationBadge.tsx';
 import { RollbackAlertCard } from './RollbackAlertCard.tsx';
+import { useQaStore } from '../../stores/qaStore.ts';
 
 export interface QACardItemProps {
   card: QACardData;
@@ -51,10 +53,14 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const [showTooltip, setShowTooltip] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
+  const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
+  const [editedSuggestion, setEditedSuggestion] = useState(card.suggestedSegment);
+  const updateSuggestedSegment = useQaStore((state) => state.updateSuggestedSegment);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isObsolete = card.status === 'stale_obsolete';
   const isApplying = propIsApplying || card.status === 'applying' || isStale;
   const isAcceptDisabled = isApplying || isObsolete || card.isLocked === true;
+  const isEditUnavailable = isApplying || isObsolete;
 
   const categoryStyle = getCategoryBadgeClasses(card.category);
   const severityStyle = getSeverityBadgeClasses(card.severity);
@@ -74,6 +80,23 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     } finally {
       setIsLocating(false);
     }
+  };
+
+  const startEditingSuggestion = () => {
+    setEditedSuggestion(card.suggestedSegment);
+    setIsEditingSuggestion(true);
+  };
+
+  const cancelEditingSuggestion = () => {
+    setEditedSuggestion(card.suggestedSegment);
+    setIsEditingSuggestion(false);
+  };
+
+  const saveEditedSuggestion = () => {
+    if (!editedSuggestion.trim()) return;
+
+    updateSuggestedSegment(card.id, editedSuggestion);
+    setIsEditingSuggestion(false);
   };
 
   const renderSeverityIcon = () => {
@@ -219,6 +242,36 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           suggestedText={card.suggestedSegment}
           showLabels={true}
         />
+        {!isEditUnavailable && (
+          <div className="mt-2 flex items-center justify-end gap-2">
+            {isEditingSuggestion ? (
+              <>
+                <label className="sr-only" htmlFor={`qa-suggestion-editor-${card.id}`}>제안문 수정</label>
+                <textarea
+                  id={`qa-suggestion-editor-${card.id}`}
+                  data-testid="qa-suggestion-editor"
+                  value={editedSuggestion}
+                  onChange={(event) => setEditedSuggestion(event.target.value)}
+                  rows={3}
+                  className="w-full resize-y rounded-lg border border-emerald-800/70 bg-slate-950 px-2.5 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                />
+                <button type="button" data-testid="qa-suggestion-cancel-btn" onClick={cancelEditingSuggestion} className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 border border-slate-700">취소</button>
+                <button
+                  type="button"
+                  data-testid="qa-suggestion-save-btn"
+                  disabled={!editedSuggestion.trim()}
+                  onClick={saveEditedSuggestion}
+                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-emerald-100 bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >저장</button>
+              </>
+            ) : (
+              <button type="button" data-testid="qa-edit-suggestion-btn" onClick={startEditingSuggestion} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-300 hover:text-emerald-100 hover:bg-emerald-950/40 rounded-md">
+                <Pencil className="w-3 h-3" />
+                수정
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Rollback Alert & Fallback Card (Task 17 UX) */}

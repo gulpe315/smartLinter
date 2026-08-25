@@ -61,6 +61,7 @@ export interface QAState {
   addReport: (payload: QaReportPayload) => void;
   dismissCard: (cardId: string) => void;
   markCardObsolete: (cardId: string) => void;
+  updateSuggestedSegment: (cardId: string, newText: string) => void;
   acceptCard: (cardId: string, service?: IBridgeService, options?: AcceptCardOptions) => Promise<ReplacementResult | null>;
   processReplacementResult: (result: ReplacementResult, service?: IBridgeService, options?: AcceptCardOptions) => Promise<boolean>;
   retryCard: (cardId: string) => void;
@@ -236,6 +237,23 @@ export const useQaStore = create<QAState>((set, get) => ({
           ? { ...card, status: 'stale_obsolete', errorMessage: undefined }
           : card
       ),
+    }));
+  },
+
+  updateSuggestedSegment: (cardId, newText) => {
+    set((state) => ({
+      cards: state.cards.map((card) => {
+        if (
+          card.id !== cardId ||
+          card.status === 'applying' ||
+          card.status === 'stale_obsolete' ||
+          card.status === 'stale_refreshing'
+        ) {
+          return card;
+        }
+
+        return { ...card, suggestedSegment: newText };
+      }),
     }));
   },
 
