@@ -1,6 +1,6 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-25 (InDesign COM 자동화 백엔드+프론트엔드 버튼 완성·커밋 완료, 앱 전체에 걸친 Tauri IPC mock-fallback 버그도 발견·수정·커밋 완료. **다음 세션 최우선 할 일은 실제 버튼 클릭 라이브 테스트** — 아직 성공 확인 못함, 아래 "다음 세션 진행 순서" 참고)
+마지막 업데이트: 2026-08-25 (InDesign COM 자동화 백엔드+프론트엔드 버튼 완성·커밋 완료, 앱 전체에 걸친 Tauri IPC mock-fallback 버그도 발견·수정·커밋 완료, **그리고 실제 버튼 클릭 라이브 테스트 성공 확인 완료.** 대시보드 "InDesign 연결" 버튼 → `/health`가 `connected:true, activeEditor:"InDesign"`로 전환됨을 curl로 직접 확인함. 이 아키텍처 전환(Scripts Panel 수동 더블클릭 → 대시보드 원클릭 COM 연결)은 이걸로 완료.)
 
 ## 진행 중인 작업 (세션 이어받기용, 2026-08-25 최종)
 
@@ -14,12 +14,9 @@
 5. **`fd90a5f` — 훨씬 중요한 버그 발견·수정.** 버튼을 실제 앱에서 클릭해도 반응이 없어서 진단한 결과: `TauriBridgeService.isTauriAvailable()`이 `'__TAURI__' in window`로 체크하는데, **Tauri v2는 기본적으로 `window.__TAURI__` 전역을 주입 안 함**(`withGlobalTauri` 옵트인 필요, 이 프로젝트엔 없음) — 그래서 실제 네이티브 앱 창 안에서도 이 체크가 항상 false가 되어 **`tauriBridge.ts`의 모든 IPC 호출(get_bridge_status, analyze_paragraph, set_always_on_top 등 전부)이 조용히 MockBridgeService(가짜 데이터)로 빠지고 있었음.** 이건 이번에 추가한 버튼만의 문제가 아니라 **앱 전체에 걸친 기존 잠재 버그**였음(Codex가 확인). Tauri v2 공식 문서 기준 정식 방식인 `@tauri-apps/api/core`의 `invoke`/`isTauri`, `@tauri-apps/api/event`의 `emit`/`listen`으로 전체 교체. Claude가 build+cargo check+test(151+181) 독립 재검증 후 커밋.
 6. `0bd595b` — 진단용 스모크 테스트 바이너리 폴더(`src-tauri/src/bin/`, `indesign_smoke.rs` — `detect_running_indesign()`/`inject_daemon_script()`를 직접 호출해보는 용도, `cargo run --bin indesign_smoke`)를 `.gitignore`에 추가(재사용 가치 있어 삭제 안 하고 유지, 커밋은 안 함).
 
-**⚠️ 남은 것 — 실제 라이브 클릭 테스트가 아직 성공한 적 없음:** `fd90a5f` 수정 이후 브릿지 서버(`npx tauri dev --no-watch`)를 재시작하지 않은 채로 세션이 끝남. 코드 수정(특히 `tauriBridge.ts`의 import 추가)이 Vite HMR로 잘 반영됐는지도 불확실(HMR 특성상 모듈 상단 import 변경이나 zustand 스토어 재생성 시 stale 상태가 남을 수 있음). **다음 세션 최우선 할 일:**
-1. `tasklist`로 기존 `smart-linter.exe`/`npx tauri dev` 프로세스가 떠 있는지 확인 → 있으면 완전히 종료 후(taskkill로 트리 전체) `npx tauri dev --no-watch`로 클린 재기동(Claude가 직접 Bash로, 사용자에게 시키지 말 것).
-2. InDesign이 켜져 있는지 확인(`tasklist InDesign.exe`) — 안 켜져 있으면 사용자에게 켜달라고 요청.
-3. 새로 뜬 앱 창에서 사용자에게 "InDesign 연결" 버튼을 한 번 눌러달라고 요청(번호 매긴 절차로) → 브릿지 서버 `/health`가 `connected:true`로 바뀌는지 Claude가 curl로 직접 확인.
-4. 성공하면 이 아키텍처 전환은 완전히 끝난 것 — Scripts Panel 수동 더블클릭 방식 폐기, ORCHESTRATOR_STATUS.md에 최종 성공 기록.
-5. 실패하면(아직도 mock으로 빠지거나 다른 에러) — **이번엔 절대 사용자와 콘솔 명령 왕복하지 말고, 바로 Codex에게 위임**해서 진단+수정([[feedback_smartlinter_delegation]] 참고 — 이번 세션에서 이 원칙을 어겨서 사용자에게 "오케스트레이터 역할 망각" 지적을 받았음).
+**✅ 실제 라이브 클릭 테스트 성공 (2026-08-25 후속 세션):** 클린 재기동(`npx tauri dev --no-watch`) → 빌드 성공, 브릿지 서버 `127.0.0.1:49152` 리스닝 확인. InDesign이 이미 켜져 있던 상태에서 사용자가 대시보드 "InDesign 연결" 버튼 클릭 → Claude가 curl로 `/health` 확인 결과 `{"connected":true,"activeEditor":"InDesign","sessionId":"7e239ec2d6706d4dd21f260dd2fac94e"}`. **아키텍처 전환(Scripts Panel 수동 더블클릭 → 대시보드 원클릭 COM 연결) 완전히 끝남.**
+
+**다음 세션 진행할 일:** 이 전환과 무관하게 원래 남아있던 Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축으로 진행.
 
 **이 전환과 무관하게 원래 남아있던 할 일:** Task 19 나머지 시나리오(QA 카드/TM 매칭/롤백) 실검증, Word taskpane 인프라 구축.
 
