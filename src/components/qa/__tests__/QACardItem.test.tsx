@@ -74,6 +74,16 @@ describe('QACardItem Component', () => {
     expect(handleAccept).toHaveBeenCalledWith('card-101');
   });
 
+  it('renders applied cards as read-only history entries', () => {
+    render(<QACardItem card={{ ...sampleCard, status: 'applied' }} readOnly />);
+
+    expect(screen.queryByTestId('qa-accept-action-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('qa-dismiss-action-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('dismiss-qa-btn')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('qa-locate-paragraph-btn')).not.toBeInTheDocument();
+    expect(screen.getByTestId('qa-card-readonly-status')).toHaveTextContent('적용됨');
+  });
+
   it('edits the suggested segment and saves it through the QA store', () => {
     useQaStore.getState().addCard(sampleCard);
     render(<QACardItem card={useQaStore.getState().cards[0]} />);

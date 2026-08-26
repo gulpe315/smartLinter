@@ -70,6 +70,29 @@ describe('QACardList Component', () => {
     expect(screen.queryByTestId('qa-empty-state')).not.toBeInTheDocument();
   });
 
+  it('shows applied and dismissed cards in read-only history and returns to the active empty state', () => {
+    useQaStore.setState({
+      appliedCards: [{
+        id: 'applied-card', paragraphId: 'para-applied', paragraphHash: 'hash-applied', paragraphText: 'Original applied',
+        category: 'Grammar', originalSegment: 'Original applied', suggestedSegment: 'Applied replacement', reason: 'Applied', severity: 'LOW', status: 'applied', createdAt: 1,
+      }],
+      dismissedCards: [{
+        id: 'dismissed-card', paragraphId: 'para-dismissed', paragraphHash: 'hash-dismissed', paragraphText: 'Original dismissed',
+        category: 'Style', originalSegment: 'Original dismissed', suggestedSegment: 'Dismissed replacement', reason: 'Dismissed', severity: 'MEDIUM', status: 'dismissed', createdAt: 2,
+      }],
+    });
+
+    render(<QACardList />);
+    fireEvent.click(screen.getByTestId('view-toggle-history'));
+
+    expect(screen.getByTestId('qa-card-item-applied-card')).toBeInTheDocument();
+    expect(screen.getByTestId('qa-card-item-dismissed-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('qa-accept-action-btn')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('view-toggle-active'));
+    expect(screen.getByTestId('qa-empty-state')).toBeInTheDocument();
+  });
+
   it('filters cards dynamically by severity pills', () => {
     useQaStore.getState().addCard({
       id: 'c-high',

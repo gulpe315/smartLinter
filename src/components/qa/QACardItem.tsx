@@ -39,6 +39,7 @@ export interface QACardItemProps {
   onDismiss?: (cardId: string) => void;
   onMarkObsolete?: (cardId: string) => void;
   isApplying?: boolean;
+  readOnly?: boolean;
   className?: string;
 }
 
@@ -48,6 +49,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   onDismiss,
   onMarkObsolete,
   isApplying: propIsApplying,
+  readOnly = false,
   className = '',
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -60,7 +62,14 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const isObsolete = card.status === 'stale_obsolete';
   const isApplying = propIsApplying || card.status === 'applying' || isStale;
   const isAcceptDisabled = isApplying || isObsolete || card.isLocked === true;
-  const isEditUnavailable = isApplying || isObsolete;
+  const isEditUnavailable = readOnly || isApplying || isObsolete;
+  const readOnlyStatus = card.status === 'applied'
+    ? '적용됨'
+    : card.status === 'dismissed'
+    ? '무시됨'
+    : card.status === 'stale_obsolete'
+    ? '만료됨'
+    : '기록됨';
 
   const categoryStyle = getCategoryBadgeClasses(card.category);
   const severityStyle = getSeverityBadgeClasses(card.severity);
@@ -210,7 +219,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           </div>
 
           {/* Dismiss (무시) Header Action */}
-          <button
+          {!readOnly && <button
             type="button"
             data-testid="dismiss-qa-btn"
             disabled={isApplying}
@@ -220,7 +229,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
             title="제안 무시"
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -309,6 +318,12 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           <span className="truncate max-w-[160px] text-emerald-400 font-medium">{card.suggestedSegment}</span>
         </div>
 
+        {readOnly ? (
+          <span data-testid="qa-card-readonly-status" className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-emerald-300 bg-emerald-950/40 border border-emerald-800/60">
+            <Check className="w-3 h-3" />
+            {readOnlyStatus}
+          </span>
+        ) : (
         <div className="flex items-center gap-2 flex-none">
           <button
             type="button"
@@ -376,6 +391,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
             )}
           </button>
         </div>
+        )}
       </div>
     </article>
   );

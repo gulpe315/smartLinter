@@ -6,7 +6,7 @@
  * batch actions, and paragraph telemetry status.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -39,12 +39,21 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     getFilteredCards,
     getCardCountBySeverity,
     isAnalyzing,
+    appliedCards,
+    dismissedCards,
   } = useQaStore();
+
+  const [view, setView] = useState<'active' | 'history'>('active');
 
   const { activeParagraph, editorConnected, editorType } = useBridgeStore();
 
   const filteredCards = getFilteredCards();
   const counts = getCardCountBySeverity();
+  const historyCards = useMemo(
+    () => [...appliedCards, ...dismissedCards].sort((a, b) => b.createdAt - a.createdAt),
+    [appliedCards, dismissedCards]
+  );
+  const historyCount = historyCards.length;
 
   const severityFilters: Array<{ label: string; value: QASeverityFilter; count: number }> = [
     { label: '전체', value: 'ALL', count: counts.total },
@@ -70,7 +79,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
             data-testid="qa-issue-counter"
             className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 font-semibold"
           >
-            {counts.total}건 발견
+            {view === 'history' ? historyCount : counts.total}건 발견
           </span>
           {isAnalyzing && (
             <span
@@ -85,8 +94,15 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
 
         {/* Filter Pills & Actions */}
         <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg bg-slate-800/80 p-0.5 border border-slate-700/80 text-[11px] text-slate-400">
+            <button type="button" data-testid="view-toggle-active" onClick={() => setView('active')} className={`px-2.5 py-1 rounded-md transition-all font-medium ${view === 'active' ? 'bg-indigo-600 text-white shadow-sm font-semibold' : 'hover:text-slate-200 text-slate-400'}`}>진행 중</button>
+            <button type="button" data-testid="view-toggle-history" onClick={() => setView('history')} className={`px-2.5 py-1 rounded-md transition-all font-medium flex items-center gap-1 ${view === 'history' ? 'bg-indigo-600 text-white shadow-sm font-semibold' : 'hover:text-slate-200 text-slate-400'}`}>
+              기록
+              <span className={`text-[9px] px-1 py-0.2 rounded-full ${view === 'history' ? 'bg-indigo-700/80 text-white' : 'bg-slate-700 text-slate-300'}`}>{historyCount}</span>
+            </button>
+          </div>
           {/* Severity Filter Buttons */}
-          <div
+          {view === 'active' && <div
             data-testid="severity-filter-group"
             className="flex items-center rounded-lg bg-slate-800/80 p-0.5 border border-slate-700/80 text-[11px] text-slate-400"
           >
@@ -119,10 +135,10 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
                 </button>
               );
             })}
-          </div>
+          </div>}
 
           {/* Dismiss All Action (visible when cards exist) */}
-          {counts.total > 0 && (
+          {view === 'active' && counts.total > 0 && (
             <button
               type="button"
               data-testid="dismiss-all-btn"
@@ -143,7 +159,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
         className="flex-1 overflow-y-auto p-4 space-y-3.5"
       >
         {/* Active Paragraph Telemetry Context Banner */}
-        {activeParagraph && (
+        {view === 'active' && activeParagraph && (
           <div
             data-testid="active-paragraph-banner"
             className="p-3 rounded-lg bg-slate-900/80 border border-indigo-900/40 text-xs text-slate-300 shadow-sm"
@@ -168,7 +184,21 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
         )}
 
         {/* Render Cards or Clean/Empty State */}
-        {filteredCards.length > 0 ? (
+        {view === 'history' ? (
+          historyCards.length > 0 ? (
+            <div className="space-y-3">
+              {historyCards.map((card) => (
+                <div key={card.id} className="animate-in fade-in slide-in-from-top-2 duration-300 fill-mode-forwards">
+                  <QACardItem card={card} readOnly />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div data-testid="qa-history-empty-state" className="h-64 flex items-center justify-center text-center p-8 border border-dashed border-slate-800/80 rounded-xl bg-slate-900/20 text-sm text-slate-400">
+              아직 처리된 카드가 없습니다.
+            </div>
+          )
+        ) : filteredCards.length > 0 ? (
           <div className="space-y-3">
             {filteredCards.map((card) => (
               <div
