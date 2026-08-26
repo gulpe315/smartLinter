@@ -45,6 +45,9 @@ export interface QACardData {
   rollbackMessage?: string;
   /** Whether the source editor frame/layer is locked. */
   isLocked?: boolean;
+  /** True when this card was instantly synthesized from a previously accepted
+   * correction, rather than freshly produced by the LLM. */
+  historyReplay?: boolean;
 }
 
 /** Severity filter options for the QA Card List */

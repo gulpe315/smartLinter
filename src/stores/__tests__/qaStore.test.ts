@@ -103,6 +103,53 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().cards.length).toBe(2);
   });
 
+  it('silently suppresses exact normalized issues previously dismissed by the user', () => {
+    useQaStore.setState({
+      dismissedCards: [{
+        id: 'dismissed-typo', paragraphId: 'old-para', paragraphHash: 'old-hash', paragraphText: 'teh',
+        category: 'Spelling', originalSegment: 'Teh', suggestedSegment: 'The', reason: 'Typo',
+        severity: 'LOW', status: 'dismissed', createdAt: Date.now(),
+      }],
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'new-para', paragraphHash: 'new-hash', paragraphText: 'Teh and recieve.',
+      report: {
+        status: 'FAIL',
+        issues: [
+          { category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Dismissed typo', severity: 'LOW' },
+          { category: 'Spelling', originalSegment: 'recieve', suggestedSegment: 'receive', reason: 'Other typo', severity: 'LOW' },
+        ],
+      },
+    });
+
+    expect(useQaStore.getState().cards).toEqual([
+      expect.objectContaining({ originalSegment: 'recieve', suggestedSegment: 'receive' }),
+    ]);
+  });
+
+  it('does not suppress an issue archived as stale_obsolete', () => {
+    useQaStore.setState({
+      dismissedCards: [{
+        id: 'obsolete-typo', paragraphId: 'old-para', paragraphHash: 'old-hash', paragraphText: 'teh',
+        category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+        severity: 'LOW', status: 'stale_obsolete', createdAt: Date.now(),
+      }],
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'new-para', paragraphHash: 'new-hash', paragraphText: 'teh',
+      report: {
+        status: 'FAIL',
+        issues: [{ category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', severity: 'LOW' }],
+      },
+    });
+
+    expect(useQaStore.getState().cards).toEqual([
+      expect.objectContaining({ originalSegment: 'teh', suggestedSegment: 'the' }),
+    ]);
+  });
+
   it('preserves a locked telemetry state on cards created from QA reports', () => {
     useQaStore.getState().addReport({
       paragraphId: 'para-locked',
@@ -558,6 +605,43 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
         suggestedSegment: 'the',
       }),
     ]);
+
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it('instantly replays accepted corrections and still runs debounced analysis', async () => {
+    vi.useFakeTimers();
+    useQaStore.setState({
+      appliedCards: [{
+        id: 'accepted-typo', paragraphId: 'old-para', paragraphHash: 'old-hash', paragraphText: 'teh',
+        category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Accepted typo',
+        severity: 'LOW', status: 'applied', createdAt: Date.now(),
+      }],
+    });
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValueOnce({
+      status: 'FAIL',
+      issues: [{ category: 'Grammar', originalSegment: 'is bad', suggestedSegment: 'is good', reason: 'Separate issue', severity: 'LOW' }],
+    });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'new-para', text: 'This contains teh typo.', hash: 'new-hash', source: 'Catalog.indd',
+      timestamp: Date.now(), editorType: 'InDesign',
+    });
+
+    expect(useQaStore.getState().cards).toEqual([
+      expect.objectContaining({
+        paragraphId: 'new-para', originalSegment: 'teh', suggestedSegment: 'the', historyReplay: true,
+      }),
+    ]);
+    expect(analyzeSpy).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+    expect(useQaStore.getState().cards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ originalSegment: 'is bad', historyReplay: undefined }),
+    ]));
 
     unlisten();
     vi.useRealTimers();

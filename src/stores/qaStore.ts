@@ -32,6 +32,7 @@ import {
 import { getStaleConflictResolver } from '../services/stale_conflict_resolver.ts';
 import { getRollbackGuard } from '../services/rollback_guard.ts';
 import { useTmStore } from './tmStore.ts';
+import { normalizeText } from '../utils/tmMatcher.ts';
 
 export interface AcceptCardOptions {
   autoResolveStale?: boolean;
@@ -41,6 +42,33 @@ export interface PendingCommand {
   cardId: string;
   paragraphId: string;
   baseHash: string;
+}
+
+function getNormalizedIssueKey(category: string, originalSegment: string, suggestedSegment: string): string {
+  return `${category}\u0000${normalizeText(originalSegment)}\u0000${normalizeText(suggestedSegment)}`;
+}
+
+export function findAcceptedCorrectionForText(appliedCards: QACardData[], text: string): QACardData | null {
+  const normalizedText = normalizeText(text);
+  if (!normalizedText) return null;
+
+  for (const card of appliedCards) {
+    const normalizedOriginal = normalizeText(card.originalSegment);
+    if (normalizedOriginal && normalizedText.includes(normalizedOriginal)) {
+      return card;
+    }
+  }
+
+  return null;
+}
+
+export function buildDismissedIssueKeySet(dismissedCards: QACardData[]): Set<string> {
+  const keys = new Set<string>();
+  for (const card of dismissedCards) {
+    if (card.status !== 'dismissed') continue;
+    keys.add(getNormalizedIssueKey(card.category, card.originalSegment, card.suggestedSegment));
+  }
+  return keys;
 }
 
 export interface QAState {
@@ -117,6 +145,7 @@ export const useQaStore = create<QAState>((set, get) => ({
       createdAt: cardInput.createdAt || Date.now(),
       errorMessage: cardInput.errorMessage,
       isLocked: cardInput.isLocked,
+      historyReplay: cardInput.historyReplay,
     };
 
     set((state) => {
@@ -153,10 +182,14 @@ export const useQaStore = create<QAState>((set, get) => ({
       });
     }
 
-    const issueKeys = new Set(
-      payload.report.issues.map((issue) =>
-        `${issue.category}\u0000${issue.originalSegment}\u0000${issue.suggestedSegment}`
+    const dismissedIssueKeys = buildDismissedIssueKeySet(get().dismissedCards);
+    const issues = payload.report.issues.filter(
+      (issue) => !dismissedIssueKeys.has(
+        getNormalizedIssueKey(issue.category, issue.originalSegment, issue.suggestedSegment)
       )
+    );
+    const issueKeys = new Set(
+      issues.map((issue) => `${issue.category}\u0000${issue.originalSegment}\u0000${issue.suggestedSegment}`)
     );
 
     // A new report is authoritative for idle cards in this exact paragraph.
@@ -190,7 +223,7 @@ export const useQaStore = create<QAState>((set, get) => ({
       };
     });
 
-    payload.report.issues.forEach((issue) => {
+    issues.forEach((issue) => {
       get().addCard({
         paragraphId: payload.paragraphId,
         paragraphHash: payload.paragraphHash,
@@ -477,6 +510,22 @@ export const useQaStore = create<QAState>((set, get) => ({
     // result, so only the newest text may update the UI.
     unlisteners.push(
       bridgeService.listen('new-paragraph-detected', (payload) => {
+        const acceptedCorrection = findAcceptedCorrectionForText(get().appliedCards, payload.text);
+        if (acceptedCorrection) {
+          get().addCard({
+            paragraphId: payload.paragraphId,
+            paragraphHash: payload.hash,
+            paragraphText: payload.text,
+            isLocked: payload.isLocked,
+            category: acceptedCorrection.category,
+            originalSegment: acceptedCorrection.originalSegment,
+            suggestedSegment: acceptedCorrection.suggestedSegment,
+            reason: acceptedCorrection.reason,
+            severity: acceptedCorrection.severity,
+            historyReplay: true,
+          });
+        }
+
         const requestVersion = ++nextAnalysisRequestVersion;
         analysisRequestVersions.set(payload.paragraphId, requestVersion);
         const pendingTimer = pendingAnalysisTimers.get(payload.paragraphId);

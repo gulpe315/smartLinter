@@ -20,6 +20,7 @@ import {
   MapPin,
   Lock,
   Pencil,
+  History,
 } from 'lucide-react';
 import { type QACardData } from '../../types/qa.ts';
 import { getBridgeService } from '../../services/tauriBridge.ts';
@@ -176,6 +177,17 @@ export const QACardItem: React.FC<QACardItemProps> = ({
             {renderSeverityIcon()}
             <span>{severityStyle.label}</span>
           </span>
+
+          {card.historyReplay && (
+            <span
+              data-testid="qa-card-history-badge"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border border-emerald-800/70 bg-emerald-950/50 text-emerald-200"
+              title="이전에 적용한 수정 이력을 바탕으로 즉시 생성된 카드입니다"
+            >
+              <History className="w-3 h-3" />
+              <span>이력 기반</span>
+            </span>
+          )}
 
           {/* Paragraph ID / Time context */}
           {card.paragraphId && (

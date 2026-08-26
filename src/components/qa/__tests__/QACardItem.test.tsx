@@ -39,6 +39,18 @@ describe('QACardItem Component', () => {
     );
   });
 
+  it('shows a history badge for replayed corrections', () => {
+    render(<QACardItem card={{ ...sampleCard, historyReplay: true }} />);
+
+    expect(screen.getByTestId('qa-card-history-badge')).toBeInTheDocument();
+  });
+
+  it('does not show a history badge for ordinary corrections', () => {
+    render(<QACardItem card={sampleCard} />);
+
+    expect(screen.queryByTestId('qa-card-history-badge')).not.toBeInTheDocument();
+  });
+
   it('renders interactive reason tooltip popover on hover', () => {
     render(<QACardItem card={sampleCard} />);
 
