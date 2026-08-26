@@ -1,18 +1,21 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-26 (백로그 아카이브 UI 완료 + 실사용 중 발견된 obsolete-card 버그 수정 + 수정이력 피드백 Phase 1 완료. Phase 2/나머지 백로그는 다음 세션.)
+마지막 업데이트: 2026-08-26 (아카이브 UI + obsolete-card 버그 + 수정이력 Phase 1 + 사용자 라이브 테스트 중 발견된 2건(historyReplay 카드 소실, 포커스 하이라이트/자동스크롤) 전부 완료. Phase 2/나머지 백로그는 다음 세션.)
 
 ## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 최종 인계, 이 절이 최신)
 
-1. **`git log --oneline -1`로 최신 커밋이 `56ce32c`(Instantly replay accepted corrections and silently suppress dismissed ones)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
+1. **`git log --oneline -1`로 최신 커밋이 `1eb70eb`(Auto-scroll to the focused card by default and show the full paragraph ID)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
 2. **이번 세션(2026-08-26) 요약, 커밋 순서대로:**
    - `9039a38` — **완료 카드 아카이브 UI(Task M).** 백로그 우선순위 목록(구 4번 항목)엔 순서가 다르게 적혀 있었지만, FEATURE_REVIEW2_CODEX.md/FEATURE_REVIEW2_AGY.md에서 두 모델이 이미 합의한 실제 권고 순서(아카이브 UI가 가장 저위험·최우선)를 따름 — 이 파일 백로그 절의 번호 순서보다 FEATURE_REVIEW2 문서의 합의가 우선한다는 걸 기억할 것. `appliedCards`/`dismissedCards`를 "기록" 탭에서 읽기전용으로 노출(`QACardItem`에 `readOnly` prop 추가).
    - `1edb2ec` — **obsolete 카드가 영원히 안 사라지는 버그 수정.** 사용자가 InDesign에서 문단을 통째로 지웠는데 "찾을 수 없음" 카드가 활성 목록에 영구 잔류하는 걸 발견 → Codex/agy 2라운드 교차검증(1라운드는 정면 상충: agy는 "위치보기 1회 실패로 충분", Codex는 "2차 확인 필요" — Claude가 `locateParagraph` 실제 코드를 읽어 `NOT_FOUND`가 진짜소멸/모호함(2개+ 후보)/선택실패 3가지를 뭉뚱그리고 있음을 확인해 양쪽에 다시 제시 → 완전 수렴) → `locateParagraph`를 `FOUND`/`NOT_FOUND`/`AMBIGUOUS`/`SELECTION_FAILED`/`ERROR`로 세분화, 진짜 `NOT_FOUND`(후보 0개)일 때만 `markCardObsolete`가 `dismissedCards`로 이동(기존엔 상태만 바꾸고 안 옮겼음 — 이게 원래 버그의 핵심). ExtendScript(`atomic_replacer.jsx`)/Rust(`indesign_com.rs`)/프론트(`tauriBridge.ts`/`QACardItem.tsx`/`qaStore.ts`) 전체 관통 수정 — `findParagraphById`의 기존 계약·테스트는 안 건드림(공유 헬퍼로 추출). `cargo test`(99)까지 포함 4개 명령 전부 독립 재검증.
    - `56ce32c` — **수정 이력 피드백 루프 Phase 1.** 사용자가 "기록에 저장되는데, 같은 문제 재발 시 기계적으로 보여줄지 AI가 참조할지"를 직접 질문 → Codex/agy 둘 다 "둘 다, 계층 구조로"에 수렴(1단계: 정확일치 즉시 재사용+조용한 무시 필터링 / 2단계: LLM 프롬프트에 소량 컨텍스트 주입, 아직 미착수). 사용자가 1단계 즉시 착수 + "무시 처리는 조용히 숨김"(agy 안, Codex는 "이전에 무시함 표시 후 복원 가능" 안이었으나 사용자가 agy 안 선택)으로 결정. `appliedCards`에서 정확히 일치하는 원문이 새 문단에 다시 나타나면 LLM 호출 없이 즉시 카드 생성(`historyReplay: true`, "이력 기반" 배지) + `dismissedCards`(단, `status==='dismissed'`인 것만, `stale_obsolete`는 제외)와 정확히 일치하는 이슈는 `addReport`에서 조용히 필터링. 새 영구 저장소 안 만들고 기존 배열에서 파생 인덱스만 계산 — 퍼지매칭 절대 사용 안 함(Task F→K→L 재발 방지). Codex 산출물에 영어 배지 텍스트("History-based") 발견 → Claude가 직접 한글("이력 기반")로 수정 후 커밋.
+   - `602edf1` — **Phase 1 라이브 테스트 중 발견된 버그 수정 + 신규 기능.** 사용자가 실제 InDesign에서 Phase 1을 써보다가 (1) 이력 기반 카드가 떴다가 곧 사라지고 LLM의 다른(때론 엉뚱한) 답으로 대체되는 버그, (2) "커서가 다른 문단으로 이동하면 그 문단 카드를 맨 위로 올리고 하이라이트해달라"는 제안을 함께 보고 → Codex+agy 교차검증(둘 다 완전 수렴): (1)은 `addReport`가 "새 리포트는 그 문단의 모든 pending 카드에 대해 권위 있다"는 로직 때문에 `historyReplay` 카드까지 매번 지워지던 것 — 원문이 여전히 문단에 남아있는 한 `historyReplay` 카드는 `addReport`의 교체 로직에서 예외 처리, 대신 리포트의 최신 `paragraphText`/`paragraphHash`/`isLocked`로 갱신(안 하면 나중에 적용 시 stale 오탐 위험, Codex가 지적). (2)는 두 모델 다 "맨 위로 재정렬"은 반대(다른 카드의 [적용] 버튼을 실수로 누르게 되는 위험, 목록 흔들림) → "제자리 하이라이트만, 자동 스크롤은 나중에 옵트인"으로 합의, 사용자도 동의.
+   - `1eb70eb` — **위 602edf1 라이브 확인 직후 사용자가 마음을 바꿔서 자동 스크롤을 지금 바로 기본 적용해달라고 요청** + 문단 배너의 ID가 10자로 잘려있던 것도 전체 표시로 변경. 둘 다 간단한 후속 작업으로 즉시 처리(추가 교차검증 없이 — 이미 방향이 정해진 구현 디테일이라 판단).
+   - 미니맵/화면-밖 표시 아이디어(사용자 제안)는 Codex+agy 둘 다 "일단 필요 없음, 자동스크롤이 기본 켜지면 이 문제 자체가 거의 사라짐"이라 결론 — 구현 안 함, 문서만 남김(QUESTION_OFFSCREEN_FOCUS_INDICATOR.md 등).
 3. **다음 세션 최우선:**
    - 수정 이력 피드백 **Phase 2**(관련성 높은 과거 수정 상위 1~2건을 LLM 프롬프트에 짧게 주입, Rust/프롬프트 레이어) — 설계는 CODEX_ANSWER_CORRECTION_HISTORY.md/AGY_ANSWER_CORRECTION_HISTORY.md에 이미 합의돼 있음, 착수만 하면 됨.
-   - Phase 1 기능(이력 기반 즉시 카드, 무시 필터링)은 아직 실제 InDesign에서 라이브 검증 안 함 — 자동테스트만 통과. 다음 세션에서 문단 하나 고치고→같은 오탈자를 다른 문단에 입력→즉시 "이력 기반" 배지 카드가 뜨는지, 무시한 제안이 다른 문단에서 안 뜨는지 확인 필요.
-   - 이 세션에서 안내했던 obsolete-card 수정 라이브 검증 절차(재연결 → 문단 삭제 → 위치보기 → 기록 탭 확인)도 사용자가 아직 실행 전이었음 — 이어서 확인.
+   - **이번 세션에 만든 기능 전부(아카이브 UI, obsolete 수정, Phase 1, historyReplay 생존 수정, 포커스 하이라이트+자동스크롤, 전체ID표시) 자동테스트만 통과했고 실제 InDesign 라이브 검증은 세션 종료 시점까지 진행 중이었음** — 다음 세션 시작 시 사용자가 어디까지 확인했는지 먼저 물어보고 이어서 검증할 것.
+   - 사용자가 관찰한 별도 이슈(버그 아님, 설계 트레이드오프): 압축 프롬프트(`qa_compressed.tera`)가 다중 이슈 예시/지시 없이 스키마만 던져서, 로컬 소형 모델이 문장이 복잡해지면 여러 후보 중 하나만 고르는 경향이 있음(관찰만 함, 아직 개선 착수 안 함 — 필요시 Phase 2 프롬프트 작업과 함께 재검토).
    - 그 뒤 백로그: `start_batch_scan`(문서 전체 일괄 검사), 동일 이슈 일괄 적용, Word taskpane 인프라.
 4. **협업 원칙 (계속 유지, [[feedback_agy_consult_when_stuck]] / [[feedback_blast_radius_underestimation]] 필독):**
    - 원인 불명 현상이든 사용자 제안이든, Claude 혼자 깊게 파고들지 말 것 — 가벼운 확인(파일 1~2개)만 하고 곧바로 Codex(`codex exec -C "D:\data\dev\App\SmartLinter" --approve-for-me '...'`)와 agy(`agy -p '...' --add-dir "D:\data\dev\App\SmartLinter" --print-timeout 15m --dangerously-skip-permissions --sandbox`) 양쪽에 공유.
