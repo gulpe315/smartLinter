@@ -1,19 +1,28 @@
 import React from 'react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QACardList } from '../QACardList.tsx';
 import { useQaStore } from '../../../stores/qaStore.ts';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
 
+const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
+
 describe('QACardList Component', () => {
   let mockBridge: MockBridgeService;
+  let scrollSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     useQaStore.getState().reset();
     useBridgeStore.getState().reset();
     mockBridge = new MockBridgeService();
     setBridgeService(mockBridge);
+    scrollSpy = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollSpy;
+  });
+
+  afterEach(() => {
+    window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
   });
 
   it('renders clean empty state when no cards exist and editor is waiting', () => {
@@ -42,6 +51,22 @@ describe('QACardList Component', () => {
     expect(screen.getByText('Word 문단 감지')).toBeInTheDocument();
     expect(screen.getByText('클라우드 플랫폼 인프라 설정 문단입니다.')).toBeInTheDocument();
     expect(screen.getByText('검수 완료: 위반 사항 없음 (Clean)')).toBeInTheDocument();
+  });
+
+  it('shows the full paragraph ID in the active paragraph banner', () => {
+    const paragraphId = 'paragraph-id-that-must-never-be-truncated';
+    useBridgeStore.getState().addParagraph({
+      paragraphId,
+      text: 'A paragraph.',
+      hash: 'sha256-hash-full-id',
+      source: 'Doc.docx',
+      timestamp: Date.now(),
+      editorType: 'Word',
+    });
+
+    render(<QACardList />);
+
+    expect(screen.getByTestId('active-paragraph-banner')).toHaveTextContent(`ID: ${paragraphId}`);
   });
 
   it('renders list of QA cards and updates count badge', () => {
@@ -99,6 +124,40 @@ describe('QACardList Component', () => {
 
     render(<QACardList />);
     expect(screen.queryByTestId('qa-card-item-focused-low')).not.toBeInTheDocument();
+  });
+
+  it('smoothly scrolls to the first matching focused card when telemetry arrives', () => {
+    useQaStore.getState().addCard({ id: 'other-card', paragraphId: 'para-other', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Other', severity: 'LOW' });
+    useQaStore.getState().addCard({ id: 'focused-card', paragraphId: 'para-focused', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Focused', severity: 'LOW' });
+    render(<QACardList />);
+
+    act(() => {
+      useBridgeStore.getState().addParagraph({ paragraphId: 'para-focused', text: 'A focused paragraph.', hash: 'hash-focused', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    });
+
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  it('does not scroll without a matching active card or on unrelated rerenders', () => {
+    useQaStore.getState().addCard({ id: 'other-card', paragraphId: 'para-other', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Other', severity: 'LOW' });
+    render(<QACardList />);
+
+    act(() => {
+      useBridgeStore.getState().addParagraph({ paragraphId: 'para-missing', text: 'No matching card.', hash: 'hash-missing', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    });
+    expect(scrollSpy).not.toHaveBeenCalled();
+
+    act(() => {
+      useBridgeStore.getState().addParagraph({ paragraphId: 'para-other', text: 'Matching card.', hash: 'hash-other', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    });
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    scrollSpy.mockClear();
+
+    act(() => {
+      useQaStore.getState().addCard({ id: 'unrelated-card', paragraphId: 'para-unrelated', category: 'Style', originalSegment: 'wordy', suggestedSegment: 'concise', reason: 'Unrelated', severity: 'LOW' });
+    });
+    expect(scrollSpy).not.toHaveBeenCalled();
   });
 
   it('shows applied and dismissed cards in read-only history and returns to the active empty state', () => {

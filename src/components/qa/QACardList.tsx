@@ -6,7 +6,7 @@
  * batch actions, and paragraph telemetry status.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -44,6 +44,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
   } = useQaStore();
 
   const [view, setView] = useState<'active' | 'history'>('active');
+  const cardRefs = useRef(new Map<string, HTMLDivElement>());
 
   const { activeParagraph, editorConnected, editorType } = useBridgeStore();
 
@@ -56,6 +57,16 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     ),
     [filteredCards, activeParagraph?.paragraphId]
   );
+
+  useEffect(() => {
+    if (!activeParagraph || focusedCardIds.size === 0) return;
+
+    const focusedCardId = filteredCards.find((card) => focusedCardIds.has(card.id))?.id;
+    cardRefs.current.get(focusedCardId ?? '')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+    });
+  }, [activeParagraph?.paragraphId]);
   const counts = getCardCountBySeverity();
   const historyCards = useMemo(
     () => [...appliedCards, ...dismissedCards].sort((a, b) => b.createdAt - a.createdAt),
@@ -177,8 +188,8 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">
                   {activeParagraph.editorType} 문단 감지
                 </span>
-                <span className="text-[11px] font-mono text-slate-400 truncate max-w-[200px]">
-                  ID: {activeParagraph.paragraphId.slice(0, 10)}...
+                <span className="text-[11px] font-mono text-slate-400 break-all">
+                  ID: {activeParagraph.paragraphId}
                 </span>
               </div>
               <span className="text-[10px] font-mono text-slate-500">
@@ -211,6 +222,10 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
             {filteredCards.map((card) => (
               <div
                 key={card.id}
+                ref={(element) => {
+                  if (element) cardRefs.current.set(card.id, element);
+                  else cardRefs.current.delete(card.id);
+                }}
                 className="animate-in fade-in slide-in-from-top-2 duration-300 fill-mode-forwards"
               >
                 <QACardItem
