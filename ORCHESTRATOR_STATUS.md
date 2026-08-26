@@ -1,10 +1,48 @@
 # SmartLinter — 오케스트레이터 현황판
 
 마지막 업데이트: 2026-08-27 세션 — `DESIGN_QA_CARD_LIVE_INTEGRITY.md`의 Suggested
-implementation order 1번(non-invasive 실시간 스냅샷 primitive) 구현·검증·커밋 완료
-(`0909ec5`). 아래 "⭐⭐⭐⭐" 절 참고.
+implementation order 1~2번(실시간 스냅샷 primitive + 새 카드 게이팅) 구현·검증·커밋
+완료(`0909ec5`, `ccf20a8`), **실제 InDesign 라이브 검증으로 원래 유령카드 버그
+재현 안 됨 확인(사용자 "정상 작동함")**. 다음은 Step 3(배치 폼+Part 3 Layer 1).
+아래 "⭐⭐⭐⭐⭐" 절 참고.
 
-## ⭐⭐⭐⭐ 2026-08-27 세션 — Step 1(실시간 스냅샷 primitive) 완료, 다음은 Step 2
+## ⭐⭐⭐⭐⭐ 2026-08-27 세션 후반 — Step 2(새 카드 게이팅) 완료+라이브검증, 다음은 Step 3
+
+1. **`git log --oneline -1`로 최신 커밋이 `ccf20a8`(Gate new QA cards on a live paragraph snapshot before showing them)인지 확인.**
+2. **한 일:** `qaStore.ts`의 `new-paragraph-detected` 핸들러에서, 기존 저렴한
+   사전필터(`analysisRequestVersions` 버전체크) 통과 직후 · `addReport` 호출 직전에
+   `getLiveParagraphSnapshot(paragraphId, payload.hash)` 게이트를 추가(작업지시서
+   `TASK_REQUEST_LIVE_SNAPSHOT_STEP2.md`). `FOUND` + 해시가 분석 당시와 일치할 때만
+   카드로 승격, 그 외(해시 불일치/`NOT_FOUND`/`AMBIGUOUS`/`BUSY`/`ERROR`/예외) 전부
+   조용히 폐기(재시도 없음 — 다음 실제 텔레메트리가 새 분석 트리거). 12줄짜리 핀셋
+   수정. `MockBridgeService.getLiveParagraphSnapshot`이 `baseHash`를 그대로
+   `currentHash`로 에코하도록 수정(안 했으면 `qaStore.test.ts` 기존 테스트 15개+
+   전부 파손됨 — 작업지시서에 이 함정을 미리 명시해서 방지).
+3. **Claude 독립검증:** `git status --short`로 예상 파일(3개+태스크지시서)만
+   바뀌었는지 확인 → diff 라인단위 정독(정확히 명세대로 최소 변경) →
+   `cargo test`/`npm test`(164/164)/`npm run test:ui`(259/259, 신규 게이팅
+   테스트 4개 포함)/`npm run build` 독립 재실행 → 커밋.
+4. **실제 InDesign 라이브 검증 완료 (사용자 확인 "정상 작동함").** Claude가 직접
+   `npx tauri dev --no-watch`로 Step1+2 전부 반영된 서버 기동(사용자에게 서버 실행
+   시키지 않음 — Bash로 가능한 건 Claude가 함), InDesign 실행 확인 후 사용자에게
+   번호 매긴 절차로 요청: ①"InDesign 연결" 버튼 클릭 ②오탈자 입력해 카드 발생
+   확인 ③카드가 뜨기 전/직후 InDesign에서 직접 그 오탈자를 고침 ④몇 초 뒤
+   유령 카드가 안 뜨는지 확인. 사용자가 "정상 작동함"으로 확인 — **원래 리포트된
+   "일오일→일요일" 유령카드 버그, 이 프로젝트의 QA카드 생명주기 정합성 설계 착수의
+   계기였던 그 버그가 최종 해결됨.**
+5. **다음 세션 최우선:** Step 3 — Part 1의 배치 폼(`getLiveParagraphSnapshots`,
+   여러 paragraphId를 한 번의 InDesign/COM 왕복으로 조회, N회 개별호출 금지) +
+   Part 3 Layer 1(이미 화면에 떠 있는 카드들에 대해, **어떤** 텔레메트리 이벤트든
+   도착하면 추가 IPC 없이 로컬 메모리의 `payload.text`와 카드들의 `originalSegment`를
+   대조해서 사라졌으면 즉시 아카이브). 이 두 개는 "배치 엔드포인트 하나 추가"라는
+   같은 슬라이스로 묶여 있음(설계문서 Suggested implementation order 3번).
+6. **참고:** Step 4(Layer 2 JIT 뷰포트/포커스 검증+오프라인/재연결 처리),
+   Step 5(F5 차단+Zustand persist+복원 시 재검증)는 설계가 이미 끝난 상태 —
+   재자문 불필요, `DESIGN_QA_CARD_LIVE_INTEGRITY.md` 그대로 순서대로 진행.
+
+---
+
+## ⭐⭐⭐⭐ 2026-08-27 세션 전반 (지나간 상태, 참고용) — Step 1(실시간 스냅샷 primitive) 완료
 
 1. **`git log --oneline -1`로 최신 커밋이 `0909ec5`(Add non-invasive live paragraph snapshot primitive)인지 확인.**
 2. **한 일:** `DESIGN_QA_CARD_LIVE_INTEGRITY.md`의 Part 1 계약대로
