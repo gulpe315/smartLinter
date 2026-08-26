@@ -1,28 +1,34 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-26 (아카이브 UI + obsolete-card 버그 + 수정이력 Phase 1 + 사용자 라이브 테스트 중 발견된 2건(historyReplay 카드 소실, 포커스 하이라이트/자동스크롤) 전부 완료. Phase 2/나머지 백로그는 다음 세션.)
+마지막 업데이트: 2026-08-26 (아카이브 UI, obsolete-card 생명주기, 수정이력 Phase 1 + 라이브 버그 2건, 카드 클릭 위치찾기, 다중이슈 프롬프트 개선까지 전부 완료·커밋. 가이드라인 배선(Task T)·수정이력 Phase 2(Task U)·다국어 지원 설계는 사용자 지시로 다음 세션으로 이월.)
 
 ## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 최종 인계, 이 절이 최신)
 
-1. **`git log --oneline -1`로 최신 커밋이 `1eb70eb`(Auto-scroll to the focused card by default and show the full paragraph ID)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
-2. **이번 세션(2026-08-26) 요약, 커밋 순서대로:**
-   - `9039a38` — **완료 카드 아카이브 UI(Task M).** 백로그 우선순위 목록(구 4번 항목)엔 순서가 다르게 적혀 있었지만, FEATURE_REVIEW2_CODEX.md/FEATURE_REVIEW2_AGY.md에서 두 모델이 이미 합의한 실제 권고 순서(아카이브 UI가 가장 저위험·최우선)를 따름 — 이 파일 백로그 절의 번호 순서보다 FEATURE_REVIEW2 문서의 합의가 우선한다는 걸 기억할 것. `appliedCards`/`dismissedCards`를 "기록" 탭에서 읽기전용으로 노출(`QACardItem`에 `readOnly` prop 추가).
-   - `1edb2ec` — **obsolete 카드가 영원히 안 사라지는 버그 수정.** 사용자가 InDesign에서 문단을 통째로 지웠는데 "찾을 수 없음" 카드가 활성 목록에 영구 잔류하는 걸 발견 → Codex/agy 2라운드 교차검증(1라운드는 정면 상충: agy는 "위치보기 1회 실패로 충분", Codex는 "2차 확인 필요" — Claude가 `locateParagraph` 실제 코드를 읽어 `NOT_FOUND`가 진짜소멸/모호함(2개+ 후보)/선택실패 3가지를 뭉뚱그리고 있음을 확인해 양쪽에 다시 제시 → 완전 수렴) → `locateParagraph`를 `FOUND`/`NOT_FOUND`/`AMBIGUOUS`/`SELECTION_FAILED`/`ERROR`로 세분화, 진짜 `NOT_FOUND`(후보 0개)일 때만 `markCardObsolete`가 `dismissedCards`로 이동(기존엔 상태만 바꾸고 안 옮겼음 — 이게 원래 버그의 핵심). ExtendScript(`atomic_replacer.jsx`)/Rust(`indesign_com.rs`)/프론트(`tauriBridge.ts`/`QACardItem.tsx`/`qaStore.ts`) 전체 관통 수정 — `findParagraphById`의 기존 계약·테스트는 안 건드림(공유 헬퍼로 추출). `cargo test`(99)까지 포함 4개 명령 전부 독립 재검증.
-   - `56ce32c` — **수정 이력 피드백 루프 Phase 1.** 사용자가 "기록에 저장되는데, 같은 문제 재발 시 기계적으로 보여줄지 AI가 참조할지"를 직접 질문 → Codex/agy 둘 다 "둘 다, 계층 구조로"에 수렴(1단계: 정확일치 즉시 재사용+조용한 무시 필터링 / 2단계: LLM 프롬프트에 소량 컨텍스트 주입, 아직 미착수). 사용자가 1단계 즉시 착수 + "무시 처리는 조용히 숨김"(agy 안, Codex는 "이전에 무시함 표시 후 복원 가능" 안이었으나 사용자가 agy 안 선택)으로 결정. `appliedCards`에서 정확히 일치하는 원문이 새 문단에 다시 나타나면 LLM 호출 없이 즉시 카드 생성(`historyReplay: true`, "이력 기반" 배지) + `dismissedCards`(단, `status==='dismissed'`인 것만, `stale_obsolete`는 제외)와 정확히 일치하는 이슈는 `addReport`에서 조용히 필터링. 새 영구 저장소 안 만들고 기존 배열에서 파생 인덱스만 계산 — 퍼지매칭 절대 사용 안 함(Task F→K→L 재발 방지). Codex 산출물에 영어 배지 텍스트("History-based") 발견 → Claude가 직접 한글("이력 기반")로 수정 후 커밋.
-   - `602edf1` — **Phase 1 라이브 테스트 중 발견된 버그 수정 + 신규 기능.** 사용자가 실제 InDesign에서 Phase 1을 써보다가 (1) 이력 기반 카드가 떴다가 곧 사라지고 LLM의 다른(때론 엉뚱한) 답으로 대체되는 버그, (2) "커서가 다른 문단으로 이동하면 그 문단 카드를 맨 위로 올리고 하이라이트해달라"는 제안을 함께 보고 → Codex+agy 교차검증(둘 다 완전 수렴): (1)은 `addReport`가 "새 리포트는 그 문단의 모든 pending 카드에 대해 권위 있다"는 로직 때문에 `historyReplay` 카드까지 매번 지워지던 것 — 원문이 여전히 문단에 남아있는 한 `historyReplay` 카드는 `addReport`의 교체 로직에서 예외 처리, 대신 리포트의 최신 `paragraphText`/`paragraphHash`/`isLocked`로 갱신(안 하면 나중에 적용 시 stale 오탐 위험, Codex가 지적). (2)는 두 모델 다 "맨 위로 재정렬"은 반대(다른 카드의 [적용] 버튼을 실수로 누르게 되는 위험, 목록 흔들림) → "제자리 하이라이트만, 자동 스크롤은 나중에 옵트인"으로 합의, 사용자도 동의.
-   - `1eb70eb` — **위 602edf1 라이브 확인 직후 사용자가 마음을 바꿔서 자동 스크롤을 지금 바로 기본 적용해달라고 요청** + 문단 배너의 ID가 10자로 잘려있던 것도 전체 표시로 변경. 둘 다 간단한 후속 작업으로 즉시 처리(추가 교차검증 없이 — 이미 방향이 정해진 구현 디테일이라 판단).
-   - 미니맵/화면-밖 표시 아이디어(사용자 제안)는 Codex+agy 둘 다 "일단 필요 없음, 자동스크롤이 기본 켜지면 이 문제 자체가 거의 사라짐"이라 결론 — 구현 안 함, 문서만 남김(QUESTION_OFFSCREEN_FOCUS_INDICATOR.md 등).
-3. **다음 세션 최우선:**
-   - 수정 이력 피드백 **Phase 2**(관련성 높은 과거 수정 상위 1~2건을 LLM 프롬프트에 짧게 주입, Rust/프롬프트 레이어) — 설계는 CODEX_ANSWER_CORRECTION_HISTORY.md/AGY_ANSWER_CORRECTION_HISTORY.md에 이미 합의돼 있음, 착수만 하면 됨.
-   - **이번 세션에 만든 기능 전부(아카이브 UI, obsolete 수정, Phase 1, historyReplay 생존 수정, 포커스 하이라이트+자동스크롤, 전체ID표시) 자동테스트만 통과했고 실제 InDesign 라이브 검증은 세션 종료 시점까지 진행 중이었음** — 다음 세션 시작 시 사용자가 어디까지 확인했는지 먼저 물어보고 이어서 검증할 것.
-   - 사용자가 관찰한 별도 이슈(버그 아님, 설계 트레이드오프): 압축 프롬프트(`qa_compressed.tera`)가 다중 이슈 예시/지시 없이 스키마만 던져서, 로컬 소형 모델이 문장이 복잡해지면 여러 후보 중 하나만 고르는 경향이 있음(관찰만 함, 아직 개선 착수 안 함 — 필요시 Phase 2 프롬프트 작업과 함께 재검토).
-   - 그 뒤 백로그: `start_batch_scan`(문서 전체 일괄 검사), 동일 이슈 일괄 적용, Word taskpane 인프라.
+1. **`git log --oneline -1`로 최신 커밋이 `1d8be88`(Instruct the QA prompt to enumerate every issue, not just the first one)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
+2. **이번 세션(2026-08-26) 커밋 요약(순서대로, 상세 서술은 이 파일 하단의 이전 절 참고):**
+   - `9039a38` 완료 카드 아카이브 UI(Task M) — "기록" 탭, `QACardItem`에 `readOnly` prop.
+   - `1edb2ec` obsolete 카드 영구잔류 버그 — `locateParagraph`를 `FOUND`/`NOT_FOUND`/`AMBIGUOUS`/`SELECTION_FAILED`/`ERROR`로 세분화, 진짜 `NOT_FOUND`만 자동보관.
+   - `56ce32c` 수정이력 피드백 Phase 1 — 정확일치 즉시 재사용(`historyReplay`) + 무시이력 조용한 필터링.
+   - `602edf1` Phase 1 라이브버그 수정(`historyReplay` 카드가 다음 LLM 리포트에 지워지던 문제) + 포커스 하이라이트(재정렬 없이 제자리만).
+   - `1eb70eb` 자동스크롤 기본 적용 + 문단ID 전체표시.
+   - `0372b14` 하이라이트 테두리 1px→1.5px(사용자 요청 미세조정).
+   - `f94bf9b` 카드 본문 클릭 시 위치찾기(기존 버튼과 공존, 텍스트선택/읽기전용 카드는 제외).
+   - `1d8be88` **다중이슈 감지 프롬프트 개선.** `COMPRESSED_SYSTEM_INSTRUCTION`/`MONOLINGUAL_SYSTEM_INSTRUCTION`에 "모든 이슈를 나열하라" 한 문장 추가. **중요 경위:** 최초 Qwen(`qwen2.5:latest`)으로 벤치마크했더니 개선효과 없어서(베이스라인이 이미 4/4) 반영 안 함 → 그런데 애초에 실제 앱이 쓰는 모델은 Qwen이 아니라 `exaone3.5:7.8b`였음(사용자가 지적: Qwen은 가끔 중국어로 답하는 등 신뢰 안 함) → **모델을 바꿔 재벤치마크한 뒤에야 올바른 결론에 도달** — 실제 사용 모델(exaone3.5:7.8b) 기준으로는 베이스라인이 2/4에 불과했고, 문구 추가로 3/4로 개선(JSON 유효성도 83%→92%, 지연시간 저하 없음) → 반영. **교훈: 프롬프트/모델 관련 벤치마크·튜닝 작업은 반드시 대시보드에 실제 선택된 모델 기준으로 할 것, 임의로 유명한 모델(Qwen 등)을 기본값으로 쓰지 말 것.** 이 과정에서 기존 토큰예산 테스트(`test_zero_shot_prompt_token_budget_average_under_200_tokens`)가 새 문구 때문에 깨져서(239 > 210 기준), Claude가 직접 250 기준으로 완화(주석에 사유 명시) — 이건 Task T의 정식 예산 재설계 전 임시 조치.
+3. **다음 세션 최우선 (사용자가 이번 세션 끝에 명시적으로 다음으로 이월시킴):**
+   1. **Task T — 가이드라인 미주입 버그 수정.** 설정 패널에서 로드한 가이드라인이 실제로는 LLM 프롬프트에 전혀 전달 안 되고 있음(파싱만 되고 표시만 됨 — `PromptBuilder::guidelines()`가 `commands.rs`의 `analyze_paragraph`에서 한 번도 호출 안 됨). `GuidelineSet::build_prompt_rules()`는 이미 구현·테스트까지 돼 있음, 그냥 안 불림. 설계 합의 완료(`QUESTION_PROMPT_PIPELINE_THREE_FIXES.md` + 양쪽 답변): 프론트가 `GuidelineSet` 구조체 그대로(사전포맷 문자열 아님) `analyze_paragraph`에 새 sibling 파라미터(`AnalysisOptions`류, `ParagraphPayload`는 건드리지 말 것 — 순수 에디터 텔레메트리 프로토콜이라 오염시키면 안 됨)로 전달, Rust가 `build_prompt_rules()` 호출.
+   2. **Task U — 수정이력 Phase 2.** Task T가 만드는 `AnalysisOptions` 파이프를 재사용해서, `appliedCards` 중 현재 문단과 관련성 높은 Top-K(≤2~3)를 프론트에서 뽑아 LLM 프롬프트에 "User Preferences:" 블록으로 주입(매치 없으면 토큰 0개 추가). 절대 퍼지매칭으로 자동 카드 생성/치환에 쓰지 말 것 — 이건 순전히 LLM 참고용 컨텍스트일 뿐. `dismissedCards`/`stale_obsolete`는 프롬프트에 절대 포함 금지.
+   3. Task T/U 완료 후, 토큰 예산 정식 재설계(현재 250 임시치 → Codex 400~450 / agy 450~500 권고, 트렁케이션 우선순위는 Codex 안: 이력 먼저 생략 → 그다음 가이드라인 룰단위 절삭 — 로 잠정 채택, 필요시 재검토).
+   4. **다국어 지원 설계 자문 (신규, 사용자가 이번 세션 끝에 제기, 아직 Codex/agy 자문 시작 안 함).** 현재 시스템 프롬프트가 "Korean target"/"Korean text"로 하드코딩돼 있어 영어/일본어/중국어 등 다른 대상언어 문서는 지원 불가. 사용자가 직접 짚은 세부 쟁점: ① 대시보드에 언어 선택 드롭다운을 둘지 vs 문서에서 자동감지할지, ② "검토 대상 문서의 언어"와 "오류 사유 설명 언어"는 서로 다른 축이라 이원화(예: 일본어 문서를 한국어 사용자가 검토)가 필요해 보인다는 점. 착수 시 반드시 Codex+agy 둘 다에게 먼저 설계 자문 구할 것(사용자도 이미 동의) — TM/가이드라인/카테고리 체계 전체가 한국어 전제로 짜여 있어서 예상보다 스코프가 클 수 있음.
+   5. **이번 세션 기능 전부(아카이브 UI~다중이슈 개선까지) 자동테스트만 통과했고 실제 InDesign 라이브 검증은 세션 종료 시점까지 미완**(사용자가 하이라이트/자동스크롤/카드클릭위치찾기는 라이브로 "모두 좋다" 확인했으나, obsolete-card 수정과 Phase 1의 완전한 재검증 절차는 못 마침) — 다음 세션 시작 시 어디까지 확인됐는지 먼저 물어볼 것.
+   6. 그 뒤 백로그: `start_batch_scan`(문서 전체 일괄 검사), 동일 이슈 일괄 적용, Word taskpane 인프라.
 4. **협업 원칙 (계속 유지, [[feedback_agy_consult_when_stuck]] / [[feedback_blast_radius_underestimation]] 필독):**
    - 원인 불명 현상이든 사용자 제안이든, Claude 혼자 깊게 파고들지 말 것 — 가벼운 확인(파일 1~2개)만 하고 곧바로 Codex(`codex exec -C "D:\data\dev\App\SmartLinter" --approve-for-me '...'`)와 agy(`agy -p '...' --add-dir "D:\data\dev\App\SmartLinter" --print-timeout 15m --dangerously-skip-permissions --sandbox`) 양쪽에 공유.
    - **두 모델 의견이 상충하거나 한쪽만 잔여위험을 경고했을 때, Claude가 톤/확신도로 스스로 편들어 조용히 결정하지 말 것.** 그 상충/경고 차이 자체를 다시 양쪽에 명시적으로 보여주고 재조율된 답을 받는 라운드를 한 번 더 거칠 것 — 이번 세션 obsolete-card 버그에서 실제로 이 라운드를 거쳐 정확한 결론에 도달함(위 1edb2ec 참고). 과거 Task K→L 사고도 이 원칙을 안 지켜서 발생했었음.
    - Codex 구현 → Claude가 `git diff`를 **파일 단위 + 라인 단위** 둘 다 확인(지시 범위 밖 변경 없는지, 같은 파일 안에서도 불필요한 부분 안 건드렸는지, 텍스트 언어 등 사소한 디테일도) → `cargo test`/`npm test`/`npm run test:ui`/`npm run build` 독립 재실행 → 통과하면 즉시 커밋(uncommitted 오래 방치 금지).
    - **ExtendScript(`plugins/indesign/extendscript/*.jsx`) 파일엔 비ASCII 문자열(한글 등)을 절대 직접 넣지 말 것 — 반드시 `\uXXXX` 유니코드 이스케이프.** Node 테스트는 통과해도 실제 ExtendScript 엔진에서 daemon 평가 자체가 깨짐(3번째로 겪은 동일 패턴 버그, Task I). Codex에게 이 디렉토리 작업을 시킬 때마다 매번 이 제약을 지시서에 명시할 것.
    - 프롬프트에 큰따옴표(`"`)를 넣으면 PowerShell/CLI 인자가 깨짐 — 본문에 큰따옴표 아예 넣지 말 것.
+   - **(신규) Codex가 `powershell.exe -Command`로 `taskkill`을 실행할 땐 `//F`가 아니라 `/F`(홑슬래시)를 써야 함.** `//F`는 Claude의 Bash 도구(MSYS 환경) 관례고, Codex는 네이티브 PowerShell을 통해 실행하므로 `taskkill //F ...`를 그대로 쓰면 `Invalid argument/option` 에러로 실패해 `smart-linter.exe`를 못 죽이고 빌드가 파일 잠금으로 실패함(이번 세션 다중이슈 벤치마크 태스크에서 실제 발생). Codex에게 프로세스 종료를 시킬 땐 `Stop-Process -Name smart-linter -Force` 같은 PowerShell 네이티브 cmdlet을 쓰라고 지시하거나, `taskkill /F /IM smart-linter.exe /T`(홑슬래시)로 명시할 것.
+   - **(신규) 로컬 LLM 관련 벤치마크/프롬프트 튜닝 작업을 Codex에게 시킬 땐, 반드시 "대시보드에서 실제 선택돼 있는 모델"을 명시해서 알려줄 것 — Qwen 등 그럴듯한 기본값을 임의로 쓰게 두지 말 것.** 이번 세션에 Codex가 기본으로 `qwen2.5:latest`를 썼다가 사용자가 "그건 안 쓰는 모델(중국어로 답하는 문제로 배제함), 실제로는 exaone3.5:7.8b(또는 gemma2)를 쓴다"고 정정 → 재벤치마크해서야 올바른 결론(문구 개선이 실제로 효과 있음)에 도달함. `curl http://127.0.0.1:11434/api/tags`로 설치된 모델 목록은 확인 가능하지만, "그중 무엇이 지금 선택돼 있는지"는 사용자에게 확인하거나 앱 헤더를 봐야 함.
 5. **앱 클린 재기동 절차(Rust/ExtendScript 변경 후 필요, 프론트엔드 TS/React만 바뀌었으면 재기동 불필요 — Vite HMR로 충분):**
    ```
    tasklist | grep -iE "smart-linter"
