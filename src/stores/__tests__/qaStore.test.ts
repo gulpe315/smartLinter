@@ -27,6 +27,21 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(state.activeCardId).toBeNull();
   });
 
+  it('archives an obsolete card in dismissedCards instead of leaving it active', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-obsolete', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+    });
+    useQaStore.getState().setActiveCardId(cardId);
+
+    useQaStore.getState().markCardObsolete(cardId);
+
+    expect(useQaStore.getState().cards).toEqual([]);
+    expect(useQaStore.getState().dismissedCards).toEqual([
+      expect.objectContaining({ id: cardId, status: 'stale_obsolete', errorMessage: undefined }),
+    ]);
+    expect(useQaStore.getState().activeCardId).toBeNull();
+  });
+
   it('adds individual QA cards and computes unique IDs', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'para-001',

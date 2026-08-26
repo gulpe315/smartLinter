@@ -162,16 +162,43 @@ describe('QACardItem Component', () => {
   it('shows a clear notice when the paragraph cannot be located', async () => {
     const service = new MockBridgeService();
     const markObsolete = vi.fn();
-    vi.spyOn(service, 'locateParagraph').mockResolvedValue({ found: false });
+    vi.spyOn(service, 'locateParagraph').mockResolvedValue({ status: 'NOT_FOUND' });
+    setBridgeService(service);
+    render(<QACardItem card={sampleCard} onMarkObsolete={markObsolete} />);
+
+    fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
+
+    await waitFor(() => expect(markObsolete).toHaveBeenCalledWith('card-101'));
+  });
+
+  it('keeps the card active and explains an ambiguous paragraph location', async () => {
+    const service = new MockBridgeService();
+    const markObsolete = vi.fn();
+    vi.spyOn(service, 'locateParagraph').mockResolvedValue({ status: 'AMBIGUOUS' });
     setBridgeService(service);
     render(<QACardItem card={sampleCard} onMarkObsolete={markObsolete} />);
 
     fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
 
     expect(await screen.findByTestId('qa-locate-error')).toHaveTextContent(
-      '문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.'
+      '동일한 내용의 문단이 여러 곳에 있어 위치를 자동으로 특정할 수 없습니다. 문서에서 직접 확인해 주세요.'
     );
-    expect(markObsolete).toHaveBeenCalledWith('card-101');
+    expect(markObsolete).not.toHaveBeenCalled();
+  });
+
+  it('keeps the card active and explains a paragraph selection failure', async () => {
+    const service = new MockBridgeService();
+    const markObsolete = vi.fn();
+    vi.spyOn(service, 'locateParagraph').mockResolvedValue({ status: 'SELECTION_FAILED' });
+    setBridgeService(service);
+    render(<QACardItem card={sampleCard} onMarkObsolete={markObsolete} />);
+
+    fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
+
+    expect(await screen.findByTestId('qa-locate-error')).toHaveTextContent(
+      '문단을 찾았지만 선택하지 못했습니다. 잠긴 프레임이거나 다른 작업이 진행 중일 수 있습니다. 다시 시도해 주세요.'
+    );
+    expect(markObsolete).not.toHaveBeenCalled();
   });
 
   it('visually distinguishes an obsolete card, disables apply, and still allows dismissal', () => {

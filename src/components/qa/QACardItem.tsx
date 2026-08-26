@@ -80,9 +80,22 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     setLocateError(null);
     try {
       const result = await getBridgeService().locateParagraph(card.paragraphId, card.paragraphHash);
-      if (!result.found) {
-        setLocateError(result.message || '문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.');
-        onMarkObsolete?.(card.id);
+      switch (result.status) {
+        case 'FOUND':
+          break;
+        case 'NOT_FOUND':
+          onMarkObsolete?.(card.id);
+          break;
+        case 'AMBIGUOUS':
+          setLocateError('동일한 내용의 문단이 여러 곳에 있어 위치를 자동으로 특정할 수 없습니다. 문서에서 직접 확인해 주세요.');
+          break;
+        case 'SELECTION_FAILED':
+          setLocateError('문단을 찾았지만 선택하지 못했습니다. 잠긴 프레임이거나 다른 작업이 진행 중일 수 있습니다. 다시 시도해 주세요.');
+          break;
+        case 'ERROR':
+        default:
+          setLocateError('InDesign 연결 상태를 확인할 수 없습니다. 다시 시도해 주세요.');
+          break;
       }
     } catch (_error) {
       setLocateError('문단을 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.');

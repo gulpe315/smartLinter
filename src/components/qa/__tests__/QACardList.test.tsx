@@ -165,18 +165,19 @@ describe('QACardList Component', () => {
     expect(screen.getByText('LLM 분석 중...')).toBeInTheDocument();
   });
 
-  it('marks a card obsolete and disables apply when its paragraph cannot be located', async () => {
+  it('archives a card when its paragraph is confirmed absent', async () => {
     useQaStore.getState().addCard({
       id: 'missing-paragraph-card', paragraphId: 'para-missing', paragraphHash: 'old-hash',
       category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
     });
-    vi.spyOn(mockBridge, 'locateParagraph').mockResolvedValue({ found: false });
+    vi.spyOn(mockBridge, 'locateParagraph').mockResolvedValue({ status: 'NOT_FOUND' });
 
     render(<QACardList />);
     fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
 
-    await waitFor(() => expect(useQaStore.getState().cards[0].status).toBe('stale_obsolete'));
-    expect(screen.getByTestId('qa-card-obsolete-notice')).toBeInTheDocument();
-    expect(screen.getByTestId('qa-accept-action-btn')).toBeDisabled();
+    await waitFor(() => expect(useQaStore.getState().cards).toHaveLength(0));
+    expect(useQaStore.getState().dismissedCards).toEqual([
+      expect.objectContaining({ id: 'missing-paragraph-card', status: 'stale_obsolete' }),
+    ]);
   });
 });

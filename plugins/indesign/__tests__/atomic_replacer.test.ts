@@ -203,7 +203,7 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(targetParagraph.contents, paragraphText);
         });
 
-        it('does not select a paragraph when its locator hash is stale', () => {
+        it('returns NOT_FOUND when a completed story scan finds no hash matches', () => {
             const paragraphText = 'This paragraph has changed.';
             const targetParagraph = env.createParagraph(paragraphText, 'locate-stale');
             (env.activeDocument as any).stories = {
@@ -225,6 +225,54 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
 
             assert.equal(result.status, 'NOT_FOUND');
             assert.equal(selected, false);
+            assert.equal(targetParagraph.contents, paragraphText);
+        });
+
+        it('returns AMBIGUOUS when a story scan finds multiple hash matches', () => {
+            const paragraphText = 'Duplicate paragraph text.';
+            const firstParagraph = env.createParagraph(paragraphText, 'locate-ambiguous');
+            const secondParagraph = env.createParagraph(paragraphText, 'locate-ambiguous');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'locate-ambiguous'
+                    ? { paragraphs: [firstParagraph, secondParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            let selected = false;
+            app.select = () => { selected = true; };
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.locateParagraph({
+                commandId: 'locate-ambiguous-001',
+                paragraphId: 'indesign-para-locate-ambiguous-99',
+                baseHash: computeParagraphHash(paragraphText)
+            });
+
+            assert.equal(result.status, 'AMBIGUOUS');
+            assert.equal(selected, false);
+        });
+
+        it('returns SELECTION_FAILED when a located paragraph cannot be selected', () => {
+            const paragraphText = 'Selection failure paragraph.';
+            const targetParagraph = env.createParagraph(paragraphText, 'locate-selection-failure');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'locate-selection-failure'
+                    ? { paragraphs: [targetParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            app.select = () => { throw new Error('Selection is unavailable'); };
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.locateParagraph({
+                commandId: 'locate-selection-failure-001',
+                paragraphId: 'indesign-para-locate-selection-failure-0',
+                baseHash: computeParagraphHash(paragraphText)
+            });
+
+            assert.equal(result.status, 'SELECTION_FAILED');
             assert.equal(targetParagraph.contents, paragraphText);
         });
 

@@ -221,13 +221,17 @@ export const useQaStore = create<QAState>((set, get) => ({
   },
 
   markCardObsolete: (cardId) => {
-    set((state) => ({
-      cards: state.cards.map((card) =>
-        card.id === cardId
-          ? { ...card, status: 'stale_obsolete', errorMessage: undefined }
-          : card
-      ),
-    }));
+    set((state) => {
+      const target = state.cards.find((c) => c.id === cardId);
+      if (!target) return state;
+
+      const updatedTarget: QACardData = { ...target, status: 'stale_obsolete', errorMessage: undefined };
+      return {
+        cards: state.cards.filter((c) => c.id !== cardId),
+        dismissedCards: [updatedTarget, ...state.dismissedCards],
+        activeCardId: state.activeCardId === cardId ? null : state.activeCardId,
+      };
+    });
   },
 
   updateSuggestedSegment: (cardId, newText) => {

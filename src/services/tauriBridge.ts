@@ -92,6 +92,11 @@ export interface BridgeEventMap {
 
 export type BridgeEventName = keyof BridgeEventMap;
 export type BridgeEventHandler<K extends BridgeEventName> = (payload: BridgeEventMap[K]) => void;
+export type LocateParagraphStatus = 'FOUND' | 'NOT_FOUND' | 'AMBIGUOUS' | 'SELECTION_FAILED' | 'ERROR';
+export interface LocateParagraphResult {
+  status: LocateParagraphStatus;
+  message?: string;
+}
 
 /**
  * Abstract interface for event subscription & backend communication
@@ -107,7 +112,7 @@ export interface IBridgeService {
   sendReplacementCommand(command: ReplacementCommand): Promise<ReplacementResult>;
 
   /** Selects a QA paragraph in InDesign without editing its document contents. */
-  locateParagraph(paragraphId: string, baseHash?: string): Promise<{ found: boolean; message?: string }>;
+  locateParagraph(paragraphId: string, baseHash?: string): Promise<LocateParagraphResult>;
 
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
@@ -425,8 +430,8 @@ export class MockBridgeService implements IBridgeService {
     return result;
   }
 
-  async locateParagraph(_paragraphId: string, _baseHash?: string): Promise<{ found: boolean; message?: string }> {
-    return { found: true, message: 'Mock paragraph located successfully' };
+  async locateParagraph(_paragraphId: string, _baseHash?: string): Promise<LocateParagraphResult> {
+    return { status: 'FOUND', message: 'Mock paragraph located successfully' };
   }
 
   async fetchBridgeHealth(): Promise<BridgeStatusPayload> {
@@ -656,19 +661,19 @@ export class TauriBridgeService implements IBridgeService {
     return this.fallbackService.sendReplacementCommand(command);
   }
 
-  async locateParagraph(paragraphId: string, baseHash?: string): Promise<{ found: boolean; message?: string }> {
+  async locateParagraph(paragraphId: string, baseHash?: string): Promise<LocateParagraphResult> {
     if (!this.isTauriAvailable()) {
       return this.fallbackService.locateParagraph(paragraphId, baseHash);
     }
 
     try {
-      const result: { status: string; message?: string } = await invoke('locate_paragraph_in_editor', {
+      const result: LocateParagraphResult = await invoke('locate_paragraph_in_editor', {
         paragraphId,
         baseHash,
       });
-      return { found: result.status === 'FOUND', message: result.message };
+      return result;
     } catch (e) {
-      return { found: false, message: e instanceof Error ? e.message : String(e) };
+      return { status: 'ERROR', message: e instanceof Error ? e.message : String(e) };
     }
   }
 

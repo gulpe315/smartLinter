@@ -56,9 +56,9 @@
      * @param {Object} doc InDesign Document reference
      * @param {string} paragraphId Stable paragraph identifier
      * @param {string} [baseHash] Hash of the paragraph when the command was created
-     * @returns {Object|null} InDesign Paragraph reference, or null when absent
+     * @returns {{story: Object, paragraphIndex: number}|null} Resolved Story and index hint, or null when unavailable
      */
-    function findParagraphById(doc, paragraphId, baseHash) {
+    function resolveStoryForParagraphId(doc, paragraphId) {
         var prefix = 'indesign-para-';
         if (!doc || typeof paragraphId !== 'string' || paragraphId.indexOf(prefix) !== 0) {
             return null;
@@ -77,20 +77,43 @@
         }
 
         var paragraphIndex = parseInt(indexText, 10);
-        try {
-            if (!doc.stories || typeof doc.stories.itemByID !== 'function') {
-                return null;
-            }
+        if (!doc.stories || typeof doc.stories.itemByID !== 'function') {
+            return null;
+        }
 
-            // InDesign's itemByID expects a Number.  Preserve the string lookup
-            // only for non-numeric/custom ids used by compatible DOM adapters.
-            var numericStoryId = parseInt(storyId, 10);
-            var story = isNaN(numericStoryId)
-                ? doc.stories.itemByID(storyId)
-                : doc.stories.itemByID(numericStoryId);
-            if (!story || story.isValid === false || !story.paragraphs) {
+        // InDesign's itemByID expects a Number.  Preserve the string lookup
+        // only for non-numeric/custom ids used by compatible DOM adapters.
+        var numericStoryId = parseInt(storyId, 10);
+        var story = isNaN(numericStoryId)
+            ? doc.stories.itemByID(storyId)
+            : doc.stories.itemByID(numericStoryId);
+        if (!story || story.isValid === false || !story.paragraphs) {
+            return null;
+        }
+        return { story: story, paragraphIndex: paragraphIndex };
+    }
+
+    function scanStoryForHashMatches(story, baseHash) {
+        var matches = [];
+        for (var i = 0; i < story.paragraphs.length; i++) {
+            var paragraph = story.paragraphs[i];
+            if (paragraph && paragraph.isValid !== false &&
+                    getHashUtil().computeParagraphHash(paragraph.contents || '', true)
+                        .toLowerCase() === baseHash.toLowerCase()) {
+                matches.push(paragraph);
+            }
+        }
+        return matches;
+    }
+
+    function findParagraphById(doc, paragraphId, baseHash) {
+        try {
+            var resolved = resolveStoryForParagraphId(doc, paragraphId);
+            if (!resolved) {
                 return null;
             }
+            var story = resolved.story;
+            var paragraphIndex = resolved.paragraphIndex;
 
             // Fast path: the stored index still identifies the original
             // paragraph. Verify the hash before accepting it, as an index can
@@ -113,18 +136,7 @@
                 return null;
             }
 
-            var matches = [];
-            for (var i = 0; i < story.paragraphs.length; i++) {
-                paragraph = story.paragraphs[i];
-                if (paragraph && paragraph.isValid !== false &&
-                        getHashUtil().computeParagraphHash(paragraph.contents || '', true)
-                            .toLowerCase() === baseHash.toLowerCase()) {
-                    matches.push(paragraph);
-                    if (matches.length > 1) {
-                        return null;
-                    }
-                }
-            }
+            var matches = scanStoryForHashMatches(story, baseHash);
             return matches.length === 1 ? matches[0] : null;
         } catch (e) {
             // itemByID and unresolved DOM specifiers can throw in InDesign.
@@ -241,26 +253,53 @@
      * Locates and selects a QA paragraph without changing document contents.
      * @param {{commandId: string, paragraphId: string, baseHash?: string}} command
      * @param {Object} [options]
-     * @returns {{commandId: string, status: 'FOUND'|'NOT_FOUND', message: string}}
+     * @returns {{commandId: string, status: 'FOUND'|'NOT_FOUND'|'AMBIGUOUS'|'SELECTION_FAILED'|'ERROR', message: string}}
      */
     SmartLinterAtomicReplacer.prototype.locateParagraph = function(command, options) {
         options = options || {};
         var commandId = command && command.commandId ? command.commandId : 'unknown';
         if (!command || typeof command.paragraphId !== 'string') {
-            return { commandId: commandId, status: 'NOT_FOUND', message: 'Invalid paragraph location command' };
+            return { commandId: commandId, status: 'ERROR', message: 'Invalid paragraph location command' };
         }
 
         var inApp = options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null);
-        var doc = inApp ? inApp.activeDocument : null;
-        var paragraph = findParagraphById(doc, command.paragraphId, command.baseHash);
-        if (!paragraph) {
-            return {
-                commandId: commandId,
-                status: 'NOT_FOUND',
-                message: 'The paragraph could not be found. The document may have changed.'
-            };
-        }
+        var doc;
+        var paragraph;
+        try {
+            doc = inApp ? inApp.activeDocument : null;
+            var resolved = resolveStoryForParagraphId(doc, command.paragraphId);
+            if (!resolved) {
+                return { commandId: commandId, status: 'ERROR', message: 'Unable to resolve the paragraph story.' };
+            }
 
+            var story = resolved.story;
+            if (resolved.paragraphIndex >= 0 && resolved.paragraphIndex < story.paragraphs.length) {
+                paragraph = story.paragraphs[resolved.paragraphIndex];
+                if (paragraph && paragraph.isValid !== false &&
+                        (!command.baseHash || getHashUtil().computeParagraphHash(paragraph.contents || '', true)
+                            .toLowerCase() === command.baseHash.toLowerCase())) {
+                    return selectLocatedParagraph(inApp, doc, paragraph, commandId);
+                }
+            }
+
+            if (!command.baseHash) {
+                return { commandId: commandId, status: 'ERROR', message: 'A paragraph hash is required to search the story.' };
+            }
+
+            var matches = scanStoryForHashMatches(story, command.baseHash);
+            if (matches.length === 0) {
+                return { commandId: commandId, status: 'NOT_FOUND', message: 'The paragraph could not be found in the story.' };
+            }
+            if (matches.length > 1) {
+                return { commandId: commandId, status: 'AMBIGUOUS', message: 'Multiple paragraphs match the stored paragraph hash.' };
+            }
+            return selectLocatedParagraph(inApp, doc, matches[0], commandId);
+        } catch (e) {
+            return { commandId: commandId, status: 'ERROR', message: 'Unable to resolve the paragraph location: ' + e.message };
+        }
+    };
+
+    function selectLocatedParagraph(inApp, doc, paragraph, commandId) {
         try {
             // Make the owning document/window active before selecting its text range.
             if (doc.windows && doc.windows.length > 0 && typeof doc.windows[0].activate === 'function') {
@@ -272,9 +311,9 @@
             inApp.select(paragraph.texts && paragraph.texts.length > 0 ? paragraph.texts[0] : paragraph);
             return { commandId: commandId, status: 'FOUND', message: 'Paragraph selected in InDesign' };
         } catch (e) {
-            return { commandId: commandId, status: 'NOT_FOUND', message: 'Unable to select the located paragraph: ' + e.message };
+            return { commandId: commandId, status: 'SELECTION_FAILED', message: 'Unable to select the located paragraph: ' + e.message };
         }
-    };
+    }
 
     /**
      * Applies a single hunk mutation to an InDesign Paragraph DOM element.

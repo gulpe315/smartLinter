@@ -433,7 +433,7 @@ mod platform {
             "baseHash": base_hash,
         });
         let script = format!(
-            "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{\n    var res = $.global.SmartLinterDaemonInstance.locateParagraph({command_json});\n    return JSON.stringify(res);\n  }}\n  return JSON.stringify({{ commandId: {}, status: 'NOT_FOUND', message: 'InDesign SmartLinterDaemonInstance is not initialized' }});\n}})();",
+            "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{\n    var res = $.global.SmartLinterDaemonInstance.locateParagraph({command_json});\n    return JSON.stringify(res);\n  }}\n  return JSON.stringify({{ commandId: {}, status: 'ERROR', message: 'InDesign SmartLinterDaemonInstance is not initialized' }});\n}})();",
             serde_json::to_string(&command_id).map_err(|error| format!("Cannot serialize locator command ID: {error}"))?
         );
         let _com = ComApartment::initialize()?;
