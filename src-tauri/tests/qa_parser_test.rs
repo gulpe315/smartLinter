@@ -111,7 +111,7 @@ fn test_prompt_builder_with_custom_guidelines() {
 }
 
 #[test]
-fn test_zero_shot_prompt_token_budget_average_under_200_tokens() {
+fn test_zero_shot_prompt_token_budget_average_under_250_tokens() {
     let samples: Vec<SampleEntry> = serde_json::from_str(SPIKE_DATASET_JSON).unwrap();
     assert_eq!(samples.len(), 10);
 
@@ -138,10 +138,15 @@ fn test_zero_shot_prompt_token_budget_average_under_200_tokens() {
     let avg_tokens = total_tokens as f64 / samples.len() as f64;
     println!("Average prompt token count across 10 samples: {:.2}", avg_tokens);
 
-    // Strict acceptance condition: average within ~200 tokens
+    // Acceptance condition: average within ~250 tokens. Raised from the original
+    // ~200 ceiling (SPIKE_RESULTS_TASK3.md) after the multi-issue detection clause
+    // was added to both system instructions (benchmark-validated recall/JSON-validity
+    // improvement, no latency regression) -- see prompt_builder.rs's instruction
+    // constants. Full budget/truncation redesign for guidelines + correction-history
+    // context is tracked separately for a future session.
     assert!(
-        avg_tokens <= 210.0,
-        "Average token count ({:.2}) exceeds 200 token budget",
+        avg_tokens <= 250.0,
+        "Average token count ({:.2}) exceeds 250 token budget",
         avg_tokens
     );
 }

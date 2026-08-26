@@ -7,10 +7,10 @@
 use crate::ai::types::{GenerateOptions, QueueJobRequest};
 
 /// Canonical compressed system instruction for fast paragraph QA linting.
-pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
 
 /// System instruction used when no source text is available for comparison.
-pub const MONOLINGUAL_SYSTEM_INSTRUCTION: &str = "You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+pub const MONOLINGUAL_SYSTEM_INSTRUCTION: &str = "You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
 
 /// Embedded raw Tera/template string.
 pub const QA_COMPRESSED_TEMPLATE: &str = include_str!("templates/qa_compressed.tera");
@@ -279,6 +279,14 @@ mod tests {
         assert!(req.system.as_deref().unwrap().contains("monolingual"));
         assert_eq!(req.prompt, "TEXT: 라인을 연길하세요");
         assert!(!req.prompt.contains("SRC:"));
+    }
+
+    #[test]
+    fn test_multi_issue_instruction_is_present_in_both_modes() {
+        const CLAUSE: &str = "Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.";
+
+        assert!(COMPRESSED_SYSTEM_INSTRUCTION.contains(CLAUSE));
+        assert!(MONOLINGUAL_SYSTEM_INSTRUCTION.contains(CLAUSE));
     }
 
     #[test]

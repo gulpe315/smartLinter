@@ -76,11 +76,32 @@ Target: {target}
 Please provide your comprehensive QA assessment in JSON:
 """
 
-COMPRESSED_SYSTEM_PROMPT = """You are a fast paragraph QA linter. Check Korean target against source for terminology, grammar, passive voice, numbers, and punctuation.
+BEFORE_COMPRESSED_SYSTEM_PROMPT = """You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself.
 Output JSON only matching this schema:
-{"status":"PASS"|"FAIL","issues":[{"rule":"...","original":"...","suggestion":"...","reason":"..."}]}"""
+{"status":"PASS"|"FAIL","issues":[{"category":"...","originalSegment":"...","suggestedSegment":"...","reason":"...","severity":"LOW"|"MEDIUM"|"HIGH"}]}"""
 
-def format_compressed_prompt(source: str, target: str) -> str:
-    return f"""{COMPRESSED_SYSTEM_PROMPT}
-SRC: {source}
-TGT: {target}"""
+AFTER_COMPRESSED_SYSTEM_PROMPT = """You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.
+Output JSON only matching this schema:
+{"status":"PASS"|"FAIL","issues":[{"category":"...","originalSegment":"...","suggestedSegment":"...","reason":"...","severity":"LOW"|"MEDIUM"|"HIGH"}]}"""
+
+BEFORE_MONOLINGUAL_SYSTEM_PROMPT = """You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself.
+Output JSON only matching this schema:
+{"status":"PASS"|"FAIL","issues":[{"category":"...","originalSegment":"...","suggestedSegment":"...","reason":"...","severity":"LOW"|"MEDIUM"|"HIGH"}]}"""
+
+AFTER_MONOLINGUAL_SYSTEM_PROMPT = """You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.
+Output JSON only matching this schema:
+{"status":"PASS"|"FAIL","issues":[{"category":"...","originalSegment":"...","suggestedSegment":"...","reason":"...","severity":"LOW"|"MEDIUM"|"HIGH"}]}"""
+
+# Current production default; explicit before/after variants support recall benchmarking.
+COMPRESSED_SYSTEM_PROMPT = BEFORE_COMPRESSED_SYSTEM_PROMPT
+
+def format_compressed_prompt(source: str, target: str, after: bool = True) -> str:
+    if source.strip():
+        system = AFTER_COMPRESSED_SYSTEM_PROMPT if after else BEFORE_COMPRESSED_SYSTEM_PROMPT
+        return f"""{system}
+SRC: {source.strip()}
+TGT: {target.strip()}"""
+
+    system = AFTER_MONOLINGUAL_SYSTEM_PROMPT if after else BEFORE_MONOLINGUAL_SYSTEM_PROMPT
+    return f"""{system}
+TEXT: {target.strip()}"""

@@ -115,5 +115,57 @@
     "expected_issues": [
       "요구사항 vs 요구조건"
     ]
+  },
+  {
+    "id": "multi_01_spacing_passive_typo",
+    "category": "multi_issue_spacing_passive_typo",
+    "source": "The report is automatically generated every day, and administrators can review the results in the console.",
+    "target": "\ubcf4\uace0\uc11c\ub294 \ub9e4\uc77c \uc790\ub3d9\uc73c\ub85c \uc0dd\uc131\ub418\uc5b4\uc9c0\uac8c \ub429\ub2c8\ub2e4. \uad00\ub9ac\uc790\ub294 \ucf58\uc194 \uc5d0\uc11c \uacb0\uacfc\ub97c \ud655\uc778\ud560 \uc218 \uc788\uc2b5\ub2c8\ub514.",
+    "word_count": 15,
+    "char_count": 55,
+    "expected_issues": [
+      "console particle spacing: \ucf58\uc194 \uc5d0\uc11c -> \ucf58\uc194\uc5d0\uc11c",
+      "awkward passive: \uc0dd\uc131\ub418\uc5b4\uc9c0\uac8c \ub429\ub2c8\ub2e4",
+      "typo: \uc788\uc2b5\ub2c8\ub514 -> \uc788\uc2b5\ub2c8\ub2e4"
+    ]
+  },
+  {
+    "id": "multi_02_number_spacing_typo",
+    "category": "multi_issue_number_spacing_typo",
+    "source": "Configure a 30 second timeout and retry the request twice before reporting an error.",
+    "target": "\uc694\uccad \uc2dc\uac04 \uc81c\ud55c\uc744 30\ucd08\ub85c \uc124\uc815\ud558\uace0 \uc624\ub958\ub97c \ubcf4\uace0\ud558\uae30 \uc804\uc5d0 \uc694\uccad\uc744 3\ubc88 \uc7ac\uc2dc\ub3c4\ud558\uc2ed\uc2dc\uc624. \uc124\uc815\uc744 \uc800\uc7a5\ud55c\ud6c4 \uc7ac\uc2dc\uc791\ud569\ub2c8\ub514.",
+    "word_count": 16,
+    "char_count": 71,
+    "expected_issues": [
+      "number mismatch: twice vs 3\ubc88",
+      "spacing: \uc800\uc7a5\ud55c\ud6c4 -> \uc800\uc7a5\ud55c \ud6c4",
+      "typo: \uc7ac\uc2dc\uc791\ud569\ub2c8\ub514 -> \uc7ac\uc2dc\uc791\ud569\ub2c8\ub2e4"
+    ]
+  },
+  {
+    "id": "multi_03_omission_passive_typo",
+    "category": "multi_issue_omission_passive_typo",
+    "source": "After the backup completes, the system sends an email notification and stores the archive for seven days.",
+    "target": "\uc2dc\uc2a4\ud15c\uc5d0 \uc758\ud574 \uc774\uba54\uc77c \uc54c\ub9bc\uc774 \uc804\uc1a1\ub418\uc5b4\uc9c0\uac8c \ub429\ub2c8\ub2e4. \uc544\uce74\uc774\ube0c\ub294 7\uc77c \ub3d9\uc548 \ubcf4\uad00\ub429\ub2c8\ub514.",
+    "word_count": 15,
+    "char_count": 68,
+    "expected_issues": [
+      "omission: after the backup completes",
+      "awkward passive: \uc804\uc1a1\ub418\uc5b4\uc9c0\uac8c \ub429\ub2c8\ub2e4",
+      "typo: \ubcf4\uad00\ub429\ub2c8\ub514 -> \ubcf4\uad00\ub429\ub2c8\ub2e4"
+    ]
+  },
+  {
+    "id": "multi_04_untranslated_spacing_typo",
+    "category": "multi_issue_untranslated_spacing_typo",
+    "source": "Open the Settings menu, enable automatic updates, and save the changes before closing the application.",
+    "target": "Settings \uba54\ub274\ub97c \uc5f4\uc5b4 \uc790\ub3d9 \uc5c5\ub370\uc774\ud2b8\ub97c \ud65c\uc131\ud654\ud558\uace0 \ubcc0\uacbd \uc0ac\ud56d\uc744 \uc800\uc7a5\ud55c\ud6c4 \uc751\uc6a9 \ud504\ub85c\uadf8\ub7a8\uc744 \ub2eb\uc73c\uc2ed\uc2dc\uc624. \uc124\uc815\uc744 \ub2e4\uc2dc \uc5f4\uba74 \ud655\uc778\ud569\ub2c8\ub514.",
+    "word_count": 15,
+    "char_count": 76,
+    "expected_issues": [
+      "untranslated term: Settings",
+      "spacing: \uc800\uc7a5\ud55c\ud6c4 -> \uc800\uc7a5\ud55c \ud6c4",
+      "typo: \ud655\uc778\ud569\ub2c8\ub514 -> \ud655\uc778\ud569\ub2c8\ub2e4"
+    ]
   }
 ]
