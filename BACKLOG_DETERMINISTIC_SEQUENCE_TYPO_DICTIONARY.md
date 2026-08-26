@@ -396,6 +396,45 @@ BCP-47-keyed 4) merge logic wired into `analyze_paragraph` per the
 5-row merge table, plus regression tests.
 
 Both models have now independently said GO with no open disagreements.
-Implementation has not started -- awaiting explicit user go-ahead given
-the scope (schema change touching `QaIssue` + new Rust module + merge
-logic + data files).
+
+## Implementation complete, backend only (2026-08-26)
+
+User approved and all 4 of agy's recommended steps landed, each
+independently reviewed (diff, `cargo test`) and committed separately:
+
+1. `dbcf64e` -- optional offset/provenance/confidence/rule_id/
+   conflict_group_id fields on `QaIssue` (Rust + TS), no behavior change.
+2. `a4c11c0` -- standalone `src-tauri/src/deterministic_qa` module: 3-tier
+   gating ported from the precision spike, BCP-47-keyed embedded
+   `dictionary.json` (ko only for v1), particle-whitelist trailing
+   boundary for Tier 1. Not wired anywhere yet at this point.
+3. `2bfd482` -- `deterministic_qa::merge()` implementing the 5-row merge
+   table (connected-component grouping via union-find for partial
+   overlaps), wired into `analyze_paragraph` after a successful LLM
+   report. Unvalidated-language early return is untouched.
+
+67/67 Rust lib tests pass (up from 57 at session start), no regressions.
+Bridge server rebuilt and restarted cleanly after the Rust changes
+(`npx tauri dev --no-watch`); not yet live-verified against real InDesign
+input.
+
+**Deliberately not done (v1 scope, per the reconciled design):**
+- Frontend does not yet render `provenance`/`conflict_group_id`/
+  `confidence` -- deterministic issues currently render as ordinary QA
+  cards, indistinguishable from LLM ones. The backlog's original design
+  explicitly deferred "복잡한 충돌 해결 UI" to v2; a minimal visual badge
+  (e.g. a "결정론" tag reusing the existing badge pattern) is optional
+  polish, not yet requested or scoped.
+- No live InDesign verification yet -- only unit tests (`merge()` and
+  `detect()` directly). Next session/turn should live-verify: type a
+  known v1-category typo (e.g. "일오일, 월요일, 화요일") into a connected
+  InDesign document and confirm a QA card appears immediately (should not
+  need to wait for/depend on the LLM call at all for Tier 1 hits, though
+  today's wiring runs it after the LLM call completes, not before -- so
+  latency is still LLM-bound in v1; making the deterministic pass return
+  instantly ahead of the LLM call is a possible future optimization, not
+  done here).
+- Real-world precision beyond the spike's 41-case corpus is still
+  unmeasured -- agy's caveat about dictionary entries eventually
+  colliding with proper nouns/terminology as the dictionary grows past v1
+  size still applies; no collision-check tooling has been built.
