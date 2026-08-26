@@ -61,5 +61,33 @@
     "source": "The dashboard refreshes automatically every five minutes while the report is open.",
     "target": "The dashboard refreshes automatically every five minutes while the report is open.",
     "seeded_error": null
+  },
+  {
+    "id": "en_holdout_missing_article_save_window",
+    "mode": "monolingual",
+    "source": "",
+    "target": "Save changes and close window.",
+    "seeded_error": {"kind": "missing word", "original": "close window", "suggested": "close the window"}
+  },
+  {
+    "id": "en_holdout_missing_article_review_report",
+    "mode": "monolingual",
+    "source": "",
+    "target": "Review report before the meeting.",
+    "seeded_error": {"kind": "missing word", "original": "Review report", "suggested": "Review the report"}
+  },
+  {
+    "id": "en_holdout_clarity_invoice_agent",
+    "mode": "monolingual",
+    "source": "",
+    "target": "The invoice was reviewed by the accountant and was later approved by them.",
+    "seeded_error": {"kind": "clarity", "original": "was later approved by them", "suggested": "the accountant later approved it"}
+  },
+  {
+    "id": "en_holdout_clarity_configuration_agent",
+    "mode": "monolingual",
+    "source": "",
+    "target": "The configuration was prepared by the operations team and was subsequently published by them.",
+    "seeded_error": {"kind": "clarity", "original": "was subsequently published by them", "suggested": "the operations team subsequently published it"}
   }
 ]

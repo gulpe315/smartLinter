@@ -1,0 +1,4217 @@
+{
+  "timestamp": "2026-08-26T16:27:27+0900",
+  "model": "exaone3.5:7.8b",
+  "repetitions": 3,
+  "dataset": "english_profile_dataset.json",
+  "warmup": {
+    "wall_latency_ms": 14582.34,
+    "ttft_ms": 8065.02,
+    "prompt_tokens": 197,
+    "prompt_eval_time_ms": 2240.76,
+    "prompt_eval_tps": 87.92,
+    "gen_tokens": 58,
+    "gen_time_ms": 6432.24,
+    "gen_tps": 9.02,
+    "total_server_dur_ms": 14322.84,
+    "load_dur_ms": 5646.79,
+    "json_valid": true,
+    "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Incorrect spelling of 'receive'.\",\"severity\":\"MEDIUM\"}\n]}",
+    "parsed_json": {
+      "status": "FAIL",
+      "issues": [
+        {
+          "category": "Spelling",
+          "originalSegment": "recieve",
+          "suggestedSegment": "receive",
+          "reason": "Incorrect spelling of 'receive'.",
+          "severity": "MEDIUM"
+        }
+      ]
+    }
+  },
+  "instruction_texts": {
+    "english_monolingual": "You are a fast English monolingual paragraph QA linter. Inspect the English text itself for grammar, spelling, typos, missing words, clarity, and punctuation. Do not return PASS merely because no source is available; always inspect the text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}",
+    "english_bilingual": "You are a fast bilingual paragraph QA linter. Check the English target against the source for translation fidelity, omissions, grammar, spelling, typos, clarity, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}",
+    "english_monolingual_fewshot": "You are a fast English monolingual paragraph QA linter. Inspect the English text itself for grammar, spelling, typos, missing words, clarity, and punctuation. Do not return PASS merely because no source is available; always inspect the text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}\nApply these concrete checks. In ordinary sentence prose, flag a missing required article or determiner before a singular countable noun. Do not apply this rule to product names, labels, headings, or quoted UI text.\n\nExample 1\nInput: Open dashboard and select Users.\nOutput:\n{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Open dashboard\",\"suggestedSegment\":\"Open the dashboard\",\"reason\":\"The singular countable noun needs the article 'the' in this sentence.\",\"severity\":\"LOW\"}]}\n\nFlag unclear or unnecessarily indirect wording when a repeated agent is referred to less directly in consecutive actions. Do not flag passive voice merely for being passive; flag it only when the wording reduces clarity or creates needless repetition.\n\nExample 2\nInput: The audit was completed by the security team and was then submitted by them for approval.\nOutput:\n{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was then submitted by them\",\"suggestedSegment\":\"the security team then submitted it\",\"reason\":\"The repeated agent reference is unnecessarily indirect; an active construction is clearer.\",\"severity\":\"LOW\"}]}",
+    "english_bilingual_fewshot": "You are a fast bilingual paragraph QA linter. Check the English target against the source for translation fidelity, omissions, grammar, spelling, typos, clarity, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}\nApply these concrete checks. In ordinary sentence prose, flag a missing required article or determiner before a singular countable noun. Do not apply this rule to product names, labels, headings, or quoted UI text.\n\nExample 1\nInput: Open dashboard and select Users.\nOutput:\n{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Open dashboard\",\"suggestedSegment\":\"Open the dashboard\",\"reason\":\"The singular countable noun needs the article 'the' in this sentence.\",\"severity\":\"LOW\"}]}\n\nFlag unclear or unnecessarily indirect wording when a repeated agent is referred to less directly in consecutive actions. Do not flag passive voice merely for being passive; flag it only when the wording reduces clarity or creates needless repetition.\n\nExample 2\nInput: The audit was completed by the security team and was then submitted by them for approval.\nOutput:\n{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was then submitted by them\",\"suggestedSegment\":\"the security team then submitted it\",\"reason\":\"The repeated agent reference is unnecessarily indirect; an active construction is clearer.\",\"severity\":\"LOW\"}]}"
+  },
+  "summaries": {
+    "english": {
+      "runs": 39,
+      "seeded_error_recall_pct": 42.42,
+      "seed_recall_pct": 66.67,
+      "holdout_recall_pct": 0.0,
+      "false_positive_rate_clean_pct": 0.0,
+      "json_valid_rate_pct": 100.0,
+      "mean_latency_ms": 7155.53,
+      "p95_latency_ms": 17692.81,
+      "mean_prompt_tokens": 199.62,
+      "case_runs": {
+        "en_mono_typo_receive": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_grammar_subject_verb": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_missing_article": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_mono_awkward_passive": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_mono_missing_comma": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_bilingual_omission": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_bilingual_number_mismatch": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_clean": [
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          }
+        ],
+        "en_bilingual_clean": [
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          }
+        ],
+        "en_holdout_missing_article_save_window": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_holdout_missing_article_review_report": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_holdout_clarity_invoice_agent": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_holdout_clarity_configuration_agent": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ]
+      }
+    },
+    "korean_baseline": {
+      "runs": 39,
+      "seeded_error_recall_pct": 42.42,
+      "seed_recall_pct": 66.67,
+      "holdout_recall_pct": 0.0,
+      "false_positive_rate_clean_pct": 50.0,
+      "json_valid_rate_pct": 100.0,
+      "mean_latency_ms": 13443.76,
+      "p95_latency_ms": 26795.36,
+      "mean_prompt_tokens": 206.54,
+      "case_runs": {
+        "en_mono_typo_receive": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_grammar_subject_verb": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_missing_article": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_mono_awkward_passive": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_mono_missing_comma": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_bilingual_omission": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_bilingual_number_mismatch": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_clean": [
+          {
+            "clean": false
+          },
+          {
+            "clean": false
+          },
+          {
+            "clean": false
+          }
+        ],
+        "en_bilingual_clean": [
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          }
+        ],
+        "en_holdout_missing_article_save_window": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_holdout_missing_article_review_report": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_holdout_clarity_invoice_agent": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_holdout_clarity_configuration_agent": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ]
+      }
+    },
+    "english_fewshot": {
+      "runs": 39,
+      "seeded_error_recall_pct": 90.91,
+      "seed_recall_pct": 85.71,
+      "holdout_recall_pct": 100.0,
+      "false_positive_rate_clean_pct": 50.0,
+      "json_valid_rate_pct": 100.0,
+      "mean_latency_ms": 12005.2,
+      "p95_latency_ms": 19794.11,
+      "mean_prompt_tokens": 459.62,
+      "case_runs": {
+        "en_mono_typo_receive": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_grammar_subject_verb": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_missing_article": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_awkward_passive": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_missing_comma": [
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          },
+          {
+            "seeded_error_caught": false
+          }
+        ],
+        "en_bilingual_omission": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_bilingual_number_mismatch": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_mono_clean": [
+          {
+            "clean": false
+          },
+          {
+            "clean": false
+          },
+          {
+            "clean": false
+          }
+        ],
+        "en_bilingual_clean": [
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          },
+          {
+            "clean": true
+          }
+        ],
+        "en_holdout_missing_article_save_window": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_holdout_missing_article_review_report": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_holdout_clarity_invoice_agent": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ],
+        "en_holdout_clarity_configuration_agent": [
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          },
+          {
+            "seeded_error_caught": true
+          }
+        ]
+      }
+    }
+  },
+  "records": [
+    {
+      "wall_latency_ms": 6846.5,
+      "ttft_ms": 219.94,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 119.33,
+      "prompt_eval_tps": 1650.95,
+      "gen_tokens": 58,
+      "gen_time_ms": 6531.14,
+      "gen_tps": 8.88,
+      "total_server_dur_ms": 6744.78,
+      "load_dur_ms": 91.29,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Incorrect spelling of 'receive'.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Incorrect spelling of 'receive'.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 18435.23,
+      "ttft_ms": 3184.54,
+      "prompt_tokens": 206,
+      "prompt_eval_time_ms": 3023.3,
+      "prompt_eval_tps": 68.14,
+      "gen_tokens": 127,
+      "gen_time_ms": 15012.13,
+      "gen_tps": 8.46,
+      "total_server_dur_ms": 18163.56,
+      "load_dur_ms": 107.18,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Incorrect spelling of 'receive'\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Context Mismatch\",\"originalSegment\":\"deployment completes\",\"suggestedSegment\":\"배포 완료\",\"reason\":\"The term 'deployment completes' is in English while the rest of the text is in Korean. Consistency should be maintained in language use.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Incorrect spelling of 'receive'",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Context Mismatch",
+            "originalSegment": "deployment completes",
+            "suggestedSegment": "배포 완료",
+            "reason": "The term 'deployment completes' is in English while the rest of the text is in Korean. Consistency should be maintained in language use.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 19214.84,
+      "ttft_ms": 5030.38,
+      "prompt_tokens": 457,
+      "prompt_eval_time_ms": 4763.23,
+      "prompt_eval_tps": 95.94,
+      "gen_tokens": 118,
+      "gen_time_ms": 14014.1,
+      "gen_tps": 8.42,
+      "total_server_dur_ms": 18916.86,
+      "load_dur_ms": 108.16,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Misspelling of the word 'receive'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Grammar\",\"originalSegment\":\"the release manager will recieve\",\"suggestedSegment\":\"the release manager will receive\",\"reason\":\"Corrected spelling issue identified above impacts clarity slightly but primarily a spelling error.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Misspelling of the word 'receive'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Grammar",
+            "originalSegment": "the release manager will recieve",
+            "suggestedSegment": "the release manager will receive",
+            "reason": "Corrected spelling issue identified above impacts clarity slightly but primarily a spelling error.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 9191.67,
+      "ttft_ms": 563.21,
+      "prompt_tokens": 193,
+      "prompt_eval_time_ms": 414.04,
+      "prompt_eval_tps": 466.13,
+      "gen_tokens": 74,
+      "gen_time_ms": 8462.92,
+      "gen_tps": 8.74,
+      "total_server_dur_ms": 9015.3,
+      "load_dur_ms": 97.21,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are responsible\",\"suggestedSegment\":\"Each administrator is responsible\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are responsible",
+            "suggestedSegment": "Each administrator is responsible",
+            "reason": "Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 17759.91,
+      "ttft_ms": 533.01,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 375.8,
+      "prompt_eval_tps": 537.52,
+      "gen_tokens": 142,
+      "gen_time_ms": 16942.76,
+      "gen_tps": 8.38,
+      "total_server_dur_ms": 17461.04,
+      "load_dur_ms": 116.89,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are\",\"suggestedSegment\":\"Each administrator is\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Context Mismatch\",\"originalSegment\":\"reviewing the quarterly access report before Friday\",\"suggestedSegment\":\"review the quarterly access report by Friday\",\"reason\":\"The phrasing 'before Friday' suggests immediacy not typically aligned with administrative tasks; 'by Friday' is more appropriate for deadlines.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are",
+            "suggestedSegment": "Each administrator is",
+            "reason": "Subject 'Each administrator' requires singular verb 'is'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Context Mismatch",
+            "originalSegment": "reviewing the quarterly access report before Friday",
+            "suggestedSegment": "review the quarterly access report by Friday",
+            "reason": "The phrasing 'before Friday' suggests immediacy not typically aligned with administrative tasks; 'by Friday' is more appropriate for deadlines.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 19438.4,
+      "ttft_ms": 561.26,
+      "prompt_tokens": 453,
+      "prompt_eval_time_ms": 404.57,
+      "prompt_eval_tps": 1119.7,
+      "gen_tokens": 154,
+      "gen_time_ms": 18475.52,
+      "gen_tps": 8.34,
+      "total_server_dur_ms": 19022.43,
+      "load_dur_ms": 103.52,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are responsible\",\"suggestedSegment\":\"Each administrator is responsible\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Article Usage\",\"originalSegment\":\"the quarterly access report\",\"suggestedSegment\":\"the quarterly access report (no change needed here, but ensuring contextually appropriate article usage)\",\"reason\":\"While not strictly incorrect, ensure contextually appropriate article usage around 'report'. Here it seems fine but worth noting for broader clarity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are responsible",
+            "suggestedSegment": "Each administrator is responsible",
+            "reason": "Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Article Usage",
+            "originalSegment": "the quarterly access report",
+            "suggestedSegment": "the quarterly access report (no change needed here, but ensuring contextually appropriate article usage)",
+            "reason": "While not strictly incorrect, ensure contextually appropriate article usage around 'report'. Here it seems fine but worth noting for broader clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1899.37,
+      "ttft_ms": 601.02,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 417.68,
+      "prompt_eval_tps": 466.86,
+      "gen_tokens": 12,
+      "gen_time_ms": 1277.28,
+      "gen_tps": 9.39,
+      "total_server_dur_ms": 1845.18,
+      "load_dur_ms": 101.92,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 14842.98,
+      "ttft_ms": 587.15,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 416.95,
+      "prompt_eval_tps": 489.26,
+      "gen_tokens": 122,
+      "gen_time_ms": 14088.54,
+      "gen_tps": 8.66,
+      "total_server_dur_ms": 14641.28,
+      "load_dur_ms": 116.75,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Language Mismatch\",\"originalSegment\":\"Open console and select Projects from the navigation menu to create a new workspace.\",\"suggestedSegment\":\"콘솔을 열고 네비게이션 메뉴에서 프로젝트를 선택하여 새로운 워크스페이스를 생성하세요.\",\"reason\":\"텍스트는 영어로 작성되어 있지만, 지시하는 내용은 한국어 환경에서의 작업 지시로 해석되어야 합니다. 한국어로 자연스럽게 번역해야 합니다.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Language Mismatch",
+            "originalSegment": "Open console and select Projects from the navigation menu to create a new workspace.",
+            "suggestedSegment": "콘솔을 열고 네비게이션 메뉴에서 프로젝트를 선택하여 새로운 워크스페이스를 생성하세요.",
+            "reason": "텍스트는 영어로 작성되어 있지만, 지시하는 내용은 한국어 환경에서의 작업 지시로 해석되어야 합니다. 한국어로 자연스럽게 번역해야 합니다.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 8425.46,
+      "ttft_ms": 609.07,
+      "prompt_tokens": 455,
+      "prompt_eval_time_ms": 446.42,
+      "prompt_eval_tps": 1019.23,
+      "gen_tokens": 66,
+      "gen_time_ms": 7742.85,
+      "gen_tps": 8.52,
+      "total_server_dur_ms": 8328.96,
+      "load_dur_ms": 103.54,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Open console\",\"suggestedSegment\":\"Open the console\",\"reason\":\"The singular countable noun 'console' should be preceded by the article 'the' for clarity.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "Open console",
+            "suggestedSegment": "Open the console",
+            "reason": "The singular countable noun 'console' should be preceded by the article 'the' for clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1928.1,
+      "ttft_ms": 639.4,
+      "prompt_tokens": 199,
+      "prompt_eval_time_ms": 475.21,
+      "prompt_eval_tps": 418.76,
+      "gen_tokens": 12,
+      "gen_time_ms": 1268.58,
+      "gen_tps": 9.46,
+      "total_server_dur_ms": 1885.34,
+      "load_dur_ms": 103.21,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 12965.43,
+      "ttft_ms": 616.67,
+      "prompt_tokens": 208,
+      "prompt_eval_time_ms": 478.2,
+      "prompt_eval_tps": 434.96,
+      "gen_tokens": 105,
+      "gen_time_ms": 12151.78,
+      "gen_tps": 8.64,
+      "total_server_dur_ms": 12749.24,
+      "load_dur_ms": 106.16,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The report was completed by the finance team and was then sent by them to leadership for review.\",\"suggestedSegment\":\"보고서는 재무팀에 의해 완료되어 그 후 리더십에 검토를 위해 제출되었습니다.\",\"reason\":\"The provided text is in English, not Korean. The task requires inspection of Korean text only.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The report was completed by the finance team and was then sent by them to leadership for review.",
+            "suggestedSegment": "보고서는 재무팀에 의해 완료되어 그 후 리더십에 검토를 위해 제출되었습니다.",
+            "reason": "The provided text is in English, not Korean. The task requires inspection of Korean text only.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 10965.0,
+      "ttft_ms": 672.81,
+      "prompt_tokens": 459,
+      "prompt_eval_time_ms": 518.22,
+      "prompt_eval_tps": 885.72,
+      "gen_tokens": 86,
+      "gen_time_ms": 10123.7,
+      "gen_tps": 8.49,
+      "total_server_dur_ms": 10777.34,
+      "load_dur_ms": 106.98,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Clarity\",\"originalSegment\":\"was then sent by them to leadership for review\",\"suggestedSegment\":\"the finance team then sent it to leadership for review\",\"reason\":\"The repeated reference to 'them' is unnecessarily indirect; specifying 'the finance team' directly improves clarity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was then sent by them to leadership for review",
+            "suggestedSegment": "the finance team then sent it to leadership for review",
+            "reason": "The repeated reference to 'them' is unnecessarily indirect; specifying 'the finance team' directly improves clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 17678.08,
+      "ttft_ms": 623.53,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 446.94,
+      "prompt_eval_tps": 440.78,
+      "gen_tokens": 143,
+      "gen_time_ms": 16799.6,
+      "gen_tps": 8.51,
+      "total_server_dur_ms": 17406.31,
+      "load_dur_ms": 113.4,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Clarity\",\"originalSegment\":\"When the migration completes click Restart\",\"suggestedSegment\":\"Upon completion of the migration, click Restart\",\"reason\":\"Improving clarity by specifying 'Upon completion' for better readability and flow.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Punctuation\",\"originalSegment\":\"then verify that the service health check passes.\",\"suggestedSegment\":\"then verify that the service health check passes.;\",\"reason\":\"Adding a semicolon after 'passes' to properly conclude the sentence.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "When the migration completes click Restart",
+            "suggestedSegment": "Upon completion of the migration, click Restart",
+            "reason": "Improving clarity by specifying 'Upon completion' for better readability and flow.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Punctuation",
+            "originalSegment": "then verify that the service health check passes.",
+            "suggestedSegment": "then verify that the service health check passes.;",
+            "reason": "Adding a semicolon after 'passes' to properly conclude the sentence.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 20638.55,
+      "ttft_ms": 603.51,
+      "prompt_tokens": 206,
+      "prompt_eval_time_ms": 439.76,
+      "prompt_eval_tps": 468.44,
+      "gen_tokens": 169,
+      "gen_time_ms": 19733.82,
+      "gen_tps": 8.56,
+      "total_server_dur_ms": 20322.73,
+      "load_dur_ms": 114.86,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"When the migration completes click Restart\",\"suggestedSegment\":\"마이그레이션이 완료되면 '다시 시작'을 클릭하세요\",\"reason\":\"The text provided is in English but the instruction specifies inspecting a Korean text. The given sentence should be translated or checked for Korean adaptation issues if intended for Korean audience.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Punctuation\",\"originalSegment\":\"then verify that the service health check passes.\",\"suggestedSegment\":\"그 다음 서비스 건강 상태 확인이 통과되었는지 확인하세요.\",\"reason\":\"The sentence lacks appropriate Korean punctuation and structure for clarity.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "When the migration completes click Restart",
+            "suggestedSegment": "마이그레이션이 완료되면 '다시 시작'을 클릭하세요",
+            "reason": "The text provided is in English but the instruction specifies inspecting a Korean text. The given sentence should be translated or checked for Korean adaptation issues if intended for Korean audience.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Punctuation",
+            "originalSegment": "then verify that the service health check passes.",
+            "suggestedSegment": "그 다음 서비스 건강 상태 확인이 통과되었는지 확인하세요.",
+            "reason": "The sentence lacks appropriate Korean punctuation and structure for clarity.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 18277.51,
+      "ttft_ms": 619.32,
+      "prompt_tokens": 457,
+      "prompt_eval_time_ms": 463.5,
+      "prompt_eval_tps": 985.97,
+      "gen_tokens": 148,
+      "gen_time_ms": 17390.22,
+      "gen_tps": 8.51,
+      "total_server_dur_ms": 17990.32,
+      "load_dur_ms": 102.46,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Grammar\",\"originalSegment\":\"When the migration completes click\",\"suggestedSegment\":\"Upon completion of the migration, click\",\"reason\":\"Using 'Upon completion of' clarifies the sequence of actions more clearly and avoids potential ambiguity around tense.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Clarity\",\"originalSegment\":\"verify that the service health check passes\",\"suggestedSegment\":\"ensure the service health check succeeds\",\"reason\":\"Using 'ensure' and 'succeeds' can make the instruction more direct and active, improving clarity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "When the migration completes click",
+            "suggestedSegment": "Upon completion of the migration, click",
+            "reason": "Using 'Upon completion of' clarifies the sequence of actions more clearly and avoids potential ambiguity around tense.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Clarity",
+            "originalSegment": "verify that the service health check passes",
+            "suggestedSegment": "ensure the service health check succeeds",
+            "reason": "Using 'ensure' and 'succeeds' can make the instruction more direct and active, improving clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 14817.85,
+      "ttft_ms": 3279.27,
+      "prompt_tokens": 215,
+      "prompt_eval_time_ms": 3070.62,
+      "prompt_eval_tps": 70.02,
+      "gen_tokens": 98,
+      "gen_time_ms": 11363.59,
+      "gen_tps": 8.62,
+      "total_server_dur_ms": 14590.45,
+      "load_dur_ms": 111.18,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Omission\",\n        \"originalSegment\":\"select the Billing tab\",\n        \"suggestedSegment\":\"select the Billing tab\",\n        \"reason\":\"The specific instruction to select the 'Billing' tab was omitted in the target text, which reduces clarity for users needing detailed steps.\",\n        \"severity\":\"MEDIUM\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab",
+            "reason": "The specific instruction to select the 'Billing' tab was omitted in the target text, which reduces clarity for users needing detailed steps.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 14711.49,
+      "ttft_ms": 3088.81,
+      "prompt_tokens": 215,
+      "prompt_eval_time_ms": 2895.62,
+      "prompt_eval_tps": 74.25,
+      "gen_tokens": 98,
+      "gen_time_ms": 11446.27,
+      "gen_tps": 8.56,
+      "total_server_dur_ms": 14471.96,
+      "load_dur_ms": 105.31,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Terminology Omission\",\n        \"originalSegment\":\"select the Billing tab\",\n        \"suggestedSegment\":\"select the Billing tab specifically\",\n        \"reason\":\"The term 'Billing' is omitted in the target text, which could lead to confusion about which tab to select.\",\n        \"severity\":\"MEDIUM\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Terminology Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab specifically",
+            "reason": "The term 'Billing' is omitted in the target text, which could lead to confusion about which tab to select.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 15536.8,
+      "ttft_ms": 5349.51,
+      "prompt_tokens": 475,
+      "prompt_eval_time_ms": 5104.89,
+      "prompt_eval_tps": 93.05,
+      "gen_tokens": 85,
+      "gen_time_ms": 10031.55,
+      "gen_tps": 8.47,
+      "total_server_dur_ms": 15282.39,
+      "load_dur_ms": 114.91,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Omission\",\"originalSegment\":\"select the Billing tab\",\"suggestedSegment\":\"select the Billing tab\",\"reason\":\"The determiner 'the' before 'Billing tab' is omitted, though it might be acceptable depending on context, it's flagged here for consistency with typical usage.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab",
+            "reason": "The determiner 'the' before 'Billing tab' is omitted, though it might be acceptable depending on context, it's flagged here for consistency with typical usage.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 13998.12,
+      "ttft_ms": 969.52,
+      "prompt_tokens": 220,
+      "prompt_eval_time_ms": 804.73,
+      "prompt_eval_tps": 273.38,
+      "gen_tokens": 110,
+      "gen_time_ms": 12830.85,
+      "gen_tps": 8.57,
+      "total_server_dur_ms": 13782.87,
+      "load_dur_ms": 104.04,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Incorrect Information\",\"originalSegment\":\"The retention policy keeps audit logs for 14 days after the account is closed.\",\"suggestedSegment\":\"The retention policy keeps audit logs for 14 days after the account is closed (corrected from original source if needed).\",\"reason\":\"The duration specified in the target text (41 days) contradicts the source text (14 days).\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Incorrect Information",
+            "originalSegment": "The retention policy keeps audit logs for 14 days after the account is closed.",
+            "suggestedSegment": "The retention policy keeps audit logs for 14 days after the account is closed (corrected from original source if needed).",
+            "reason": "The duration specified in the target text (41 days) contradicts the source text (14 days).",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 10385.36,
+      "ttft_ms": 965.0,
+      "prompt_tokens": 220,
+      "prompt_eval_time_ms": 804.74,
+      "prompt_eval_tps": 273.38,
+      "gen_tokens": 79,
+      "gen_time_ms": 9276.55,
+      "gen_tps": 8.52,
+      "total_server_dur_ms": 10223.53,
+      "load_dur_ms": 110.23,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Number Discrepancy\",\"originalSegment\":\"14 days\",\"suggestedSegment\":\"41 days\",\"reason\":\"The number of days specified in the target text differs significantly from the source text, indicating a potential error in translation or transcription.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Number Discrepancy",
+            "originalSegment": "14 days",
+            "suggestedSegment": "41 days",
+            "reason": "The number of days specified in the target text differs significantly from the source text, indicating a potential error in translation or transcription.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 11400.26,
+      "ttft_ms": 1040.62,
+      "prompt_tokens": 480,
+      "prompt_eval_time_ms": 865.24,
+      "prompt_eval_tps": 554.76,
+      "gen_tokens": 86,
+      "gen_time_ms": 10201.82,
+      "gen_tps": 8.43,
+      "total_server_dur_ms": 11204.66,
+      "load_dur_ms": 106.53,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Inconsistency\",\"originalSegment\":\"14 days\",\"suggestedSegment\":\"14 days (corrected to match source if intended) / 41 days\",\"reason\":\"The target text incorrectly states a different duration (41 days) compared to the source text (14 days).\",\"severity\":\"MEDIUM\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Inconsistency",
+            "originalSegment": "14 days",
+            "suggestedSegment": "14 days (corrected to match source if intended) / 41 days",
+            "reason": "The target text incorrectly states a different duration (41 days) compared to the source text (14 days).",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 2132.12,
+      "ttft_ms": 802.47,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 621.35,
+      "prompt_eval_tps": 328.32,
+      "gen_tokens": 12,
+      "gen_time_ms": 1308.2,
+      "gen_tps": 9.17,
+      "total_server_dur_ms": 2085.48,
+      "load_dur_ms": 108.44,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_clean",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 29547.53,
+      "ttft_ms": 742.16,
+      "prompt_tokens": 213,
+      "prompt_eval_time_ms": 605.92,
+      "prompt_eval_tps": 351.53,
+      "gen_tokens": 241,
+      "gen_time_ms": 28368.95,
+      "gen_tps": 8.5,
+      "total_server_dur_ms": 29097.46,
+      "load_dur_ms": 105.45,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Language Mismatch\",\"originalSegment\":\"To add a user\",\"suggestedSegment\":\"사용자 추가하기 위해\",\"reason\":\"The instruction contains English words in a context expecting purely Korean text.\",\"severity\":\"HIGH\"},\n    {\"category\":\"Content Appropriateness\",\"originalSegment\":\"open Team settings\",\"suggestedSegment\":\"팀 설정을 열기\",\"reason\":\"Direct translation needed for Korean fluency; 'Team settings' should be more naturally phrased in Korean.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Content Appropriateness\",\"originalSegment\":\"select Invite member\",\"suggestedSegment\":\"초대하기 위한 멤버 선택\",\"reason\":\"Idiomatic translation required for smoother Korean reading.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Content Appropriateness\",\"originalSegment\":\"enter the user's work email address\",\"suggestedSegment\":\"사용자의 업무 이메일 주소 입력하기\",\"reason\":\"Natural phrasing adjustment for Korean language fluency.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Language Mismatch",
+            "originalSegment": "To add a user",
+            "suggestedSegment": "사용자 추가하기 위해",
+            "reason": "The instruction contains English words in a context expecting purely Korean text.",
+            "severity": "HIGH"
+          },
+          {
+            "category": "Content Appropriateness",
+            "originalSegment": "open Team settings",
+            "suggestedSegment": "팀 설정을 열기",
+            "reason": "Direct translation needed for Korean fluency; 'Team settings' should be more naturally phrased in Korean.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Content Appropriateness",
+            "originalSegment": "select Invite member",
+            "suggestedSegment": "초대하기 위한 멤버 선택",
+            "reason": "Idiomatic translation required for smoother Korean reading.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Content Appropriateness",
+            "originalSegment": "enter the user's work email address",
+            "suggestedSegment": "사용자의 업무 이메일 주소 입력하기",
+            "reason": "Natural phrasing adjustment for Korean language fluency.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_clean",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "clean": false
+      }
+    },
+    {
+      "wall_latency_ms": 10109.46,
+      "ttft_ms": 801.67,
+      "prompt_tokens": 464,
+      "prompt_eval_time_ms": 629.44,
+      "prompt_eval_tps": 737.17,
+      "gen_tokens": 78,
+      "gen_time_ms": 9164.96,
+      "gen_tps": 8.51,
+      "total_server_dur_ms": 9943.24,
+      "load_dur_ms": 105.25,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Grammar\",\"originalSegment\":\"enter the user's work email address\",\"suggestedSegment\":\"enter their work email address\",\"reason\":\"The possessive pronoun 'their' is more concise and clear than repeating 'user's'.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "enter the user's work email address",
+            "suggestedSegment": "enter their work email address",
+            "reason": "The possessive pronoun 'their' is more concise and clear than repeating 'user's'.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_clean",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "clean": false
+      }
+    },
+    {
+      "wall_latency_ms": 2271.28,
+      "ttft_ms": 847.29,
+      "prompt_tokens": 214,
+      "prompt_eval_time_ms": 673.77,
+      "prompt_eval_tps": 317.62,
+      "gen_tokens": 13,
+      "gen_time_ms": 1400.76,
+      "gen_tps": 9.28,
+      "total_server_dur_ms": 2216.74,
+      "load_dur_ms": 98.41,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 2213.68,
+      "ttft_ms": 823.08,
+      "prompt_tokens": 214,
+      "prompt_eval_time_ms": 676.84,
+      "prompt_eval_tps": 316.18,
+      "gen_tokens": 13,
+      "gen_time_ms": 1368.12,
+      "gen_tps": 9.5,
+      "total_server_dur_ms": 2173.96,
+      "load_dur_ms": 109.93,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 2151.8,
+      "ttft_ms": 849.98,
+      "prompt_tokens": 474,
+      "prompt_eval_time_ms": 705.29,
+      "prompt_eval_tps": 672.06,
+      "gen_tokens": 12,
+      "gen_time_ms": 1279.51,
+      "gen_tps": 9.38,
+      "total_server_dur_ms": 2114.23,
+      "load_dur_ms": 105.86,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 1909.18,
+      "ttft_ms": 480.38,
+      "prompt_tokens": 186,
+      "prompt_eval_time_ms": 303.9,
+      "prompt_eval_tps": 612.04,
+      "gen_tokens": 13,
+      "gen_time_ms": 1405.62,
+      "gen_tps": 9.25,
+      "total_server_dur_ms": 1859.75,
+      "load_dur_ms": 112.04,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 1711.12,
+      "ttft_ms": 421.55,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 292.64,
+      "prompt_eval_tps": 666.34,
+      "gen_tokens": 12,
+      "gen_time_ms": 1268.69,
+      "gen_tps": 9.46,
+      "total_server_dur_ms": 1681.07,
+      "load_dur_ms": 105.92,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 9080.33,
+      "ttft_ms": 445.96,
+      "prompt_tokens": 446,
+      "prompt_eval_time_ms": 311.02,
+      "prompt_eval_tps": 1433.97,
+      "gen_tokens": 71,
+      "gen_time_ms": 8501.79,
+      "gen_tps": 8.35,
+      "total_server_dur_ms": 8937.76,
+      "load_dur_ms": 101.42,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"close window\",\"suggestedSegment\":\"close the window\",\"reason\":\"Adding the definite article 'the' improves clarity by specifying which window is being referred to, assuming context allows for it.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "close window",
+            "suggestedSegment": "close the window",
+            "reason": "Adding the definite article 'the' improves clarity by specifying which window is being referred to, assuming context allows for it.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 2081.97,
+      "ttft_ms": 515.93,
+      "prompt_tokens": 186,
+      "prompt_eval_time_ms": 327.42,
+      "prompt_eval_tps": 568.08,
+      "gen_tokens": 13,
+      "gen_time_ms": 1541.1,
+      "gen_tps": 8.44,
+      "total_server_dur_ms": 2038.2,
+      "load_dur_ms": 129.38,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 9850.1,
+      "ttft_ms": 442.28,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 305.62,
+      "prompt_eval_tps": 638.05,
+      "gen_tokens": 78,
+      "gen_time_ms": 9264.53,
+      "gen_tps": 8.42,
+      "total_server_dur_ms": 9696.5,
+      "load_dur_ms": 115.58,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Language Mismatch\",\"originalSegment\":\"Review report before the meeting.\",\"suggestedSegment\":\"검토 보고서를 회의 전에 검토하세요.\",\"reason\":\"The provided text is in English while the instruction specifies Korean text inspection.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Language Mismatch",
+            "originalSegment": "Review report before the meeting.",
+            "suggestedSegment": "검토 보고서를 회의 전에 검토하세요.",
+            "reason": "The provided text is in English while the instruction specifies Korean text inspection.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 8302.42,
+      "ttft_ms": 475.21,
+      "prompt_tokens": 446,
+      "prompt_eval_time_ms": 319.64,
+      "prompt_eval_tps": 1395.33,
+      "gen_tokens": 63,
+      "gen_time_ms": 7705.99,
+      "gen_tps": 8.18,
+      "total_server_dur_ms": 8171.04,
+      "load_dur_ms": 114.04,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Review report\",\"suggestedSegment\":\"Review the report\",\"reason\":\"The singular countable noun 'report' requires the article 'the' for clarity.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "Review report",
+            "suggestedSegment": "Review the report",
+            "reason": "The singular countable noun 'report' requires the article 'the' for clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 10355.92,
+      "ttft_ms": 585.87,
+      "prompt_tokens": 194,
+      "prompt_eval_time_ms": 423.58,
+      "prompt_eval_tps": 458.0,
+      "gen_tokens": 80,
+      "gen_time_ms": 9620.49,
+      "gen_tps": 8.32,
+      "total_server_dur_ms": 10194.2,
+      "load_dur_ms": 112.02,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Redundancy\",\"originalSegment\":\"was reviewed by the accountant and was later approved by them\",\"suggestedSegment\":\"was reviewed and later approved by the accountant\",\"reason\":\"The repetition of 'was' makes the sentence redundant and less clear.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Redundancy",
+            "originalSegment": "was reviewed by the accountant and was later approved by them",
+            "suggestedSegment": "was reviewed and later approved by the accountant",
+            "reason": "The repetition of 'was' makes the sentence redundant and less clear.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 12351.83,
+      "ttft_ms": 537.59,
+      "prompt_tokens": 203,
+      "prompt_eval_time_ms": 397.0,
+      "prompt_eval_tps": 511.34,
+      "gen_tokens": 97,
+      "gen_time_ms": 11634.49,
+      "gen_tps": 8.34,
+      "total_server_dur_ms": 12157.66,
+      "load_dur_ms": 102.01,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The invoice was reviewed by the accountant and was later approved by them.\",\"suggestedSegment\":\"송장은 회계사에 의해 검토되었고, 이후에 승인되었습니다.\",\"reason\":\"The provided text is in English, not Korean. The task requires inspection of Korean text only.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The invoice was reviewed by the accountant and was later approved by them.",
+            "suggestedSegment": "송장은 회계사에 의해 검토되었고, 이후에 승인되었습니다.",
+            "reason": "The provided text is in English, not Korean. The task requires inspection of Korean text only.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 9860.73,
+      "ttft_ms": 588.66,
+      "prompt_tokens": 454,
+      "prompt_eval_time_ms": 426.01,
+      "prompt_eval_tps": 1065.7,
+      "gen_tokens": 75,
+      "gen_time_ms": 9128.86,
+      "gen_tps": 8.22,
+      "total_server_dur_ms": 9705.21,
+      "load_dur_ms": 120.53,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was later approved by them\",\"suggestedSegment\":\"was later approved by the accountant\",\"reason\":\"The repeated reference to 'them' is unnecessarily indirect and can lead to confusion about who performed the approval action.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was later approved by them",
+            "suggestedSegment": "was later approved by the accountant",
+            "reason": "The repeated reference to 'them' is unnecessarily indirect and can lead to confusion about who performed the approval action.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1878.4,
+      "ttft_ms": 546.59,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 394.42,
+      "prompt_eval_tps": 494.4,
+      "gen_tokens": 12,
+      "gen_time_ms": 1309.74,
+      "gen_tps": 9.16,
+      "total_server_dur_ms": 1845.55,
+      "load_dur_ms": 102.55,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "english",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 12340.72,
+      "ttft_ms": 533.85,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 401.81,
+      "prompt_eval_tps": 507.7,
+      "gen_tokens": 97,
+      "gen_time_ms": 11627.07,
+      "gen_tps": 8.34,
+      "total_server_dur_ms": 12149.78,
+      "load_dur_ms": 108.58,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The configuration was prepared by the operations team and was subsequently published by them.\",\"suggestedSegment\":\"설정은 운영팀에 의해 준비되어 이후에 그들이 게시했습니다.\",\"reason\":\"The provided text is in English, not Korean. The task requires inspection of Korean text only.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The configuration was prepared by the operations team and was subsequently published by them.",
+            "suggestedSegment": "설정은 운영팀에 의해 준비되어 이후에 그들이 게시했습니다.",
+            "reason": "The provided text is in English, not Korean. The task requires inspection of Korean text only.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "korean_baseline",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 10731.06,
+      "ttft_ms": 591.1,
+      "prompt_tokens": 455,
+      "prompt_eval_time_ms": 438.38,
+      "prompt_eval_tps": 1037.91,
+      "gen_tokens": 82,
+      "gen_time_ms": 9984.3,
+      "gen_tps": 8.21,
+      "total_server_dur_ms": 10563.22,
+      "load_dur_ms": 111.28,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was subsequently published by them\",\"suggestedSegment\":\"was subsequently published by the operations team\",\"reason\":\"The repeated agent reference 'by them' is unnecessarily indirect; specifying 'the operations team' once clarifies who performed the action without repetition.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was subsequently published by them",
+            "suggestedSegment": "was subsequently published by the operations team",
+            "reason": "The repeated agent reference 'by them' is unnecessarily indirect; specifying 'the operations team' once clarifies who performed the action without repetition.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "english_fewshot",
+      "repetition": 1,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 7474.68,
+      "ttft_ms": 625.09,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 450.21,
+      "prompt_eval_tps": 437.57,
+      "gen_tokens": 58,
+      "gen_time_ms": 6744.03,
+      "gen_tps": 8.6,
+      "total_server_dur_ms": 7353.82,
+      "load_dur_ms": 124.96,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Incorrect spelling of 'receive'\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Incorrect spelling of 'receive'",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 17432.89,
+      "ttft_ms": 600.28,
+      "prompt_tokens": 206,
+      "prompt_eval_time_ms": 458.76,
+      "prompt_eval_tps": 449.03,
+      "gen_tokens": 141,
+      "gen_time_ms": 16576.51,
+      "gen_tps": 8.51,
+      "total_server_dur_ms": 17160.4,
+      "load_dur_ms": 109.67,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Incorrect spelling of 'receive' in Korean context (though note: original text is in English, this principle applies similarly).\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Context Mismatch\",\"originalSegment\":\"deployment completes\",\"suggestedSegment\":\"배포 완료\",\"reason\":\"The phrase 'deployment completes' is in English while the rest seems to imply a Korean context without proper translation or adaptation.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Incorrect spelling of 'receive' in Korean context (though note: original text is in English, this principle applies similarly).",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Context Mismatch",
+            "originalSegment": "deployment completes",
+            "suggestedSegment": "배포 완료",
+            "reason": "The phrase 'deployment completes' is in English while the rest seems to imply a Korean context without proper translation or adaptation.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 14925.8,
+      "ttft_ms": 627.7,
+      "prompt_tokens": 457,
+      "prompt_eval_time_ms": 472.9,
+      "prompt_eval_tps": 966.38,
+      "gen_tokens": 118,
+      "gen_time_ms": 14078.42,
+      "gen_tps": 8.38,
+      "total_server_dur_ms": 14694.31,
+      "load_dur_ms": 106.46,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Misspelling of the word 'receive'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Grammar\",\"originalSegment\":\"the release manager will recieve\",\"suggestedSegment\":\"the release manager will receive\",\"reason\":\"Corrected spelling issue identified above impacts clarity slightly but primarily a spelling error.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Misspelling of the word 'receive'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Grammar",
+            "originalSegment": "the release manager will recieve",
+            "suggestedSegment": "the release manager will receive",
+            "reason": "Corrected spelling issue identified above impacts clarity slightly but primarily a spelling error.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 9151.2,
+      "ttft_ms": 527.61,
+      "prompt_tokens": 193,
+      "prompt_eval_time_ms": 362.3,
+      "prompt_eval_tps": 532.71,
+      "gen_tokens": 74,
+      "gen_time_ms": 8490.6,
+      "gen_tps": 8.72,
+      "total_server_dur_ms": 9002.35,
+      "load_dur_ms": 107.46,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are responsible\",\"suggestedSegment\":\"Each administrator is responsible\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are responsible",
+            "suggestedSegment": "Each administrator is responsible",
+            "reason": "Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 17954.28,
+      "ttft_ms": 524.14,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 358.44,
+      "prompt_eval_tps": 563.55,
+      "gen_tokens": 147,
+      "gen_time_ms": 17164.16,
+      "gen_tps": 8.56,
+      "total_server_dur_ms": 17658.09,
+      "load_dur_ms": 110.51,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are\",\"suggestedSegment\":\"Each administrator is\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Context Mismatch\",\"originalSegment\":\"reviewing the quarterly access report before Friday\",\"suggestedSegment\":\"review the quarterly access report by Friday\",\"reason\":\"The phrasing 'before Friday' suggests an earlier deadline than 'by Friday', which might imply inconsistency unless contextually clarified. However, primary issue is grammatical.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are",
+            "suggestedSegment": "Each administrator is",
+            "reason": "Subject 'Each administrator' requires singular verb 'is'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Context Mismatch",
+            "originalSegment": "reviewing the quarterly access report before Friday",
+            "suggestedSegment": "review the quarterly access report by Friday",
+            "reason": "The phrasing 'before Friday' suggests an earlier deadline than 'by Friday', which might imply inconsistency unless contextually clarified. However, primary issue is grammatical.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 19215.91,
+      "ttft_ms": 549.18,
+      "prompt_tokens": 453,
+      "prompt_eval_time_ms": 393.82,
+      "prompt_eval_tps": 1150.27,
+      "gen_tokens": 154,
+      "gen_time_ms": 18375.89,
+      "gen_tps": 8.38,
+      "total_server_dur_ms": 18913.9,
+      "load_dur_ms": 109.49,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are responsible\",\"suggestedSegment\":\"Each administrator is responsible\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Article Usage\",\"originalSegment\":\"the quarterly access report\",\"suggestedSegment\":\"the quarterly access report (no change needed here, but ensuring contextually appropriate article usage)\",\"reason\":\"While not strictly incorrect, ensure contextually appropriate article usage around 'report'. Here it seems fine but worth noting for broader clarity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are responsible",
+            "suggestedSegment": "Each administrator is responsible",
+            "reason": "Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Article Usage",
+            "originalSegment": "the quarterly access report",
+            "suggestedSegment": "the quarterly access report (no change needed here, but ensuring contextually appropriate article usage)",
+            "reason": "While not strictly incorrect, ensure contextually appropriate article usage around 'report'. Here it seems fine but worth noting for broader clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1904.4,
+      "ttft_ms": 585.65,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 415.09,
+      "prompt_eval_tps": 469.77,
+      "gen_tokens": 12,
+      "gen_time_ms": 1294.1,
+      "gen_tps": 9.27,
+      "total_server_dur_ms": 1866.62,
+      "load_dur_ms": 114.55,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 14033.02,
+      "ttft_ms": 548.7,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 410.67,
+      "prompt_eval_tps": 496.75,
+      "gen_tokens": 114,
+      "gen_time_ms": 13243.06,
+      "gen_tps": 8.61,
+      "total_server_dur_ms": 13776.07,
+      "load_dur_ms": 107.04,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Language Mismatch\",\"originalSegment\":\"Open console and select Projects from the navigation menu to create a new workspace.\",\"suggestedSegment\":\"콘솔을 열고 네비게이션 메뉴에서 프로젝트를 선택하여 새로운 워크스페이스를 생성하세요.\",\"reason\":\"텍스트는 영어로 작성되어 있지만, 지시 대상이 한국어 사용자로 가정되는 상황에서 언어 불일치가 발생합니다.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Language Mismatch",
+            "originalSegment": "Open console and select Projects from the navigation menu to create a new workspace.",
+            "suggestedSegment": "콘솔을 열고 네비게이션 메뉴에서 프로젝트를 선택하여 새로운 워크스페이스를 생성하세요.",
+            "reason": "텍스트는 영어로 작성되어 있지만, 지시 대상이 한국어 사용자로 가정되는 상황에서 언어 불일치가 발생합니다.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 8546.25,
+      "ttft_ms": 584.1,
+      "prompt_tokens": 455,
+      "prompt_eval_time_ms": 436.94,
+      "prompt_eval_tps": 1041.33,
+      "gen_tokens": 66,
+      "gen_time_ms": 7835.22,
+      "gen_tps": 8.42,
+      "total_server_dur_ms": 8405.71,
+      "load_dur_ms": 105.11,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Open console\",\"suggestedSegment\":\"Open the console\",\"reason\":\"The singular countable noun 'console' should be preceded by the article 'the' for clarity.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "Open console",
+            "suggestedSegment": "Open the console",
+            "reason": "The singular countable noun 'console' should be preceded by the article 'the' for clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1953.52,
+      "ttft_ms": 664.45,
+      "prompt_tokens": 199,
+      "prompt_eval_time_ms": 505.01,
+      "prompt_eval_tps": 394.05,
+      "gen_tokens": 12,
+      "gen_time_ms": 1269.46,
+      "gen_tps": 9.45,
+      "total_server_dur_ms": 1920.35,
+      "load_dur_ms": 104.06,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 12790.78,
+      "ttft_ms": 623.91,
+      "prompt_tokens": 208,
+      "prompt_eval_time_ms": 492.99,
+      "prompt_eval_tps": 421.92,
+      "gen_tokens": 103,
+      "gen_time_ms": 11991.87,
+      "gen_tps": 8.59,
+      "total_server_dur_ms": 12603.7,
+      "load_dur_ms": 105.99,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The report was completed by the finance team and was then sent by them to leadership for review.\",\"suggestedSegment\":\"보고서는 재무팀에 의해 작성되어 리더십에 검토를 위해 제출되었습니다.\",\"reason\":\"The provided text is in English, not Korean. The task requires inspection of Korean text only.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The report was completed by the finance team and was then sent by them to leadership for review.",
+            "suggestedSegment": "보고서는 재무팀에 의해 작성되어 리더십에 검토를 위해 제출되었습니다.",
+            "reason": "The provided text is in English, not Korean. The task requires inspection of Korean text only.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 11095.71,
+      "ttft_ms": 685.69,
+      "prompt_tokens": 459,
+      "prompt_eval_time_ms": 521.69,
+      "prompt_eval_tps": 879.83,
+      "gen_tokens": 86,
+      "gen_time_ms": 10216.57,
+      "gen_tps": 8.42,
+      "total_server_dur_ms": 10876.57,
+      "load_dur_ms": 106.11,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Clarity\",\"originalSegment\":\"was then sent by them to leadership for review\",\"suggestedSegment\":\"the finance team then sent it to leadership for review\",\"reason\":\"The repeated reference to 'them' is unnecessarily indirect; specifying 'the finance team' directly improves clarity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was then sent by them to leadership for review",
+            "suggestedSegment": "the finance team then sent it to leadership for review",
+            "reason": "The repeated reference to 'them' is unnecessarily indirect; specifying 'the finance team' directly improves clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 17825.41,
+      "ttft_ms": 603.66,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 436.71,
+      "prompt_eval_tps": 451.1,
+      "gen_tokens": 144,
+      "gen_time_ms": 16945.71,
+      "gen_tps": 8.5,
+      "total_server_dur_ms": 17521.1,
+      "load_dur_ms": 99.69,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Clarity\",\"originalSegment\":\"When the migration completes click Restart\",\"suggestedSegment\":\"Upon completion of the migration, click Restart\",\"reason\":\"Improving clarity by specifying 'Upon completion' for better readability and flow.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Punctuation\",\"originalSegment\":\"then verify that the service health check passes.\",\"suggestedSegment\":\"then verify that the service health check passes.;\",\"reason\":\"Adding a semicolon after 'passes' for proper separation between independent clauses.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "When the migration completes click Restart",
+            "suggestedSegment": "Upon completion of the migration, click Restart",
+            "reason": "Improving clarity by specifying 'Upon completion' for better readability and flow.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Punctuation",
+            "originalSegment": "then verify that the service health check passes.",
+            "suggestedSegment": "then verify that the service health check passes.;",
+            "reason": "Adding a semicolon after 'passes' for proper separation between independent clauses.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 14446.93,
+      "ttft_ms": 591.7,
+      "prompt_tokens": 206,
+      "prompt_eval_time_ms": 443.24,
+      "prompt_eval_tps": 464.76,
+      "gen_tokens": 116,
+      "gen_time_ms": 13606.29,
+      "gen_tps": 8.53,
+      "total_server_dur_ms": 14185.98,
+      "load_dur_ms": 107.29,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"When the migration completes click Restart, then verify that the service health check passes.\",\"suggestedSegment\":\"마이그레이션이 완료되면 '다시 시작'을 클릭하고 서비스의 건강 상태 확인이 통과되는지 확인하세요.\",\"reason\":\"주어진 텍스트는 영어 문장으로, 한국어 문맥에서의 자연스러움과 정확한 표현을 위해 번역이 필요합니다.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "When the migration completes click Restart, then verify that the service health check passes.",
+            "suggestedSegment": "마이그레이션이 완료되면 '다시 시작'을 클릭하고 서비스의 건강 상태 확인이 통과되는지 확인하세요.",
+            "reason": "주어진 텍스트는 영어 문장으로, 한국어 문맥에서의 자연스러움과 정확한 표현을 위해 번역이 필요합니다.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 17993.84,
+      "ttft_ms": 609.19,
+      "prompt_tokens": 457,
+      "prompt_eval_time_ms": 461.91,
+      "prompt_eval_tps": 989.37,
+      "gen_tokens": 144,
+      "gen_time_ms": 17099.77,
+      "gen_tps": 8.42,
+      "total_server_dur_ms": 17695.01,
+      "load_dur_ms": 97.7,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Grammar\",\"originalSegment\":\"When the migration completes click\",\"suggestedSegment\":\"Upon completion of the migration, click\",\"reason\":\"Using 'Upon completion of' clarifies the sequence of actions more clearly and avoids potential ambiguity around tense.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Clarity\",\"originalSegment\":\"verify that the service health check passes\",\"suggestedSegment\":\"ensure the service health check succeeds\",\"reason\":\"Using 'ensure' and 'succeeds' provides clearer direction and is more direct.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "When the migration completes click",
+            "suggestedSegment": "Upon completion of the migration, click",
+            "reason": "Using 'Upon completion of' clarifies the sequence of actions more clearly and avoids potential ambiguity around tense.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Clarity",
+            "originalSegment": "verify that the service health check passes",
+            "suggestedSegment": "ensure the service health check succeeds",
+            "reason": "Using 'ensure' and 'succeeds' provides clearer direction and is more direct.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 10471.47,
+      "ttft_ms": 888.33,
+      "prompt_tokens": 215,
+      "prompt_eval_time_ms": 704.61,
+      "prompt_eval_tps": 305.13,
+      "gen_tokens": 81,
+      "gen_time_ms": 9371.45,
+      "gen_tps": 8.64,
+      "total_server_dur_ms": 10223.26,
+      "load_dur_ms": 105.94,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Omission\",\"originalSegment\":\"select the Billing tab\",\"suggestedSegment\":\"select the Billing tab (specifically mentioning 'Billing' for clarity)\",\"reason\":\"The specific tab name 'Billing' is omitted, reducing clarity for users.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab (specifically mentioning 'Billing' for clarity)",
+            "reason": "The specific tab name 'Billing' is omitted, reducing clarity for users.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 13256.41,
+      "ttft_ms": 853.08,
+      "prompt_tokens": 215,
+      "prompt_eval_time_ms": 702.82,
+      "prompt_eval_tps": 305.91,
+      "gen_tokens": 103,
+      "gen_time_ms": 12211.47,
+      "gen_tps": 8.43,
+      "total_server_dur_ms": 13040.52,
+      "load_dur_ms": 108.85,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Terminology Omission\",\n        \"originalSegment\":\"select the Billing tab\",\n        \"suggestedSegment\":\"select the Billing tab specifically\",\n        \"reason\":\"The target text omits the crucial detail of selecting the 'Billing' tab, which is present in the source text and important for clarity.\",\n        \"severity\":\"MEDIUM\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Terminology Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab specifically",
+            "reason": "The target text omits the crucial detail of selecting the 'Billing' tab, which is present in the source text and important for clarity.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 18866.94,
+      "ttft_ms": 909.14,
+      "prompt_tokens": 475,
+      "prompt_eval_time_ms": 747.02,
+      "prompt_eval_tps": 635.86,
+      "gen_tokens": 146,
+      "gen_time_ms": 17703.32,
+      "gen_tps": 8.25,
+      "total_server_dur_ms": 18592.34,
+      "load_dur_ms": 107.68,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Omission\",\"originalSegment\":\"select the Billing tab\",\"suggestedSegment\":\"select the Billing tab\",\"reason\":\"The determiner 'the' before 'Billing tab' is omitted, though it's less critical here due to common usage, it still slightly affects clarity.\",\"severity\":\"LOW\"},{\"category\":\"Clarity\",\"originalSegment\":\"select the tab\",\"suggestedSegment\":\"select the Billing tab\",\"reason\":\"Omitting 'Billing' makes the instruction less specific and potentially unclear about which tab to select in contexts where multiple tabs might exist.\",\"severity\":\"MEDIUM\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab",
+            "reason": "The determiner 'the' before 'Billing tab' is omitted, though it's less critical here due to common usage, it still slightly affects clarity.",
+            "severity": "LOW"
+          },
+          {
+            "category": "Clarity",
+            "originalSegment": "select the tab",
+            "suggestedSegment": "select the Billing tab",
+            "reason": "Omitting 'Billing' makes the instruction less specific and potentially unclear about which tab to select in contexts where multiple tabs might exist.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 13760.43,
+      "ttft_ms": 995.53,
+      "prompt_tokens": 220,
+      "prompt_eval_time_ms": 814.68,
+      "prompt_eval_tps": 270.04,
+      "gen_tokens": 107,
+      "gen_time_ms": 12497.1,
+      "gen_tps": 8.56,
+      "total_server_dur_ms": 13469.41,
+      "load_dur_ms": 104.4,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Incorrect Information\",\n        \"originalSegment\":\"14 days after the account is closed.\",\n        \"suggestedSegment\":\"14 days after the account is closed (or as specified by policy).\",\n        \"reason\":\"The target text incorrectly states a longer retention period than the source text, potentially leading to misinformation.\",\n        \"severity\":\"MEDIUM\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Incorrect Information",
+            "originalSegment": "14 days after the account is closed.",
+            "suggestedSegment": "14 days after the account is closed (or as specified by policy).",
+            "reason": "The target text incorrectly states a longer retention period than the source text, potentially leading to misinformation.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 11938.36,
+      "ttft_ms": 971.7,
+      "prompt_tokens": 220,
+      "prompt_eval_time_ms": 801.24,
+      "prompt_eval_tps": 274.57,
+      "gen_tokens": 93,
+      "gen_time_ms": 10821.81,
+      "gen_tps": 8.59,
+      "total_server_dur_ms": 11761.71,
+      "load_dur_ms": 109.76,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Number Discrepancy\",\n        \"originalSegment\":\"14 days\",\n        \"suggestedSegment\":\"41 days\",\n        \"reason\":\"The number of days specified in the target text does not match the source text, indicating a significant factual error.\",\n        \"severity\":\"HIGH\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Number Discrepancy",
+            "originalSegment": "14 days",
+            "suggestedSegment": "41 days",
+            "reason": "The number of days specified in the target text does not match the source text, indicating a significant factual error.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 12584.64,
+      "ttft_ms": 1031.3,
+      "prompt_tokens": 480,
+      "prompt_eval_time_ms": 868.29,
+      "prompt_eval_tps": 552.81,
+      "gen_tokens": 96,
+      "gen_time_ms": 11250.64,
+      "gen_tps": 8.53,
+      "total_server_dur_ms": 12245.03,
+      "load_dur_ms": 105.31,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Inconsistency\",\"originalSegment\":\"14 days\",\"suggestedSegment\":\"14 days (corrected to match source if intended) / 41 days\",\"reason\":\"The duration specified in the target text (41 days) differs from the source text (14 days), indicating an inconsistency unless corrected to match the source intent.\",\"severity\":\"MEDIUM\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Inconsistency",
+            "originalSegment": "14 days",
+            "suggestedSegment": "14 days (corrected to match source if intended) / 41 days",
+            "reason": "The duration specified in the target text (41 days) differs from the source text (14 days), indicating an inconsistency unless corrected to match the source intent.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 2081.21,
+      "ttft_ms": 754.14,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 584.35,
+      "prompt_eval_tps": 349.1,
+      "gen_tokens": 12,
+      "gen_time_ms": 1304.59,
+      "gen_tps": 9.2,
+      "total_server_dur_ms": 2043.47,
+      "load_dur_ms": 108.08,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_clean",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 26735.22,
+      "ttft_ms": 743.0,
+      "prompt_tokens": 213,
+      "prompt_eval_time_ms": 600.33,
+      "prompt_eval_tps": 354.81,
+      "gen_tokens": 215,
+      "gen_time_ms": 25439.89,
+      "gen_tps": 8.45,
+      "total_server_dur_ms": 26167.76,
+      "load_dur_ms": 107.19,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Language Mismatch\",\"originalSegment\":\"To add a user\",\"suggestedSegment\":\"사용자 추가하기 위해\",\"reason\":\"The instruction contains English words in a Korean QA context, which is inconsistent with the task requirement for monolingual Korean text.\",\"severity\":\"HIGH\"},\n    {\"category\":\"Content Irrelevance\",\"originalSegment\":\"open Team settings, select Invite member\",\"suggestedSegment\":\"제거되어야 함\",\"reason\":\"The steps provided are in English and describe actions typically found in interface instructions rather than natural Korean text.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Grammar and Style\",\"originalSegment\":\"enter the user's work email address\",\"suggestedSegment\":\"사용자의 업무 이메일 주소를 입력하세요\",\"reason\":\"Direct translation of instructions should maintain natural Korean phrasing for clarity and fluency.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Language Mismatch",
+            "originalSegment": "To add a user",
+            "suggestedSegment": "사용자 추가하기 위해",
+            "reason": "The instruction contains English words in a Korean QA context, which is inconsistent with the task requirement for monolingual Korean text.",
+            "severity": "HIGH"
+          },
+          {
+            "category": "Content Irrelevance",
+            "originalSegment": "open Team settings, select Invite member",
+            "suggestedSegment": "제거되어야 함",
+            "reason": "The steps provided are in English and describe actions typically found in interface instructions rather than natural Korean text.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Grammar and Style",
+            "originalSegment": "enter the user's work email address",
+            "suggestedSegment": "사용자의 업무 이메일 주소를 입력하세요",
+            "reason": "Direct translation of instructions should maintain natural Korean phrasing for clarity and fluency.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_clean",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "clean": false
+      }
+    },
+    {
+      "wall_latency_ms": 10103.65,
+      "ttft_ms": 780.27,
+      "prompt_tokens": 464,
+      "prompt_eval_time_ms": 627.08,
+      "prompt_eval_tps": 739.94,
+      "gen_tokens": 78,
+      "gen_time_ms": 9172.1,
+      "gen_tps": 8.5,
+      "total_server_dur_ms": 9935.07,
+      "load_dur_ms": 100.44,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Grammar\",\"originalSegment\":\"enter the user's work email address\",\"suggestedSegment\":\"enter their work email address\",\"reason\":\"The possessive pronoun 'their' is more concise and clear than repeating 'user's'.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "enter the user's work email address",
+            "suggestedSegment": "enter their work email address",
+            "reason": "The possessive pronoun 'their' is more concise and clear than repeating 'user's'.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_clean",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "clean": false
+      }
+    },
+    {
+      "wall_latency_ms": 2246.65,
+      "ttft_ms": 833.85,
+      "prompt_tokens": 214,
+      "prompt_eval_time_ms": 673.74,
+      "prompt_eval_tps": 317.63,
+      "gen_tokens": 13,
+      "gen_time_ms": 1390.43,
+      "gen_tps": 9.35,
+      "total_server_dur_ms": 2206.91,
+      "load_dur_ms": 101.71,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 2244.57,
+      "ttft_ms": 813.62,
+      "prompt_tokens": 214,
+      "prompt_eval_time_ms": 661.13,
+      "prompt_eval_tps": 323.69,
+      "gen_tokens": 13,
+      "gen_time_ms": 1408.55,
+      "gen_tps": 9.23,
+      "total_server_dur_ms": 2194.08,
+      "load_dur_ms": 103.34,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 2199.18,
+      "ttft_ms": 865.04,
+      "prompt_tokens": 474,
+      "prompt_eval_time_ms": 712.15,
+      "prompt_eval_tps": 665.59,
+      "gen_tokens": 12,
+      "gen_time_ms": 1312.65,
+      "gen_tps": 9.14,
+      "total_server_dur_ms": 2161.15,
+      "load_dur_ms": 116.33,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 1889.91,
+      "ttft_ms": 459.66,
+      "prompt_tokens": 186,
+      "prompt_eval_time_ms": 296.08,
+      "prompt_eval_tps": 628.2,
+      "gen_tokens": 13,
+      "gen_time_ms": 1427.4,
+      "gen_tps": 9.11,
+      "total_server_dur_ms": 1867.31,
+      "load_dur_ms": 106.59,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 1746.83,
+      "ttft_ms": 423.91,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 293.89,
+      "prompt_eval_tps": 663.5,
+      "gen_tokens": 12,
+      "gen_time_ms": 1320.47,
+      "gen_tps": 9.09,
+      "total_server_dur_ms": 1735.7,
+      "load_dur_ms": 106.81,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 8673.61,
+      "ttft_ms": 439.94,
+      "prompt_tokens": 446,
+      "prompt_eval_time_ms": 308.13,
+      "prompt_eval_tps": 1447.42,
+      "gen_tokens": 68,
+      "gen_time_ms": 8149.6,
+      "gen_tps": 8.34,
+      "total_server_dur_ms": 8583.48,
+      "load_dur_ms": 101.75,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"close window\",\"suggestedSegment\":\"close the window\",\"reason\":\"Adding the article 'the' before 'window' improves clarity by specifying which window is being referred to.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "close window",
+            "suggestedSegment": "close the window",
+            "reason": "Adding the article 'the' before 'window' improves clarity by specifying which window is being referred to.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1753.67,
+      "ttft_ms": 434.76,
+      "prompt_tokens": 186,
+      "prompt_eval_time_ms": 293.74,
+      "prompt_eval_tps": 633.22,
+      "gen_tokens": 12,
+      "gen_time_ms": 1296.85,
+      "gen_tps": 9.25,
+      "total_server_dur_ms": 1722.1,
+      "load_dur_ms": 101.31,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 10773.84,
+      "ttft_ms": 438.04,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 300.19,
+      "prompt_eval_tps": 649.58,
+      "gen_tokens": 86,
+      "gen_time_ms": 10030.59,
+      "gen_tps": 8.57,
+      "total_server_dur_ms": 10458.8,
+      "load_dur_ms": 118.16,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"Review report before the meeting.\",\"suggestedSegment\":\"회의 전에 보고서 검토하세요.\",\"reason\":\"The provided text is in English and not Korean, hence it contains an inherent language mismatch issue for a Korean monolingual linter.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "Review report before the meeting.",
+            "suggestedSegment": "회의 전에 보고서 검토하세요.",
+            "reason": "The provided text is in English and not Korean, hence it contains an inherent language mismatch issue for a Korean monolingual linter.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 8120.67,
+      "ttft_ms": 457.35,
+      "prompt_tokens": 446,
+      "prompt_eval_time_ms": 306.98,
+      "prompt_eval_tps": 1452.87,
+      "gen_tokens": 63,
+      "gen_time_ms": 7541.03,
+      "gen_tps": 8.35,
+      "total_server_dur_ms": 7988.05,
+      "load_dur_ms": 106.2,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Review report\",\"suggestedSegment\":\"Review the report\",\"reason\":\"The singular countable noun 'report' requires the article 'the' for clarity.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "Review report",
+            "suggestedSegment": "Review the report",
+            "reason": "The singular countable noun 'report' requires the article 'the' for clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 10212.66,
+      "ttft_ms": 547.04,
+      "prompt_tokens": 194,
+      "prompt_eval_time_ms": 387.69,
+      "prompt_eval_tps": 500.4,
+      "gen_tokens": 80,
+      "gen_time_ms": 9476.44,
+      "gen_tps": 8.44,
+      "total_server_dur_ms": 10012.8,
+      "load_dur_ms": 114.64,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Redundancy\",\"originalSegment\":\"was reviewed by the accountant and was later approved by them\",\"suggestedSegment\":\"was reviewed and later approved by the accountant\",\"reason\":\"The repetition of 'was' makes the sentence redundant and less clear.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Redundancy",
+            "originalSegment": "was reviewed by the accountant and was later approved by them",
+            "suggestedSegment": "was reviewed and later approved by the accountant",
+            "reason": "The repetition of 'was' makes the sentence redundant and less clear.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 11970.29,
+      "ttft_ms": 537.03,
+      "prompt_tokens": 203,
+      "prompt_eval_time_ms": 388.63,
+      "prompt_eval_tps": 522.34,
+      "gen_tokens": 97,
+      "gen_time_ms": 11166.47,
+      "gen_tps": 8.69,
+      "total_server_dur_ms": 11678.9,
+      "load_dur_ms": 108.78,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The invoice was reviewed by the accountant and was later approved by them.\",\"suggestedSegment\":\"송장은 회계사에 의해 검토되었고, 이후에 승인되었습니다.\",\"reason\":\"The provided text is in English, not Korean. The task requires inspection of Korean text only.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The invoice was reviewed by the accountant and was later approved by them.",
+            "suggestedSegment": "송장은 회계사에 의해 검토되었고, 이후에 승인되었습니다.",
+            "reason": "The provided text is in English, not Korean. The task requires inspection of Korean text only.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 9420.55,
+      "ttft_ms": 570.01,
+      "prompt_tokens": 454,
+      "prompt_eval_time_ms": 414.21,
+      "prompt_eval_tps": 1096.06,
+      "gen_tokens": 75,
+      "gen_time_ms": 8708.63,
+      "gen_tps": 8.61,
+      "total_server_dur_ms": 9266.25,
+      "load_dur_ms": 111.59,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was later approved by them\",\"suggestedSegment\":\"was later approved by the accountant\",\"reason\":\"The repeated reference to 'them' is unnecessarily indirect and can lead to confusion about who performed the approval action.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was later approved by them",
+            "suggestedSegment": "was later approved by the accountant",
+            "reason": "The repeated reference to 'them' is unnecessarily indirect and can lead to confusion about who performed the approval action.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1868.87,
+      "ttft_ms": 537.31,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 385.0,
+      "prompt_eval_tps": 506.49,
+      "gen_tokens": 12,
+      "gen_time_ms": 1315.35,
+      "gen_tps": 9.12,
+      "total_server_dur_ms": 1841.07,
+      "load_dur_ms": 106.17,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "english",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 11747.86,
+      "ttft_ms": 539.96,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 400.2,
+      "prompt_eval_tps": 509.75,
+      "gen_tokens": 96,
+      "gen_time_ms": 10938.11,
+      "gen_tps": 8.78,
+      "total_server_dur_ms": 11470.28,
+      "load_dur_ms": 119.41,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The configuration was prepared by the operations team and was subsequently published by them.\",\"suggestedSegment\":\"구성은 운영팀에 의해 준비되어 이후에 그들이 출판했습니다.\",\"reason\":\"The provided text is in English, not Korean. Please provide a Korean text for analysis.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The configuration was prepared by the operations team and was subsequently published by them.",
+            "suggestedSegment": "구성은 운영팀에 의해 준비되어 이후에 그들이 출판했습니다.",
+            "reason": "The provided text is in English, not Korean. Please provide a Korean text for analysis.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "korean_baseline",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 9691.93,
+      "ttft_ms": 572.99,
+      "prompt_tokens": 455,
+      "prompt_eval_time_ms": 403.66,
+      "prompt_eval_tps": 1127.18,
+      "gen_tokens": 74,
+      "gen_time_ms": 8964.15,
+      "gen_tps": 8.26,
+      "total_server_dur_ms": 9493.79,
+      "load_dur_ms": 97.38,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was subsequently published by them\",\"suggestedSegment\":\"the operations team subsequently published it\",\"reason\":\"The repeated reference to 'them' is unnecessarily indirect; using 'the operations team' directly improves clarity.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was subsequently published by them",
+            "suggestedSegment": "the operations team subsequently published it",
+            "reason": "The repeated reference to 'them' is unnecessarily indirect; using 'the operations team' directly improves clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "english_fewshot",
+      "repetition": 2,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 7443.15,
+      "ttft_ms": 650.41,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 480.85,
+      "prompt_eval_tps": 409.69,
+      "gen_tokens": 58,
+      "gen_time_ms": 6680.43,
+      "gen_tps": 8.68,
+      "total_server_dur_ms": 7315.67,
+      "load_dur_ms": 119.43,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Incorrect spelling of 'receive'.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Incorrect spelling of 'receive'.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 15773.57,
+      "ttft_ms": 596.44,
+      "prompt_tokens": 206,
+      "prompt_eval_time_ms": 442.5,
+      "prompt_eval_tps": 465.53,
+      "gen_tokens": 127,
+      "gen_time_ms": 14980.68,
+      "gen_tps": 8.48,
+      "total_server_dur_ms": 15555.44,
+      "load_dur_ms": 119.79,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Incorrect spelling of English word in Korean context\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Context Mismatch\",\"originalSegment\":\"deployment completes\",\"suggestedSegment\":\"배포 완료\",\"reason\":\"The phrase 'deployment completes' is in English while the rest seems to expect Korean context without clear translation provided, leading to potential confusion.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Incorrect spelling of English word in Korean context",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Context Mismatch",
+            "originalSegment": "deployment completes",
+            "suggestedSegment": "배포 완료",
+            "reason": "The phrase 'deployment completes' is in English while the rest seems to expect Korean context without clear translation provided, leading to potential confusion.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 7972.31,
+      "ttft_ms": 619.06,
+      "prompt_tokens": 457,
+      "prompt_eval_time_ms": 468.43,
+      "prompt_eval_tps": 975.61,
+      "gen_tokens": 62,
+      "gen_time_ms": 7230.09,
+      "gen_tps": 8.58,
+      "total_server_dur_ms": 7835.93,
+      "load_dur_ms": 104.27,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"recieve\",\"suggestedSegment\":\"receive\",\"reason\":\"Misspelled word; correct spelling is 'receive'.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "recieve",
+            "suggestedSegment": "receive",
+            "reason": "Misspelled word; correct spelling is 'receive'.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_typo_receive",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 9230.64,
+      "ttft_ms": 514.32,
+      "prompt_tokens": 193,
+      "prompt_eval_time_ms": 361.25,
+      "prompt_eval_tps": 534.26,
+      "gen_tokens": 74,
+      "gen_time_ms": 8564.74,
+      "gen_tps": 8.64,
+      "total_server_dur_ms": 9065.44,
+      "load_dur_ms": 104.04,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are responsible\",\"suggestedSegment\":\"Each administrator is responsible\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are responsible",
+            "suggestedSegment": "Each administrator is responsible",
+            "reason": "Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 17530.32,
+      "ttft_ms": 493.93,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 357.31,
+      "prompt_eval_tps": 565.33,
+      "gen_tokens": 143,
+      "gen_time_ms": 16737.38,
+      "gen_tps": 8.54,
+      "total_server_dur_ms": 17219.02,
+      "load_dur_ms": 110.26,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are\",\"suggestedSegment\":\"Each administrator is\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Context Mismatch\",\"originalSegment\":\"reviewing the quarterly access report before Friday\",\"suggestedSegment\":\"review the quarterly access report by Friday\",\"reason\":\"The phrasing 'before Friday' suggests immediacy not typically aligned with administrative tasks; 'by Friday' is more appropriate for scheduled reviews.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are",
+            "suggestedSegment": "Each administrator is",
+            "reason": "Subject 'Each administrator' requires singular verb 'is'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Context Mismatch",
+            "originalSegment": "reviewing the quarterly access report before Friday",
+            "suggestedSegment": "review the quarterly access report by Friday",
+            "reason": "The phrasing 'before Friday' suggests immediacy not typically aligned with administrative tasks; 'by Friday' is more appropriate for scheduled reviews.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 18814.8,
+      "ttft_ms": 538.69,
+      "prompt_tokens": 453,
+      "prompt_eval_time_ms": 383.3,
+      "prompt_eval_tps": 1181.85,
+      "gen_tokens": 150,
+      "gen_time_ms": 17951.57,
+      "gen_tps": 8.36,
+      "total_server_dur_ms": 18462.1,
+      "load_dur_ms": 97.3,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Subject-Verb Agreement\",\"originalSegment\":\"Each administrator are responsible\",\"suggestedSegment\":\"Each administrator is responsible\",\"reason\":\"Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Article Usage\",\"originalSegment\":\"the quarterly access report\",\"suggestedSegment\":\"the quarterly access report (no change needed here, but ensuring contextually appropriate article usage)\",\"reason\":\"While not strictly incorrect, ensure contextually appropriate article usage if referring to a specific report known to both parties.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Subject-Verb Agreement",
+            "originalSegment": "Each administrator are responsible",
+            "suggestedSegment": "Each administrator is responsible",
+            "reason": "Subject 'Each administrator' requires singular verb 'is' instead of plural 'are'.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Article Usage",
+            "originalSegment": "the quarterly access report",
+            "suggestedSegment": "the quarterly access report (no change needed here, but ensuring contextually appropriate article usage)",
+            "reason": "While not strictly incorrect, ensure contextually appropriate article usage if referring to a specific report known to both parties.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_grammar_subject_verb",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1851.06,
+      "ttft_ms": 564.1,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 402.42,
+      "prompt_eval_tps": 484.57,
+      "gen_tokens": 12,
+      "gen_time_ms": 1262.6,
+      "gen_tps": 9.5,
+      "total_server_dur_ms": 1813.27,
+      "load_dur_ms": 108.01,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 13029.92,
+      "ttft_ms": 546.89,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 410.31,
+      "prompt_eval_tps": 497.18,
+      "gen_tokens": 106,
+      "gen_time_ms": 12262.49,
+      "gen_tps": 8.64,
+      "total_server_dur_ms": 12796.59,
+      "load_dur_ms": 110.0,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Language Mismatch\",\"originalSegment\":\"Open console and select Projects from the navigation menu to create a new workspace.\",\"suggestedSegment\":\"콘솔을 열고 네비게이션 메뉴에서 프로젝트를 선택하여 새로운 워크스페이스를 생성하세요.\",\"reason\":\"텍스트는 영어로 작성되어 있지만, 지시사항은 한국어로 검토되어야 합니다.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Language Mismatch",
+            "originalSegment": "Open console and select Projects from the navigation menu to create a new workspace.",
+            "suggestedSegment": "콘솔을 열고 네비게이션 메뉴에서 프로젝트를 선택하여 새로운 워크스페이스를 생성하세요.",
+            "reason": "텍스트는 영어로 작성되어 있지만, 지시사항은 한국어로 검토되어야 합니다.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 8635.0,
+      "ttft_ms": 609.47,
+      "prompt_tokens": 455,
+      "prompt_eval_time_ms": 439.47,
+      "prompt_eval_tps": 1035.34,
+      "gen_tokens": 66,
+      "gen_time_ms": 7880.9,
+      "gen_tps": 8.37,
+      "total_server_dur_ms": 8461.14,
+      "load_dur_ms": 111.71,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Open console\",\"suggestedSegment\":\"Open the console\",\"reason\":\"The singular countable noun 'console' should be preceded by the article 'the' for clarity.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "Open console",
+            "suggestedSegment": "Open the console",
+            "reason": "The singular countable noun 'console' should be preceded by the article 'the' for clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_article",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1933.41,
+      "ttft_ms": 636.75,
+      "prompt_tokens": 199,
+      "prompt_eval_time_ms": 485.18,
+      "prompt_eval_tps": 410.16,
+      "gen_tokens": 12,
+      "gen_time_ms": 1272.12,
+      "gen_tps": 9.43,
+      "total_server_dur_ms": 1894.84,
+      "load_dur_ms": 104.84,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 13184.03,
+      "ttft_ms": 674.32,
+      "prompt_tokens": 208,
+      "prompt_eval_time_ms": 528.12,
+      "prompt_eval_tps": 393.85,
+      "gen_tokens": 105,
+      "gen_time_ms": 12286.69,
+      "gen_tps": 8.55,
+      "total_server_dur_ms": 12943.21,
+      "load_dur_ms": 113.76,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The report was completed by the finance team and was then sent by them to leadership for review.\",\"suggestedSegment\":\"보고서는 재무팀에 의해 완료되어 그 후 리더십에 검토를 위해 제출되었습니다.\",\"reason\":\"The provided text is in English, not Korean. The task requires inspection of Korean text only.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The report was completed by the finance team and was then sent by them to leadership for review.",
+            "suggestedSegment": "보고서는 재무팀에 의해 완료되어 그 후 리더십에 검토를 위해 제출되었습니다.",
+            "reason": "The provided text is in English, not Korean. The task requires inspection of Korean text only.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 11339.08,
+      "ttft_ms": 704.86,
+      "prompt_tokens": 459,
+      "prompt_eval_time_ms": 538.75,
+      "prompt_eval_tps": 851.97,
+      "gen_tokens": 86,
+      "gen_time_ms": 10442.95,
+      "gen_tps": 8.24,
+      "total_server_dur_ms": 11129.69,
+      "load_dur_ms": 115.14,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Clarity\",\"originalSegment\":\"was then sent by them to leadership for review\",\"suggestedSegment\":\"the finance team then sent it to leadership for review\",\"reason\":\"The repeated reference to 'them' is unnecessarily indirect; specifying 'the finance team' directly improves clarity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was then sent by them to leadership for review",
+            "suggestedSegment": "the finance team then sent it to leadership for review",
+            "reason": "The repeated reference to 'them' is unnecessarily indirect; specifying 'the finance team' directly improves clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_awkward_passive",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 40239.62,
+      "ttft_ms": 23146.23,
+      "prompt_tokens": 197,
+      "prompt_eval_time_ms": 3060.76,
+      "prompt_eval_tps": 64.36,
+      "gen_tokens": 144,
+      "gen_time_ms": 16789.77,
+      "gen_tps": 8.58,
+      "total_server_dur_ms": 39523.86,
+      "load_dur_ms": 19670.63,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Clarity\",\"originalSegment\":\"When the migration completes click Restart\",\"suggestedSegment\":\"Upon completion of the migration, click Restart\",\"reason\":\"Improving clarity by specifying 'Upon completion' for better readability and flow.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Punctuation\",\"originalSegment\":\"then verify that the service health check passes.\",\"suggestedSegment\":\"then verify that the service health check passes.;\",\"reason\":\"Adding a semicolon after 'passes' for proper separation between independent clauses.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "When the migration completes click Restart",
+            "suggestedSegment": "Upon completion of the migration, click Restart",
+            "reason": "Improving clarity by specifying 'Upon completion' for better readability and flow.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Punctuation",
+            "originalSegment": "then verify that the service health check passes.",
+            "suggestedSegment": "then verify that the service health check passes.;",
+            "reason": "Adding a semicolon after 'passes' for proper separation between independent clauses.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 27336.62,
+      "ttft_ms": 3053.37,
+      "prompt_tokens": 206,
+      "prompt_eval_time_ms": 2867.45,
+      "prompt_eval_tps": 71.84,
+      "gen_tokens": 203,
+      "gen_time_ms": 23853.04,
+      "gen_tps": 8.51,
+      "total_server_dur_ms": 26849.4,
+      "load_dur_ms": 100.99,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"When the migration completes click Restart\",\"suggestedSegment\":\"마이그레이션이 완료되면 '다시 시작'을 클릭하세요\",\"reason\":\"The text provided is in English within a Korean context, indicating a translation mismatch issue.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Punctuation\",\"originalSegment\":\"then verify\",\"suggestedSegment\":\"그 다음에 확인하세요\",\"reason\":\"The phrase 'then verify' can be improved for natural Korean expression.\",\"severity\":\"LOW\"},\n    {\"category\":\"Grammar\",\"originalSegment\":\"service health check passes\",\"suggestedSegment\":\"서비스 상태 확인이 성공적으로 완료됩니다\",\"reason\":\"The phrase 'passes' is awkward in Korean; a more natural expression is provided.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "When the migration completes click Restart",
+            "suggestedSegment": "마이그레이션이 완료되면 '다시 시작'을 클릭하세요",
+            "reason": "The text provided is in English within a Korean context, indicating a translation mismatch issue.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Punctuation",
+            "originalSegment": "then verify",
+            "suggestedSegment": "그 다음에 확인하세요",
+            "reason": "The phrase 'then verify' can be improved for natural Korean expression.",
+            "severity": "LOW"
+          },
+          {
+            "category": "Grammar",
+            "originalSegment": "service health check passes",
+            "suggestedSegment": "서비스 상태 확인이 성공적으로 완료됩니다",
+            "reason": "The phrase 'passes' is awkward in Korean; a more natural expression is provided.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 23709.52,
+      "ttft_ms": 4962.32,
+      "prompt_tokens": 457,
+      "prompt_eval_time_ms": 4701.81,
+      "prompt_eval_tps": 97.2,
+      "gen_tokens": 158,
+      "gen_time_ms": 18412.79,
+      "gen_tps": 8.58,
+      "total_server_dur_ms": 23275.99,
+      "load_dur_ms": 122.48,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Clarity\",\"originalSegment\":\"click Restart\",\"suggestedSegment\":\"click Restart button\",\"reason\":\"Specifying 'button' clarifies what action to perform, assuming 'Restart' might refer to a menu item or button label needing explicit identification.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Grammar\",\"originalSegment\":\"When the migration completes\",\"suggestedSegment\":\"Upon completion of the migration\",\"reason\":\"Using 'Upon completion' can sometimes improve flow and clarity, though 'When' is acceptable; however, adding 'of the' before 'migration' enhances specificity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "click Restart",
+            "suggestedSegment": "click Restart button",
+            "reason": "Specifying 'button' clarifies what action to perform, assuming 'Restart' might refer to a menu item or button label needing explicit identification.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Grammar",
+            "originalSegment": "When the migration completes",
+            "suggestedSegment": "Upon completion of the migration",
+            "reason": "Using 'Upon completion' can sometimes improve flow and clarity, though 'When' is acceptable; however, adding 'of the' before 'migration' enhances specificity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_missing_comma",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 14965.07,
+      "ttft_ms": 3261.76,
+      "prompt_tokens": 215,
+      "prompt_eval_time_ms": 3032.06,
+      "prompt_eval_tps": 70.91,
+      "gen_tokens": 101,
+      "gen_time_ms": 11494.19,
+      "gen_tps": 8.79,
+      "total_server_dur_ms": 14690.85,
+      "load_dur_ms": 116.48,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Omission\",\n        \"originalSegment\":\"select the Billing tab\",\n        \"suggestedSegment\":\"select the Billing tab\",\n        \"reason\":\"The specific instruction to select the 'Billing' tab was omitted in the target text, which could lead to confusion about which tab to choose initially.\",\n        \"severity\":\"MEDIUM\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab",
+            "reason": "The specific instruction to select the 'Billing' tab was omitted in the target text, which could lead to confusion about which tab to choose initially.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 15034.44,
+      "ttft_ms": 3031.91,
+      "prompt_tokens": 215,
+      "prompt_eval_time_ms": 2845.15,
+      "prompt_eval_tps": 75.57,
+      "gen_tokens": 103,
+      "gen_time_ms": 11788.27,
+      "gen_tps": 8.74,
+      "total_server_dur_ms": 14762.12,
+      "load_dur_ms": 103.64,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Terminology Omission\",\n        \"originalSegment\":\"select the Billing tab\",\n        \"suggestedSegment\":\"select the Billing tab specifically\",\n        \"reason\":\"The target text omits the crucial detail of selecting the 'Billing' tab, which is present in the source text and essential for clarity.\",\n        \"severity\":\"MEDIUM\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Terminology Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab specifically",
+            "reason": "The target text omits the crucial detail of selecting the 'Billing' tab, which is present in the source text and essential for clarity.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 22995.53,
+      "ttft_ms": 5201.53,
+      "prompt_tokens": 475,
+      "prompt_eval_time_ms": 4977.22,
+      "prompt_eval_tps": 95.43,
+      "gen_tokens": 148,
+      "gen_time_ms": 17475.29,
+      "gen_tps": 8.47,
+      "total_server_dur_ms": 22582.38,
+      "load_dur_ms": 98.72,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Omission\",\"originalSegment\":\"select the Billing tab\",\"suggestedSegment\":\"select the Billing tab\",\"reason\":\"The determiner 'the' before 'Billing tab' is omitted, though it's less critical here due to common usage, it still slightly affects clarity.\",\"severity\":\"LOW\"},{\"category\":\"Omission\",\"originalSegment\":\"select the tab\",\"suggestedSegment\":\"select the Billing tab\",\"reason\":\"Similar to above, omitting 'the' before 'tab' could lead to slight ambiguity, though less critical here compared to 'Billing tab'.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Omission",
+            "originalSegment": "select the Billing tab",
+            "suggestedSegment": "select the Billing tab",
+            "reason": "The determiner 'the' before 'Billing tab' is omitted, though it's less critical here due to common usage, it still slightly affects clarity.",
+            "severity": "LOW"
+          },
+          {
+            "category": "Omission",
+            "originalSegment": "select the tab",
+            "suggestedSegment": "select the Billing tab",
+            "reason": "Similar to above, omitting 'the' before 'tab' could lead to slight ambiguity, though less critical here compared to 'Billing tab'.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_omission",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 13984.58,
+      "ttft_ms": 987.22,
+      "prompt_tokens": 220,
+      "prompt_eval_time_ms": 810.84,
+      "prompt_eval_tps": 271.32,
+      "gen_tokens": 110,
+      "gen_time_ms": 12766.25,
+      "gen_tps": 8.62,
+      "total_server_dur_ms": 13732.53,
+      "load_dur_ms": 108.74,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Incorrect Information\",\"originalSegment\":\"The retention policy keeps audit logs for 14 days after the account is closed.\",\"suggestedSegment\":\"The retention policy keeps audit logs for 14 days after the account is closed (corrected from original source if needed).\",\"reason\":\"The duration specified in the target text (41 days) contradicts the source text (14 days).\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Incorrect Information",
+            "originalSegment": "The retention policy keeps audit logs for 14 days after the account is closed.",
+            "suggestedSegment": "The retention policy keeps audit logs for 14 days after the account is closed (corrected from original source if needed).",
+            "reason": "The duration specified in the target text (41 days) contradicts the source text (14 days).",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 11890.71,
+      "ttft_ms": 987.58,
+      "prompt_tokens": 220,
+      "prompt_eval_time_ms": 821.03,
+      "prompt_eval_tps": 267.96,
+      "gen_tokens": 93,
+      "gen_time_ms": 10707.83,
+      "gen_tps": 8.69,
+      "total_server_dur_ms": 11672.14,
+      "load_dur_ms": 115.06,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\n        \"category\":\"Number Discrepancy\",\n        \"originalSegment\":\"14 days\",\n        \"suggestedSegment\":\"41 days\",\n        \"reason\":\"The number of days specified in the target text does not match the source text, indicating a significant factual error.\",\n        \"severity\":\"HIGH\"\n    }\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Number Discrepancy",
+            "originalSegment": "14 days",
+            "suggestedSegment": "41 days",
+            "reason": "The number of days specified in the target text does not match the source text, indicating a significant factual error.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 12384.61,
+      "ttft_ms": 984.0,
+      "prompt_tokens": 480,
+      "prompt_eval_time_ms": 830.02,
+      "prompt_eval_tps": 578.3,
+      "gen_tokens": 92,
+      "gen_time_ms": 11195.28,
+      "gen_tps": 8.22,
+      "total_server_dur_ms": 12159.34,
+      "load_dur_ms": 99.23,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Inconsistency\",\"originalSegment\":\"14 days\",\"suggestedSegment\":\"14 days (corrected to match source if intended) / 41 days (if source correction needed)\",\"reason\":\"The target text incorrectly states a different duration (41 days) compared to the source text (14 days).\",\"severity\":\"MEDIUM\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Inconsistency",
+            "originalSegment": "14 days",
+            "suggestedSegment": "14 days (corrected to match source if intended) / 41 days (if source correction needed)",
+            "reason": "The target text incorrectly states a different duration (41 days) compared to the source text (14 days).",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_bilingual_number_mismatch",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 2035.95,
+      "ttft_ms": 748.77,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 566.03,
+      "prompt_eval_tps": 360.41,
+      "gen_tokens": 12,
+      "gen_time_ms": 1263.15,
+      "gen_tps": 9.5,
+      "total_server_dur_ms": 1994.11,
+      "load_dur_ms": 111.19,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_mono_clean",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 24512.08,
+      "ttft_ms": 749.95,
+      "prompt_tokens": 213,
+      "prompt_eval_time_ms": 595.69,
+      "prompt_eval_tps": 357.57,
+      "gen_tokens": 201,
+      "gen_time_ms": 23339.49,
+      "gen_tps": 8.61,
+      "total_server_dur_ms": 24067.59,
+      "load_dur_ms": 109.46,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Language Mismatch\",\"originalSegment\":\"To add a user\",\"suggestedSegment\":\"사용자 추가하기\",\"reason\":\"The instruction contains English words in a context requiring Korean text.\",\"severity\":\"HIGH\"},\n    {\"category\":\"Content Appropriateness\",\"originalSegment\":\"open Team settings, select Invite member\",\"suggestedSegment\":\"팀 설정 열기, 멤버 초대 선택\",\"reason\":\"Specific English terms like 'Team settings' and 'Invite member' should be translated into natural Korean phrasing.\",\"severity\":\"MEDIUM\"},\n    {\"category\":\"Grammar\",\"originalSegment\":\"enter the user's work email address\",\"suggestedSegment\":\"사용자의 업무 이메일 주소 입력하기\",\"reason\":\"While grammatically correct, ensuring natural phrasing in Korean improves clarity.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Language Mismatch",
+            "originalSegment": "To add a user",
+            "suggestedSegment": "사용자 추가하기",
+            "reason": "The instruction contains English words in a context requiring Korean text.",
+            "severity": "HIGH"
+          },
+          {
+            "category": "Content Appropriateness",
+            "originalSegment": "open Team settings, select Invite member",
+            "suggestedSegment": "팀 설정 열기, 멤버 초대 선택",
+            "reason": "Specific English terms like 'Team settings' and 'Invite member' should be translated into natural Korean phrasing.",
+            "severity": "MEDIUM"
+          },
+          {
+            "category": "Grammar",
+            "originalSegment": "enter the user's work email address",
+            "suggestedSegment": "사용자의 업무 이메일 주소 입력하기",
+            "reason": "While grammatically correct, ensuring natural phrasing in Korean improves clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_clean",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "clean": false
+      }
+    },
+    {
+      "wall_latency_ms": 14392.28,
+      "ttft_ms": 5083.97,
+      "prompt_tokens": 464,
+      "prompt_eval_time_ms": 4860.31,
+      "prompt_eval_tps": 95.47,
+      "gen_tokens": 78,
+      "gen_time_ms": 9139.05,
+      "gen_tps": 8.53,
+      "total_server_dur_ms": 14129.56,
+      "load_dur_ms": 93.53,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Grammar\",\"originalSegment\":\"enter the user's work email address\",\"suggestedSegment\":\"enter their work email address\",\"reason\":\"The possessive pronoun 'their' is more concise and clear than repeating 'user's'.\",\"severity\":\"LOW\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "enter the user's work email address",
+            "suggestedSegment": "enter their work email address",
+            "reason": "The possessive pronoun 'their' is more concise and clear than repeating 'user's'.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_mono_clean",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "clean": false
+      }
+    },
+    {
+      "wall_latency_ms": 2288.38,
+      "ttft_ms": 848.14,
+      "prompt_tokens": 214,
+      "prompt_eval_time_ms": 667.97,
+      "prompt_eval_tps": 320.37,
+      "gen_tokens": 13,
+      "gen_time_ms": 1412.59,
+      "gen_tps": 9.2,
+      "total_server_dur_ms": 2242.49,
+      "load_dur_ms": 116.88,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 2227.2,
+      "ttft_ms": 819.52,
+      "prompt_tokens": 214,
+      "prompt_eval_time_ms": 682.78,
+      "prompt_eval_tps": 313.42,
+      "gen_tokens": 13,
+      "gen_time_ms": 1379.6,
+      "gen_tps": 9.42,
+      "total_server_dur_ms": 2181.12,
+      "load_dur_ms": 102.1,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 2200.54,
+      "ttft_ms": 878.58,
+      "prompt_tokens": 474,
+      "prompt_eval_time_ms": 713.94,
+      "prompt_eval_tps": 663.92,
+      "gen_tokens": 12,
+      "gen_time_ms": 1294.94,
+      "gen_tps": 9.27,
+      "total_server_dur_ms": 2137.33,
+      "load_dur_ms": 105.59,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_bilingual_clean",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "clean": true
+      }
+    },
+    {
+      "wall_latency_ms": 1951.88,
+      "ttft_ms": 527.31,
+      "prompt_tokens": 186,
+      "prompt_eval_time_ms": 357.65,
+      "prompt_eval_tps": 520.06,
+      "gen_tokens": 13,
+      "gen_time_ms": 1395.93,
+      "gen_tps": 9.31,
+      "total_server_dur_ms": 1901.75,
+      "load_dur_ms": 103.04,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 1726.43,
+      "ttft_ms": 441.57,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 287.27,
+      "prompt_eval_tps": 678.81,
+      "gen_tokens": 12,
+      "gen_time_ms": 1259.29,
+      "gen_tps": 9.53,
+      "total_server_dur_ms": 1669.24,
+      "load_dur_ms": 99.03,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 12928.79,
+      "ttft_ms": 4737.77,
+      "prompt_tokens": 446,
+      "prompt_eval_time_ms": 4517.79,
+      "prompt_eval_tps": 98.72,
+      "gen_tokens": 68,
+      "gen_time_ms": 8053.02,
+      "gen_tps": 8.44,
+      "total_server_dur_ms": 12704.1,
+      "load_dur_ms": 116.35,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"close window\",\"suggestedSegment\":\"close the window\",\"reason\":\"Adding the article 'the' before 'window' improves clarity by specifying which window is being referred to.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "close window",
+            "suggestedSegment": "close the window",
+            "reason": "Adding the article 'the' before 'window' improves clarity by specifying which window is being referred to.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_save_window",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1785.32,
+      "ttft_ms": 501.67,
+      "prompt_tokens": 186,
+      "prompt_eval_time_ms": 351.37,
+      "prompt_eval_tps": 529.35,
+      "gen_tokens": 12,
+      "gen_time_ms": 1262.36,
+      "gen_tps": 9.51,
+      "total_server_dur_ms": 1753.25,
+      "load_dur_ms": 102.82,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 13416.63,
+      "ttft_ms": 423.39,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 296.1,
+      "prompt_eval_tps": 658.55,
+      "gen_tokens": 111,
+      "gen_time_ms": 12765.93,
+      "gen_tps": 8.7,
+      "total_server_dur_ms": 13179.88,
+      "load_dur_ms": 109.07,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"Review report before the meeting.\",\"suggestedSegment\":\"회의 전에 보고서 검토하세요.\",\"reason\":\"The provided text is in English and not Korean, hence it contains no Korean language specific issues like spelling, grammar, or syntax errors relevant to this task. However, for context, a proper Korean translation is suggested for clarity and appropriateness in a Korean setting.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "Review report before the meeting.",
+            "suggestedSegment": "회의 전에 보고서 검토하세요.",
+            "reason": "The provided text is in English and not Korean, hence it contains no Korean language specific issues like spelling, grammar, or syntax errors relevant to this task. However, for context, a proper Korean translation is suggested for clarity and appropriateness in a Korean setting.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 7925.67,
+      "ttft_ms": 451.8,
+      "prompt_tokens": 446,
+      "prompt_eval_time_ms": 306.05,
+      "prompt_eval_tps": 1457.26,
+      "gen_tokens": 63,
+      "gen_time_ms": 7341.0,
+      "gen_tps": 8.58,
+      "total_server_dur_ms": 7781.98,
+      "load_dur_ms": 102.04,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Grammar\",\"originalSegment\":\"Review report\",\"suggestedSegment\":\"Review the report\",\"reason\":\"The singular countable noun 'report' requires the article 'the' for clarity.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Grammar",
+            "originalSegment": "Review report",
+            "suggestedSegment": "Review the report",
+            "reason": "The singular countable noun 'report' requires the article 'the' for clarity.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_missing_article_review_report",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 9887.83,
+      "ttft_ms": 540.99,
+      "prompt_tokens": 194,
+      "prompt_eval_time_ms": 387.64,
+      "prompt_eval_tps": 500.46,
+      "gen_tokens": 80,
+      "gen_time_ms": 9196.92,
+      "gen_tps": 8.7,
+      "total_server_dur_ms": 9726.29,
+      "load_dur_ms": 106.12,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Redundancy\",\"originalSegment\":\"was reviewed by the accountant and was later approved by them\",\"suggestedSegment\":\"was reviewed and later approved by the accountant\",\"reason\":\"The repetition of 'was' makes the sentence redundant and less clear.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Redundancy",
+            "originalSegment": "was reviewed by the accountant and was later approved by them",
+            "suggestedSegment": "was reviewed and later approved by the accountant",
+            "reason": "The repetition of 'was' makes the sentence redundant and less clear.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 12046.87,
+      "ttft_ms": 527.56,
+      "prompt_tokens": 203,
+      "prompt_eval_time_ms": 382.69,
+      "prompt_eval_tps": 530.45,
+      "gen_tokens": 97,
+      "gen_time_ms": 11313.71,
+      "gen_tps": 8.57,
+      "total_server_dur_ms": 11818.13,
+      "load_dur_ms": 107.71,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The invoice was reviewed by the accountant and was later approved by them.\",\"suggestedSegment\":\"송장은 회계사에 의해 검토되었고, 이후에 승인되었습니다.\",\"reason\":\"The provided text is in English, not Korean. The task requires inspection of Korean text only.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The invoice was reviewed by the accountant and was later approved by them.",
+            "suggestedSegment": "송장은 회계사에 의해 검토되었고, 이후에 승인되었습니다.",
+            "reason": "The provided text is in English, not Korean. The task requires inspection of Korean text only.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 9717.85,
+      "ttft_ms": 546.56,
+      "prompt_tokens": 454,
+      "prompt_eval_time_ms": 399.54,
+      "prompt_eval_tps": 1136.32,
+      "gen_tokens": 76,
+      "gen_time_ms": 9000.83,
+      "gen_tps": 8.44,
+      "total_server_dur_ms": 9534.06,
+      "load_dur_ms": 101.83,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was later approved by them\",\"suggestedSegment\":\"was later approved by the accountant\",\"reason\":\"The repeated reference to 'them' is unnecessarily indirect and reduces clarity; specifying 'the accountant' directly improves readability.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was later approved by them",
+            "suggestedSegment": "was later approved by the accountant",
+            "reason": "The repeated reference to 'them' is unnecessarily indirect and reduces clarity; specifying 'the accountant' directly improves readability.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_invoice_agent",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    },
+    {
+      "wall_latency_ms": 1886.08,
+      "ttft_ms": 562.07,
+      "prompt_tokens": 195,
+      "prompt_eval_time_ms": 407.2,
+      "prompt_eval_tps": 478.87,
+      "gen_tokens": 12,
+      "gen_time_ms": 1301.05,
+      "gen_tps": 9.22,
+      "total_server_dur_ms": 1851.9,
+      "load_dur_ms": 103.8,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "english",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 11772.46,
+      "ttft_ms": 552.16,
+      "prompt_tokens": 204,
+      "prompt_eval_time_ms": 401.49,
+      "prompt_eval_tps": 508.11,
+      "gen_tokens": 96,
+      "gen_time_ms": 11055.17,
+      "gen_tps": 8.68,
+      "total_server_dur_ms": 11591.67,
+      "load_dur_ms": 122.93,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Translation Issue\",\"originalSegment\":\"The configuration was prepared by the operations team and was subsequently published by them.\",\"suggestedSegment\":\"구성은 운영팀에 의해 준비되어 이후에 그들이 게시했습니다.\",\"reason\":\"The provided text is in English, not Korean. Please provide a Korean text for analysis.\",\"severity\":\"HIGH\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Translation Issue",
+            "originalSegment": "The configuration was prepared by the operations team and was subsequently published by them.",
+            "suggestedSegment": "구성은 운영팀에 의해 준비되어 이후에 그들이 게시했습니다.",
+            "reason": "The provided text is in English, not Korean. Please provide a Korean text for analysis.",
+            "severity": "HIGH"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "korean_baseline",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": false
+      }
+    },
+    {
+      "wall_latency_ms": 10254.06,
+      "ttft_ms": 555.73,
+      "prompt_tokens": 455,
+      "prompt_eval_time_ms": 406.8,
+      "prompt_eval_tps": 1118.48,
+      "gen_tokens": 82,
+      "gen_time_ms": 9549.27,
+      "gen_tps": 8.59,
+      "total_server_dur_ms": 10094.81,
+      "load_dur_ms": 105.77,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[{\"category\":\"Clarity\",\"originalSegment\":\"was subsequently published by them\",\"suggestedSegment\":\"was subsequently published by the operations team\",\"reason\":\"The repeated agent reference 'by them' is unnecessarily indirect; specifying 'the operations team' once clarifies who performed the action without repetition.\",\"severity\":\"LOW\"}]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Clarity",
+            "originalSegment": "was subsequently published by them",
+            "suggestedSegment": "was subsequently published by the operations team",
+            "reason": "The repeated agent reference 'by them' is unnecessarily indirect; specifying 'the operations team' once clarifies who performed the action without repetition.",
+            "severity": "LOW"
+          }
+        ]
+      },
+      "case_id": "en_holdout_clarity_configuration_agent",
+      "variant": "english_fewshot",
+      "repetition": 3,
+      "verdict": {
+        "seeded_error_caught": true
+      }
+    }
+  ]
+}
