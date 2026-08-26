@@ -160,10 +160,7 @@ pub async fn analyze_paragraph(
         .target(&paragraph.text);
 
     if let Some(guidelines) = options.as_ref().and_then(|options| options.guidelines.clone()) {
-        let prompt_rules = guidelines.build_prompt_rules();
-        if !prompt_rules.trim().is_empty() {
-            builder = builder.guidelines(prompt_rules);
-        }
+        builder = builder.guideline_set(guidelines);
     }
 
     if let Some(preferences) = options.and_then(|options| options.user_preferences) {

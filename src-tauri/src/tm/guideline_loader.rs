@@ -133,11 +133,14 @@ impl GuidelineSet {
             return String::new();
         }
 
-        let mut lines = Vec::with_capacity(self.rules.len());
-        for rule in &self.rules {
-            lines.push(rule.to_prompt_line());
-        }
-        lines.join("\n")
+        self.prompt_rule_lines().join("\n")
+    }
+
+    /// Returns the canonical prompt representation of each structured rule.
+    /// Keeping this separate lets prompt construction drop whole rules without
+    /// duplicating `QaRule::to_prompt_line()` formatting elsewhere.
+    pub fn prompt_rule_lines(&self) -> Vec<String> {
+        self.rules.iter().map(QaRule::to_prompt_line).collect()
     }
 
     /// Returns sensible built-in default guideline rules when no project file is found.

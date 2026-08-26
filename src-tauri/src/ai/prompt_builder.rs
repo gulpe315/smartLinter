@@ -4,7 +4,21 @@
 //! validated in Task 3 Spike (SPIKE_RESULTS_TASK3.md). Keeps prompt token count within ~200 tokens
 //! on average while strictly forcing JSON output schema on local LLM runtimes (Ollama).
 
-use crate::ai::types::{GenerateOptions, QueueJobRequest};
+use crate::{
+    ai::types::{GenerateOptions, QueueJobRequest},
+    tm::GuidelineSet,
+};
+use tracing::debug;
+
+/// Desired prompt size and absolute maximum, estimated with `estimate_tokens`.
+pub const NOMINAL_PROMPT_TOKEN_BUDGET: usize = 400;
+pub const HARD_PROMPT_TOKEN_CAP: usize = 450;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum GuidelineContext {
+    Structured(Vec<String>),
+    Raw(String),
+}
 
 /// A compact, previously accepted correction supplied as advisory QA context.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,7 +43,7 @@ pub const QA_COMPRESSED_TEMPLATE: &str = include_str!("templates/qa_compressed.t
 pub struct PromptBuilder {
     source: String,
     target: String,
-    guidelines: Option<String>,
+    guidelines: Option<GuidelineContext>,
     user_preferences: Vec<CorrectionPreference>,
     temperature: Option<f32>,
     num_ctx: Option<u32>,
@@ -66,8 +80,20 @@ impl PromptBuilder {
     pub fn guidelines(mut self, guidelines: impl Into<String>) -> Self {
         let g = guidelines.into();
         if !g.trim().is_empty() {
-            self.guidelines = Some(g);
+            self.guidelines = Some(GuidelineContext::Raw(g));
         }
+        self
+    }
+
+    /// Sets project guidelines while retaining structured-rule boundaries for
+    /// deterministic token-budget truncation.
+    pub fn guideline_set(mut self, guidelines: GuidelineSet) -> Self {
+        self.guidelines = if guidelines.rules.is_empty() {
+            (!guidelines.raw_content.trim().is_empty())
+                .then(|| GuidelineContext::Raw(guidelines.raw_content))
+        } else {
+            Some(GuidelineContext::Structured(guidelines.prompt_rule_lines()))
+        };
         self
     }
 
@@ -107,19 +133,77 @@ impl PromptBuilder {
 
     /// Builds the system prompt component with optional project and preference context.
     pub fn build_system_prompt(&self) -> String {
+        self.build_budgeted_system_prompt(&self.build_user_prompt())
+    }
+
+    fn build_budgeted_system_prompt(&self, user_prompt: &str) -> String {
         let instruction = if self.source.trim().is_empty() {
             MONOLINGUAL_SYSTEM_INSTRUCTION
         } else {
             COMPRESSED_SYSTEM_INSTRUCTION
         };
-        let mut prompt = instruction.to_string();
-        if let Some(ref guidelines) = self.guidelines {
-            prompt.push_str("\n\nGuidelines:\n");
-            prompt.push_str(guidelines.trim());
+        let original_history_count = self.user_preferences.len();
+        let mut history_count = original_history_count;
+        let mut guideline_lines = self.guideline_lines();
+        let original_guideline_count = guideline_lines.len();
+
+        while self.prompt_token_count(instruction, &guideline_lines, history_count, user_prompt)
+            > HARD_PROMPT_TOKEN_CAP
+            && history_count > 0
+        {
+            history_count -= 1;
         }
-        if !self.user_preferences.is_empty() {
+
+        while self.prompt_token_count(instruction, &guideline_lines, history_count, user_prompt)
+            > HARD_PROMPT_TOKEN_CAP
+            && !guideline_lines.is_empty()
+        {
+            guideline_lines.pop();
+        }
+
+        let total_tokens =
+            self.prompt_token_count(instruction, &guideline_lines, history_count, user_prompt);
+        if history_count != original_history_count
+            || guideline_lines.len() != original_guideline_count
+        {
+            debug!(
+                nominal_budget = NOMINAL_PROMPT_TOKEN_BUDGET,
+                hard_cap = HARD_PROMPT_TOKEN_CAP,
+                estimated_tokens = total_tokens,
+                history_kept = history_count,
+                history_dropped = original_history_count - history_count,
+                guidelines_kept = guideline_lines.len(),
+                guidelines_dropped = original_guideline_count - guideline_lines.len(),
+                "Truncated QA prompt context to fit token budget"
+            );
+        }
+
+        self.render_system_prompt(instruction, &guideline_lines, history_count)
+    }
+
+    fn guideline_lines(&self) -> Vec<String> {
+        match &self.guidelines {
+            Some(GuidelineContext::Structured(lines)) => lines.clone(),
+            // Legacy/free-form guidelines are only cut at line boundaries.
+            Some(GuidelineContext::Raw(raw)) => raw.lines().map(str::to_owned).collect(),
+            None => Vec::new(),
+        }
+    }
+
+    fn render_system_prompt(
+        &self,
+        instruction: &str,
+        guideline_lines: &[String],
+        history_count: usize,
+    ) -> String {
+        let mut prompt = instruction.to_string();
+        if !guideline_lines.is_empty() {
+            prompt.push_str("\n\nGuidelines:\n");
+            prompt.push_str(&guideline_lines.join("\n"));
+        }
+        if history_count > 0 {
             prompt.push_str("\n\nUser Preferences (prior accepted; use only if applicable):\n");
-            for preference in &self.user_preferences {
+            for preference in self.user_preferences.iter().take(history_count) {
                 prompt.push_str(&format!(
                     "- \"{}\" -> \"{}\"\n",
                     preference.original_segment.trim(),
@@ -129,6 +213,20 @@ impl PromptBuilder {
             prompt.pop();
         }
         prompt
+    }
+
+    fn prompt_token_count(
+        &self,
+        instruction: &str,
+        guideline_lines: &[String],
+        history_count: usize,
+        user_prompt: &str,
+    ) -> usize {
+        Self::estimate_tokens(&format!(
+            "{}\n{}",
+            self.render_system_prompt(instruction, guideline_lines, history_count),
+            user_prompt
+        ))
     }
 
     /// Builds the user prompt component containing the source and target paragraphs.
@@ -142,8 +240,8 @@ impl PromptBuilder {
 
     /// Builds the full single-string prompt (combining system instructions and SRC/TGT payload).
     pub fn build_prompt(&self) -> String {
-        let system = self.build_system_prompt();
         let user = self.build_user_prompt();
+        let system = self.build_budgeted_system_prompt(&user);
         format!("{}\n{}", system, user)
     }
 
@@ -160,8 +258,9 @@ impl PromptBuilder {
 
     /// Constructs a fully configured `QueueJobRequest` with JSON format enforced.
     pub fn build_queue_request(&self, paragraph_id: impl Into<String>) -> QueueJobRequest {
-        let mut req = QueueJobRequest::new(paragraph_id, self.build_user_prompt())
-            .with_system(self.build_system_prompt())
+        let user = self.build_user_prompt();
+        let mut req = QueueJobRequest::new(paragraph_id, user.clone())
+            .with_system(self.build_budgeted_system_prompt(&user))
             .with_options(self.build_generate_options());
 
         if let Some(ref m) = self.model_override {
@@ -331,6 +430,118 @@ mod tests {
 
         assert!(with_preferences.contains("User Preferences (prior accepted; use only if applicable):\n- \"teh\" -> \"the\""));
         assert!(!without_preferences.contains("User Preferences:"));
+    }
+
+    fn preference(original: &str, suggested: &str) -> CorrectionPreference {
+        CorrectionPreference {
+            original_segment: original.to_string(),
+            suggested_segment: suggested.to_string(),
+            category: None,
+            reason: None,
+        }
+    }
+
+    #[test]
+    fn budget_keeps_small_guidelines_and_two_history_entries() {
+        let builder = PromptBuilder::new()
+            .source("Open Settings.")
+            .target("설정을 엽니다.")
+            .guidelines("- [Style] Use polite Korean.\n- [Terms] Keep product names unchanged.")
+            .user_preferences([preference("teh", "the"), preference("colour", "color")]);
+
+        let prompt = builder.build_prompt();
+        assert!(prompt.contains("Use polite Korean."));
+        assert!(prompt.contains("\"teh\" -> \"the\""));
+        assert!(prompt.contains("\"colour\" -> \"color\""));
+        assert!(PromptBuilder::estimate_tokens(&prompt) <= HARD_PROMPT_TOKEN_CAP);
+    }
+
+    #[test]
+    fn budget_drops_all_history_before_touching_guidelines() {
+        let guideline = format!("- [Priority] {}", "guideline ".repeat(70));
+        let builder = PromptBuilder::new()
+            .source("Source")
+            .target("Target")
+            .guidelines(&guideline)
+            .user_preferences([
+                preference(&"first ".repeat(180), &"replacement ".repeat(180)),
+                preference(&"second ".repeat(180), &"replacement ".repeat(180)),
+            ]);
+
+        let prompt = builder.build_prompt();
+        assert!(prompt.contains(&guideline));
+        assert!(!prompt.contains("User Preferences"));
+        assert!(PromptBuilder::estimate_tokens(&prompt) <= HARD_PROMPT_TOKEN_CAP);
+    }
+
+    #[test]
+    fn budget_reduces_history_to_one_before_guidelines() {
+        let guideline = format!("- [Priority] {}", "guideline ".repeat(70));
+        let first = "first ".repeat(25);
+        let second = "second ".repeat(25);
+        let prompt = PromptBuilder::new()
+            .source("Source")
+            .target("Target")
+            .guidelines(&guideline)
+            .user_preferences([
+                preference(&first, &"replacement ".repeat(25)),
+                preference(&second, &"replacement ".repeat(25)),
+            ])
+            .build_prompt();
+
+        assert!(prompt.contains(&guideline));
+        assert!(prompt.contains(&first.trim()));
+        assert!(!prompt.contains(&second.trim()));
+        assert!(PromptBuilder::estimate_tokens(&prompt) <= HARD_PROMPT_TOKEN_CAP);
+    }
+
+    #[test]
+    fn budget_truncates_structured_guidelines_at_whole_rule_boundaries() {
+        let mut guidelines = GuidelineSet::new("Oversized");
+        for index in 0..20 {
+            guidelines = guidelines.with_rule(crate::tm::QaRule::new(
+                format!("Rule {index}"),
+                format!("rule-{index} {}", "detail ".repeat(35)),
+            ));
+        }
+        let all_lines = guidelines.prompt_rule_lines();
+        let prompt = PromptBuilder::new()
+            .source("Source")
+            .target("Target")
+            .guideline_set(guidelines)
+            .user_preferences([
+                preference(&"first ".repeat(180), &"replacement ".repeat(180)),
+                preference(&"second ".repeat(180), &"replacement ".repeat(180)),
+            ])
+            .build_prompt();
+
+        assert!(!prompt.contains("User Preferences"));
+        let kept = all_lines
+            .iter()
+            .take_while(|line| prompt.contains(line.as_str()))
+            .count();
+        assert!(kept > 0 && kept < all_lines.len());
+        assert!(all_lines
+            .iter()
+            .skip(kept)
+            .all(|line| !prompt.contains(line.as_str())));
+        assert!(PromptBuilder::estimate_tokens(&prompt) <= HARD_PROMPT_TOKEN_CAP);
+    }
+
+    #[test]
+    fn budget_preserves_oversized_payload_and_omits_optional_context() {
+        let target = format!("{}끝", "payload ".repeat(800));
+        let prompt = PromptBuilder::new()
+            .source("Source")
+            .target(&target)
+            .guidelines("- [Style] This must be omitted.")
+            .user_preferences([preference("old", "new")])
+            .build_prompt();
+
+        assert!(prompt.contains(&format!("TGT: {}", target.trim())));
+        assert!(!prompt.contains("Guidelines:"));
+        assert!(!prompt.contains("User Preferences"));
+        assert!(PromptBuilder::estimate_tokens(&prompt) > HARD_PROMPT_TOKEN_CAP);
     }
 
     #[test]
