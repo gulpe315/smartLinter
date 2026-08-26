@@ -39,6 +39,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     getFilteredCards,
     getCardCountBySeverity,
     isAnalyzing,
+    analysisError,
     appliedCards,
     dismissedCards,
   } = useQaStore();
@@ -108,6 +109,15 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
               <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
               LLM 분석 중...
             </span>
+          )}
+          {analysisError && (
+            <div
+              data-testid="qa-analysis-error-banner"
+              className="p-2.5 rounded bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2"
+            >
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <span>{analysisError}</span>
+            </div>
           )}
         </div>
 

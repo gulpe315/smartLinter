@@ -724,6 +724,10 @@ export class TauriBridgeService implements IBridgeService {
     try {
       return await invoke('analyze_paragraph', options ? { paragraph, options } : { paragraph });
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('not yet validated')) {
+        throw (e instanceof Error ? e : new Error(message));
+      }
       console.warn('Tauri invoke analyze_paragraph failed, using fallback:', e);
     }
 

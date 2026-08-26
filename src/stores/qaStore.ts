@@ -141,6 +141,7 @@ export interface QAState {
   filter: QAFilterState;
   activeCardId: string | null;
   isAnalyzing: boolean;
+  analysisError: string | null;
 
   // --- Actions ---
   addCard: (card: Partial<QACardData> & { category: string; originalSegment: string; suggestedSegment: string; reason: string }) => string;
@@ -160,6 +161,7 @@ export interface QAState {
   setSearchQuery: (query: string) => void;
   setActiveCardId: (id: string | null) => void;
   setIsAnalyzing: (analyzing: boolean) => void;
+  setAnalysisError: (message: string | null) => void;
   initEventListener: (service?: IBridgeService) => () => void;
   reset: () => void;
 
@@ -182,6 +184,7 @@ const initialState = {
   filter: initialFilterState,
   activeCardId: null as string | null,
   isAnalyzing: false,
+  analysisError: null as string | null,
 };
 
 export const useQaStore = create<QAState>((set, get) => ({
@@ -268,6 +271,7 @@ export const useQaStore = create<QAState>((set, get) => ({
         .map((card) => ({ ...card, status: 'stale_obsolete' as QACardStatus }));
 
       return {
+        analysisError: null,
         cards: state.cards
           .filter((card) =>
             !obsoleteCardIds.has(card.id) && (
@@ -564,6 +568,8 @@ export const useQaStore = create<QAState>((set, get) => ({
 
   setIsAnalyzing: (isAnalyzing) => set({ isAnalyzing }),
 
+  setAnalysisError: (analysisError) => set({ analysisError }),
+
   initEventListener: (service) => {
     const bridgeService = service || getBridgeService();
     const unlisteners: Array<() => void> = [];
@@ -651,6 +657,10 @@ export const useQaStore = create<QAState>((set, get) => ({
           } catch (error) {
             if (analysisRequestVersions.get(payload.paragraphId) === requestVersion) {
               console.warn('QA analysis failed for detected paragraph:', error);
+              const message = error instanceof Error ? error.message : String(error);
+              if (message.includes('not yet validated')) {
+                get().setAnalysisError('선택한 언어 조합은 아직 검증되지 않아 분석할 수 없습니다. 설정에서 언어를 변경해 주세요.');
+              }
             }
           } finally {
             if (analysisRequestVersions.get(payload.paragraphId) === requestVersion) {

@@ -124,6 +124,39 @@ describe('TauriBridgeService & IPC Integration', () => {
     service.destroy();
   });
 
+  it('normalizes and rethrows an unvalidated language error without using the fallback QA report', async () => {
+    const error = "QA profile for language 'en' is not yet validated";
+    const invokeMock = vi.fn().mockRejectedValue(error);
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
+    const service = new TauriBridgeService();
+    const fallbackSpy = vi.spyOn((service as any).fallbackService, 'analyzeParagraph');
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'para-unvalidated', text: 'Text', hash: 'hash', source: '', timestamp: 1, editorType: 'InDesign',
+    };
+
+    const rejected = await service.analyzeParagraph(paragraph).catch((reason) => reason);
+    expect(rejected).toBeInstanceOf(Error);
+    expect(rejected.message).toBe(error);
+    expect(fallbackSpy).not.toHaveBeenCalled();
+    service.destroy();
+  });
+
+  it('uses the fallback QA report for other Tauri analysis errors', async () => {
+    const invokeMock = vi.fn().mockRejectedValue(new Error('Ollama unavailable'));
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
+    const service = new TauriBridgeService();
+    const fallbackSpy = vi.spyOn((service as any).fallbackService, 'analyzeParagraph');
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'para-fallback', text: 'Text', hash: 'hash', source: '', timestamp: 1, editorType: 'InDesign',
+    };
+
+    await service.analyzeParagraph(paragraph);
+    expect(fallbackSpy).toHaveBeenCalledWith(paragraph, undefined);
+    service.destroy();
+  });
+
   it('listens to Tauri events and transforms BridgeStatusEvent from Rust session', async () => {
     let capturedHandler: ((evt: { payload: any }) => void) | null = null;
     const unlistenFn = vi.fn();

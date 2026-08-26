@@ -255,6 +255,18 @@ describe('QACardList Component', () => {
     expect(screen.getByText('LLM 분석 중...')).toBeInTheDocument();
   });
 
+  it('renders the analysis error banner when an unvalidated language is selected', () => {
+    useQaStore.getState().setAnalysisError(
+      '선택한 언어 조합은 아직 검증되지 않아 분석할 수 없습니다. 설정에서 언어를 변경해 주세요.'
+    );
+
+    render(<QACardList />);
+
+    expect(screen.getByTestId('qa-analysis-error-banner')).toHaveTextContent(
+      '선택한 언어 조합은 아직 검증되지 않아 분석할 수 없습니다. 설정에서 언어를 변경해 주세요.'
+    );
+  });
+
   it('archives a card when its paragraph is confirmed absent', async () => {
     useQaStore.getState().addCard({
       id: 'missing-paragraph-card', paragraphId: 'para-missing', paragraphHash: 'old-hash',

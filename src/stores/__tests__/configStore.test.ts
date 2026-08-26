@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useConfigStore } from '../configStore.ts';
 import { useBridgeStore } from '../bridgeStore.ts';
+import { useQaStore } from '../qaStore.ts';
 import { MockBridgeService, setBridgeService } from '../../services/tauriBridge.ts';
 import { DEFAULT_GUIDELINES } from '../../types/config.ts';
 
@@ -16,6 +17,7 @@ describe('useConfigStore', () => {
     setBridgeService(mockBridge);
     useConfigStore.getState().reset();
     useBridgeStore.getState().reset();
+    useQaStore.getState().reset();
     localStorage.clear();
   });
 
@@ -38,6 +40,16 @@ describe('useConfigStore', () => {
     expect(useConfigStore.getState().explanationLang).toBe('en');
     expect(localStorage.getItem('smartlinter_target_lang')).toBe('ja');
     expect(localStorage.getItem('smartlinter_explanation_lang')).toBe('en');
+  });
+
+  it('clears the QA analysis error when either QA language setting changes', () => {
+    useQaStore.getState().setAnalysisError('Unvalidated language profile');
+    useConfigStore.getState().setTargetLang('ja');
+    expect(useQaStore.getState().analysisError).toBeNull();
+
+    useQaStore.getState().setAnalysisError('Unvalidated language profile');
+    useConfigStore.getState().setExplanationLang('en');
+    expect(useQaStore.getState().analysisError).toBeNull();
   });
 
   it('should fetch installed Ollama models successfully', async () => {

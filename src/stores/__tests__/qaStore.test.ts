@@ -940,6 +940,34 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     vi.useRealTimers();
   });
 
+  it('surfaces an unvalidated language analysis error and clears it after a successful report', async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(mockBridge, 'analyzeParagraph').mockRejectedValueOnce(
+      new Error("QA profile for language 'en' is not yet validated")
+    );
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-unvalidated-language', text: 'Text', hash: 'hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(useQaStore.getState().analysisError).toBe(
+      '선택한 언어 조합은 아직 검증되지 않아 분석할 수 없습니다. 설정에서 언어를 변경해 주세요.'
+    ));
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-validated-language', paragraphText: 'Validated text', paragraphHash: 'validated-hash',
+      report: { status: 'PASS', issues: [] },
+    });
+    expect(useQaStore.getState().analysisError).toBeNull();
+
+    unlisten();
+    vi.useRealTimers();
+    warnSpy.mockRestore();
+  });
+
   it('ignores an older analysis result when the same paragraph is detected again', async () => {
     vi.useFakeTimers();
     let resolveFirstAnalysis: ((report: QaReport) => void) | undefined;

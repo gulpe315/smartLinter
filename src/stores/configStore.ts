@@ -16,6 +16,7 @@ import {
 } from '../types/config.ts';
 import { getBridgeService } from '../services/tauriBridge.ts';
 import { useBridgeStore } from './bridgeStore.ts';
+import { useQaStore } from './qaStore.ts';
 import { parseGuidelineContent, parseTmContent } from '../utils/parserUtils.ts';
 
 const STORAGE_KEYS = {
@@ -122,11 +123,13 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
   setTargetLang: (language) => {
     set({ targetLang: language });
+    useQaStore.getState().setAnalysisError(null);
     if (typeof window !== 'undefined' && window.localStorage) localStorage.setItem(STORAGE_KEYS.TARGET_LANG, language);
   },
 
   setExplanationLang: (language) => {
     set({ explanationLang: language });
+    useQaStore.getState().setAnalysisError(null);
     if (typeof window !== 'undefined' && window.localStorage) localStorage.setItem(STORAGE_KEYS.EXPLANATION_LANG, language);
   },
 
