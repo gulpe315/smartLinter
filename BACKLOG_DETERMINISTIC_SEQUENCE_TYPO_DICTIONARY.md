@@ -418,6 +418,10 @@ Bridge server rebuilt and restarted cleanly after the Rust changes
 (`npx tauri dev --no-watch`); not yet live-verified against real InDesign
 input.
 
+**Live-verified in real InDesign (2026-08-26):** user confirmed a known
+v1-category typo is correctly caught end-to-end in a connected InDesign
+document -- "잘 동작하고 있어." No further live-verification blocker.
+
 **Deliberately not done (v1 scope, per the reconciled design):**
 - Frontend does not yet render `provenance`/`conflict_group_id`/
   `confidence` -- deterministic issues currently render as ordinary QA
@@ -425,15 +429,12 @@ input.
   explicitly deferred "복잡한 충돌 해결 UI" to v2; a minimal visual badge
   (e.g. a "결정론" tag reusing the existing badge pattern) is optional
   polish, not yet requested or scoped.
-- No live InDesign verification yet -- only unit tests (`merge()` and
-  `detect()` directly). Next session/turn should live-verify: type a
-  known v1-category typo (e.g. "일오일, 월요일, 화요일") into a connected
-  InDesign document and confirm a QA card appears immediately (should not
-  need to wait for/depend on the LLM call at all for Tier 1 hits, though
-  today's wiring runs it after the LLM call completes, not before -- so
-  latency is still LLM-bound in v1; making the deterministic pass return
-  instantly ahead of the LLM call is a possible future optimization, not
-  done here).
+- Latency note (still true post-verification): today's wiring runs the
+  deterministic pass after the LLM call completes, not before -- so a
+  Tier 1 hit still waits on the full LLM round-trip even though the
+  deterministic match itself is sub-millisecond. Making the deterministic
+  pass return instantly ahead of/independent of the LLM call is a
+  possible future optimization, not done here.
 - Real-world precision beyond the spike's 41-case corpus is still
   unmeasured -- agy's caveat about dictionary entries eventually
   colliding with proper nouns/terminology as the dictionary grows past v1
