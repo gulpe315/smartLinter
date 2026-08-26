@@ -167,5 +167,47 @@
       "spacing: \uc800\uc7a5\ud55c\ud6c4 -> \uc800\uc7a5\ud55c \ud6c4",
       "typo: \ud655\uc778\ud569\ub2c8\ub514 -> \ud655\uc778\ud569\ub2c8\ub2e4"
     ]
+  },
+  {
+    "id": "monolingual_weekdays_clean_list",
+    "category": "monolingual_parallel_list_clean",
+    "source": "",
+    "target": "\uc77c\uc694\uc77c, \uc6d4\uc694\uc77c, \ud654\uc694\uc77c\uc5d0 \uc815\uae30 \uc810\uac80\uc744 \uc9c4\ud589\ud569\ub2c8\ub2e4.",
+    "word_count": 6,
+    "char_count": 26,
+    "expected_issues": []
+  },
+  {
+    "id": "monolingual_weekdays_suffix_typo",
+    "category": "monolingual_parallel_list_suffix_typo",
+    "source": "",
+    "target": "\uc77c\uc624\uc77c, \uc6d4\uc694\uc77c, \ud654\uc694\uc77c\uc5d0 \uc815\uae30 \uc810\uac80\uc744 \uc9c4\ud589\ud569\ub2c8\ub2e4.",
+    "word_count": 6,
+    "char_count": 26,
+    "expected_issues": [
+      "typo: \uc77c\uc624\uc77c -> \uc77c\uc694\uc77c"
+    ]
+  },
+  {
+    "id": "monolingual_weekdays_spacing_error",
+    "category": "monolingual_parallel_list_real_spacing",
+    "source": "",
+    "target": "\uc77c\uc694\uc77c , \uc6d4\uc694\uc77c, \ud654\uc694\uc77c\uc5d0 \uc815\uae30 \uc810\uac80\uc744 \uc9c4\ud589\ud569\ub2c8\ub2e4.",
+    "word_count": 6,
+    "char_count": 27,
+    "expected_issues": [
+      "spacing: \uc77c\uc694\uc77c , -> \uc77c\uc694\uc77c,"
+    ]
+  },
+  {
+    "id": "monolingual_ordinary_typo_control",
+    "category": "monolingual_ordinary_typo_control",
+    "source": "",
+    "target": "\uc810\uac80 \uacb0\uacfc\ub97c \uc81c\ucd9c\ud55c \ud6c4 \uad00\ub9ac\uc790\uac00 \ud655\uc778\ud569\ub2c8\ub514.",
+    "word_count": 5,
+    "char_count": 22,
+    "expected_issues": [
+      "typo: \ud655\uc778\ud569\ub2c8\ub514 -> \ud655\uc778\ud569\ub2c8\ub2e4"
+    ]
   }
 ]

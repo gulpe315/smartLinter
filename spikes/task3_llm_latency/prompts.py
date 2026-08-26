@@ -92,6 +92,16 @@ AFTER_MONOLINGUAL_SYSTEM_PROMPT = """You are a fast Korean monolingual paragraph
 Output JSON only matching this schema:
 {"status":"PASS"|"FAIL","issues":[{"category":"...","originalSegment":"...","suggestedSegment":"...","reason":"...","severity":"LOW"|"MEDIUM"|"HIGH"}]}"""
 
+MONOLINGUAL_LIST_CLAUSE = """When checking a comma-separated Korean list, compare parallel items for shared spelling or suffix patterns; report any item that breaks a clear pattern. A standard comma-separated list is not itself a spacing or punctuation issue."""
+
+MONOLINGUAL_VARIANT_A_SYSTEM_PROMPT = f"""You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean. {MONOLINGUAL_LIST_CLAUSE}
+Output JSON only matching this schema:
+{{"status":"PASS"|"FAIL","issues":[{{"category":"...","originalSegment":"...","suggestedSegment":"...","reason":"...","severity":"LOW"|"MEDIUM"|"HIGH"}}]}}"""
+
+MONOLINGUAL_VARIANT_B_SYSTEM_PROMPT = f"""You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean. {MONOLINGUAL_LIST_CLAUSE}
+Output JSON only matching this schema:
+{{"status":"PASS"|"FAIL","issues":[{{"originalSegment":"...","suggestedSegment":"...","reason":"...","category":"...","severity":"LOW"|"MEDIUM"|"HIGH"}}]}}"""
+
 # Current production default; explicit before/after variants support recall benchmarking.
 COMPRESSED_SYSTEM_PROMPT = BEFORE_COMPRESSED_SYSTEM_PROMPT
 
@@ -105,3 +115,11 @@ TGT: {target.strip()}"""
     system = AFTER_MONOLINGUAL_SYSTEM_PROMPT if after else BEFORE_MONOLINGUAL_SYSTEM_PROMPT
     return f"""{system}
 TEXT: {target.strip()}"""
+
+def format_monolingual_variant_prompt(target: str, variant: str) -> str:
+    systems = {
+        "current": AFTER_MONOLINGUAL_SYSTEM_PROMPT,
+        "A": MONOLINGUAL_VARIANT_A_SYSTEM_PROMPT,
+        "B": MONOLINGUAL_VARIANT_B_SYSTEM_PROMPT,
+    }
+    return f"{systems[variant]}\nTEXT: {target.strip()}"

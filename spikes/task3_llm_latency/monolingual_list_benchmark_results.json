@@ -1,0 +1,1047 @@
+{
+  "timestamp": "2026-08-26T13:07:14+0900",
+  "model": "exaone3.5:7.8b",
+  "repetitions": 3,
+  "warmup": {
+    "wall_latency_ms": 2216.95,
+    "ttft_ms": 903.27,
+    "prompt_tokens": 246,
+    "prompt_eval_time_ms": 764.85,
+    "prompt_eval_tps": 321.63,
+    "gen_tokens": 12,
+    "gen_time_ms": 1249.9,
+    "gen_tps": 9.6,
+    "total_server_dur_ms": 2098.42,
+    "load_dur_ms": 81.09,
+    "json_valid": true,
+    "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+    "parsed_json": {
+      "status": "PASS",
+      "issues": []
+    }
+  },
+  "summaries": {
+    "current": {
+      "cases": {
+        "monolingual_weekdays_clean_list": {
+          "metric": "pass_or_no_invented_comma_issue",
+          "passed_runs": 3,
+          "total_runs": 3
+        },
+        "monolingual_weekdays_suffix_typo": {
+          "metric": "identifies_typo_not_spacing",
+          "passed_runs": 0,
+          "total_runs": 3
+        },
+        "monolingual_weekdays_spacing_error": {
+          "metric": "catches_real_spacing",
+          "passed_runs": 0,
+          "total_runs": 3
+        },
+        "monolingual_ordinary_typo_control": {
+          "metric": "catches_ordinary_typo",
+          "passed_runs": 3,
+          "total_runs": 3
+        }
+      },
+      "mean_latency_ms": 4459.18,
+      "p95_latency_ms": 10397.6,
+      "json_valid_rate_pct": 100.0,
+      "mean_prompt_tokens": 201.5
+    },
+    "A": {
+      "cases": {
+        "monolingual_weekdays_clean_list": {
+          "metric": "pass_or_no_invented_comma_issue",
+          "passed_runs": 3,
+          "total_runs": 3
+        },
+        "monolingual_weekdays_suffix_typo": {
+          "metric": "identifies_typo_not_spacing",
+          "passed_runs": 0,
+          "total_runs": 3
+        },
+        "monolingual_weekdays_spacing_error": {
+          "metric": "catches_real_spacing",
+          "passed_runs": 0,
+          "total_runs": 3
+        },
+        "monolingual_ordinary_typo_control": {
+          "metric": "catches_ordinary_typo",
+          "passed_runs": 3,
+          "total_runs": 3
+        }
+      },
+      "mean_latency_ms": 5263.02,
+      "p95_latency_ms": 10401.31,
+      "json_valid_rate_pct": 100.0,
+      "mean_prompt_tokens": 246.5
+    },
+    "B": {
+      "cases": {
+        "monolingual_weekdays_clean_list": {
+          "metric": "pass_or_no_invented_comma_issue",
+          "passed_runs": 3,
+          "total_runs": 3
+        },
+        "monolingual_weekdays_suffix_typo": {
+          "metric": "identifies_typo_not_spacing",
+          "passed_runs": 0,
+          "total_runs": 3
+        },
+        "monolingual_weekdays_spacing_error": {
+          "metric": "catches_real_spacing",
+          "passed_runs": 0,
+          "total_runs": 3
+        },
+        "monolingual_ordinary_typo_control": {
+          "metric": "catches_ordinary_typo",
+          "passed_runs": 3,
+          "total_runs": 3
+        }
+      },
+      "mean_latency_ms": 4490.58,
+      "p95_latency_ms": 10479.37,
+      "json_valid_rate_pct": 100.0,
+      "mean_prompt_tokens": 246.5
+    }
+  },
+  "records": [
+    {
+      "wall_latency_ms": 1838.31,
+      "ttft_ms": 387.27,
+      "prompt_tokens": 201,
+      "prompt_eval_time_ms": 249.85,
+      "prompt_eval_tps": 804.49,
+      "gen_tokens": 13,
+      "gen_time_ms": 1353.11,
+      "gen_tps": 9.61,
+      "total_server_dur_ms": 1711.65,
+      "load_dur_ms": 89.33,
+      "json_valid": true,
+      "raw_response": "{\"status\": \"PASS\", \"issues\": []}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "current",
+      "repetition": 1,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 3078.46,
+      "ttft_ms": 1723.45,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 1518.11,
+      "prompt_eval_tps": 162.04,
+      "gen_tokens": 12,
+      "gen_time_ms": 1262.83,
+      "gen_tps": 9.5,
+      "total_server_dur_ms": 2868.92,
+      "load_dur_ms": 84.71,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "A",
+      "repetition": 1,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 2542.1,
+      "ttft_ms": 1205.28,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 1013.26,
+      "prompt_eval_tps": 242.78,
+      "gen_tokens": 12,
+      "gen_time_ms": 1274.04,
+      "gen_tps": 9.42,
+      "total_server_dur_ms": 2396.15,
+      "load_dur_ms": 105.15,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "B",
+      "repetition": 1,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 3014.61,
+      "ttft_ms": 1641.69,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 1454.77,
+      "prompt_eval_tps": 138.85,
+      "gen_tokens": 12,
+      "gen_time_ms": 1310.87,
+      "gen_tps": 9.15,
+      "total_server_dur_ms": 2876.6,
+      "load_dur_ms": 107.42,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "current",
+      "repetition": 1,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 3803.73,
+      "ttft_ms": 2465.35,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 2223.76,
+      "prompt_eval_tps": 111.07,
+      "gen_tokens": 12,
+      "gen_time_ms": 1277.75,
+      "gen_tps": 9.39,
+      "total_server_dur_ms": 3617.65,
+      "load_dur_ms": 112.45,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "A",
+      "repetition": 1,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2576.85,
+      "ttft_ms": 1206.68,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1043.42,
+      "prompt_eval_tps": 236.72,
+      "gen_tokens": 12,
+      "gen_time_ms": 1308.34,
+      "gen_tps": 9.17,
+      "total_server_dur_ms": 2458.17,
+      "load_dur_ms": 103.24,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "B",
+      "repetition": 1,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2978.57,
+      "ttft_ms": 1662.35,
+      "prompt_tokens": 201,
+      "prompt_eval_time_ms": 1441.99,
+      "prompt_eval_tps": 139.39,
+      "gen_tokens": 12,
+      "gen_time_ms": 1259.03,
+      "gen_tps": 9.53,
+      "total_server_dur_ms": 2846.17,
+      "load_dur_ms": 125.05,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "current",
+      "repetition": 1,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 3673.67,
+      "ttft_ms": 2322.09,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 2103.33,
+      "prompt_eval_tps": 116.96,
+      "gen_tokens": 12,
+      "gen_time_ms": 1292.25,
+      "gen_tps": 9.29,
+      "total_server_dur_ms": 3505.37,
+      "load_dur_ms": 106.16,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "A",
+      "repetition": 1,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2546.35,
+      "ttft_ms": 1215.59,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 1054.24,
+      "prompt_eval_tps": 233.34,
+      "gen_tokens": 12,
+      "gen_time_ms": 1297.21,
+      "gen_tps": 9.25,
+      "total_server_dur_ms": 2458.07,
+      "load_dur_ms": 103.23,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "B",
+      "repetition": 1,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 11676.21,
+      "ttft_ms": 1598.55,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 1453.2,
+      "prompt_eval_tps": 139.0,
+      "gen_tokens": 84,
+      "gen_time_ms": 9564.71,
+      "gen_tps": 8.78,
+      "total_server_dur_ms": 11133.63,
+      "load_dur_ms": 112.25,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"합니디\",\"suggestedSegment\":\"합니다\",\"reason\":\"잘못된 어미 사용; '합니디'는 구어체에서 주로 사용되며, 공식적인 문맥에서는 '합니다'가 적절합니다.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "잘못된 어미 사용; '합니디'는 구어체에서 주로 사용되며, 공식적인 문맥에서는 '합니다'가 적절합니다.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "current",
+      "repetition": 1,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 9922.36,
+      "ttft_ms": 521.79,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 348.66,
+      "prompt_eval_tps": 708.43,
+      "gen_tokens": 78,
+      "gen_time_ms": 8940.52,
+      "gen_tps": 8.72,
+      "total_server_dur_ms": 9421.76,
+      "load_dur_ms": 103.83,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Verb Ending\",\"originalSegment\":\"합니디\",\"suggestedSegment\":\"합니다\",\"reason\":\"어간 '합-'의 어미가 '-니디'가 아닌 '-니다'로 올바르게 끝나야 합니다.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Verb Ending",
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "어간 '합-'의 어미가 '-니디'가 아닌 '-니다'로 올바르게 끝나야 합니다.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "A",
+      "repetition": 1,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 9924.31,
+      "ttft_ms": 1199.38,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1031.81,
+      "prompt_eval_tps": 239.38,
+      "gen_tokens": 73,
+      "gen_time_ms": 8338.61,
+      "gen_tps": 8.75,
+      "total_server_dur_ms": 9481.93,
+      "load_dur_ms": 107.79,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"originalSegment\":\"합니디\", \"suggestedSegment\":\"합니다\", \"reason\":\"동사 끝맺음이 올바르지 않음 (올바른 표현은 '-습니다'임).\", \"category\":\"Grammar\", \"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "동사 끝맺음이 올바르지 않음 (올바른 표현은 '-습니다'임).",
+            "category": "Grammar",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "B",
+      "repetition": 1,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 1817.81,
+      "ttft_ms": 508.94,
+      "prompt_tokens": 201,
+      "prompt_eval_time_ms": 348.9,
+      "prompt_eval_tps": 576.1,
+      "gen_tokens": 12,
+      "gen_time_ms": 1275.0,
+      "gen_tps": 9.41,
+      "total_server_dur_ms": 1758.65,
+      "load_dur_ms": 112.81,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "current",
+      "repetition": 2,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 3637.71,
+      "ttft_ms": 2312.06,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 2175.16,
+      "prompt_eval_tps": 113.09,
+      "gen_tokens": 12,
+      "gen_time_ms": 1265.52,
+      "gen_tps": 9.48,
+      "total_server_dur_ms": 3550.58,
+      "load_dur_ms": 106.8,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "A",
+      "repetition": 2,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 2533.06,
+      "ttft_ms": 1179.54,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 1017.21,
+      "prompt_eval_tps": 241.84,
+      "gen_tokens": 12,
+      "gen_time_ms": 1292.21,
+      "gen_tps": 9.29,
+      "total_server_dur_ms": 2413.52,
+      "load_dur_ms": 100.73,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "B",
+      "repetition": 2,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 2998.29,
+      "ttft_ms": 1662.38,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 1447.82,
+      "prompt_eval_tps": 139.52,
+      "gen_tokens": 12,
+      "gen_time_ms": 1256.55,
+      "gen_tps": 9.55,
+      "total_server_dur_ms": 2834.53,
+      "load_dur_ms": 126.04,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "current",
+      "repetition": 2,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 3640.08,
+      "ttft_ms": 2326.72,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 2089.05,
+      "prompt_eval_tps": 118.24,
+      "gen_tokens": 12,
+      "gen_time_ms": 1235.33,
+      "gen_tps": 9.71,
+      "total_server_dur_ms": 3423.88,
+      "load_dur_ms": 96.4,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "A",
+      "repetition": 2,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2565.1,
+      "ttft_ms": 1228.67,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1038.87,
+      "prompt_eval_tps": 237.76,
+      "gen_tokens": 12,
+      "gen_time_ms": 1257.33,
+      "gen_tps": 9.54,
+      "total_server_dur_ms": 2400.05,
+      "load_dur_ms": 100.41,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "B",
+      "repetition": 2,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2956.42,
+      "ttft_ms": 1623.48,
+      "prompt_tokens": 201,
+      "prompt_eval_time_ms": 1405.68,
+      "prompt_eval_tps": 142.99,
+      "gen_tokens": 12,
+      "gen_time_ms": 1257.97,
+      "gen_tps": 9.54,
+      "total_server_dur_ms": 2769.02,
+      "load_dur_ms": 102.21,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "current",
+      "repetition": 2,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 3689.48,
+      "ttft_ms": 2355.63,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 2112.08,
+      "prompt_eval_tps": 116.47,
+      "gen_tokens": 12,
+      "gen_time_ms": 1258.53,
+      "gen_tps": 9.53,
+      "total_server_dur_ms": 3480.63,
+      "load_dur_ms": 106.87,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "A",
+      "repetition": 2,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2525.57,
+      "ttft_ms": 1194.31,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 1016.09,
+      "prompt_eval_tps": 242.1,
+      "gen_tokens": 12,
+      "gen_time_ms": 1256.25,
+      "gen_tps": 9.55,
+      "total_server_dur_ms": 2381.51,
+      "load_dur_ms": 106.02,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "B",
+      "repetition": 2,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 9229.23,
+      "ttft_ms": 1561.4,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 1386.36,
+      "prompt_eval_tps": 145.71,
+      "gen_tokens": 65,
+      "gen_time_ms": 7371.69,
+      "gen_tps": 8.82,
+      "total_server_dur_ms": 8861.83,
+      "load_dur_ms": 100.31,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"합니디\",\"suggestedSegment\":\"합니다\",\"reason\":\"잘못된 종결 어미 사용. 올바른 표현은 '-습니다'입니다.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "잘못된 종결 어미 사용. 올바른 표현은 '-습니다'입니다.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "current",
+      "repetition": 2,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 10410.87,
+      "ttft_ms": 1242.61,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1106.93,
+      "prompt_eval_tps": 223.14,
+      "gen_tokens": 77,
+      "gen_time_ms": 8760.91,
+      "gen_tps": 8.79,
+      "total_server_dur_ms": 10002.11,
+      "load_dur_ms": 110.04,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Verb Ending\",\"originalSegment\":\"합니디\",\"suggestedSegment\":\"합니다\",\"reason\":\"어간 '합-'의 어미가 '-니디'에서 '-니다'로 올바르게 끝나야 합니다.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Verb Ending",
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "어간 '합-'의 어미가 '-니디'에서 '-니다'로 올바르게 끝나야 합니다.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "A",
+      "repetition": 2,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 9880.04,
+      "ttft_ms": 1210.51,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1017.86,
+      "prompt_eval_tps": 242.67,
+      "gen_tokens": 73,
+      "gen_time_ms": 8137.19,
+      "gen_tps": 8.97,
+      "total_server_dur_ms": 9265.12,
+      "load_dur_ms": 106.48,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"originalSegment\":\"합니디\", \"suggestedSegment\":\"합니다\", \"reason\":\"동사 끝맺음이 올바르지 않음 (올바른 표현은 '-습니다'임).\", \"category\":\"Grammar\", \"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "동사 끝맺음이 올바르지 않음 (올바른 표현은 '-습니다'임).",
+            "category": "Grammar",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "B",
+      "repetition": 2,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 1788.83,
+      "ttft_ms": 479.02,
+      "prompt_tokens": 201,
+      "prompt_eval_time_ms": 339.19,
+      "prompt_eval_tps": 592.59,
+      "gen_tokens": 12,
+      "gen_time_ms": 1234.49,
+      "gen_tps": 9.72,
+      "total_server_dur_ms": 1683.98,
+      "load_dur_ms": 102.61,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "current",
+      "repetition": 3,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 3645.02,
+      "ttft_ms": 2329.74,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 2087.39,
+      "prompt_eval_tps": 117.85,
+      "gen_tokens": 12,
+      "gen_time_ms": 1258.6,
+      "gen_tps": 9.53,
+      "total_server_dur_ms": 3450.94,
+      "load_dur_ms": 101.74,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "A",
+      "repetition": 3,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 2537.8,
+      "ttft_ms": 1220.14,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 1054.52,
+      "prompt_eval_tps": 233.28,
+      "gen_tokens": 12,
+      "gen_time_ms": 1260.64,
+      "gen_tps": 9.52,
+      "total_server_dur_ms": 2412.78,
+      "load_dur_ms": 94.56,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_clean_list",
+      "variant": "B",
+      "repetition": 3,
+      "verdict": {
+        "pass_or_no_invented_comma_issue": true
+      }
+    },
+    {
+      "wall_latency_ms": 2932.65,
+      "ttft_ms": 1621.07,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 1439.26,
+      "prompt_eval_tps": 140.35,
+      "gen_tokens": 12,
+      "gen_time_ms": 1255.0,
+      "gen_tps": 9.56,
+      "total_server_dur_ms": 2804.69,
+      "load_dur_ms": 107.83,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "current",
+      "repetition": 3,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 3650.69,
+      "ttft_ms": 2336.27,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 2160.6,
+      "prompt_eval_tps": 114.32,
+      "gen_tokens": 12,
+      "gen_time_ms": 1318.29,
+      "gen_tps": 9.1,
+      "total_server_dur_ms": 3579.98,
+      "load_dur_ms": 97.83,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "A",
+      "repetition": 3,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2572.82,
+      "ttft_ms": 1204.08,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1087.87,
+      "prompt_eval_tps": 227.05,
+      "gen_tokens": 12,
+      "gen_time_ms": 1306.74,
+      "gen_tps": 9.18,
+      "total_server_dur_ms": 2506.66,
+      "load_dur_ms": 108.61,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_suffix_typo",
+      "variant": "B",
+      "repetition": 3,
+      "verdict": {
+        "identifies_typo_not_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2927.75,
+      "ttft_ms": 1624.51,
+      "prompt_tokens": 201,
+      "prompt_eval_time_ms": 1432.78,
+      "prompt_eval_tps": 140.29,
+      "gen_tokens": 12,
+      "gen_time_ms": 1243.98,
+      "gen_tps": 9.65,
+      "total_server_dur_ms": 2791.16,
+      "load_dur_ms": 110.95,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "current",
+      "repetition": 3,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 3610.63,
+      "ttft_ms": 2295.75,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 2068.18,
+      "prompt_eval_tps": 118.95,
+      "gen_tokens": 12,
+      "gen_time_ms": 1236.14,
+      "gen_tps": 9.71,
+      "total_server_dur_ms": 3399.68,
+      "load_dur_ms": 91.61,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "A",
+      "repetition": 3,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 2525.18,
+      "ttft_ms": 1199.46,
+      "prompt_tokens": 246,
+      "prompt_eval_time_ms": 996.63,
+      "prompt_eval_tps": 246.83,
+      "gen_tokens": 12,
+      "gen_time_ms": 1247.35,
+      "gen_tps": 9.62,
+      "total_server_dur_ms": 2357.03,
+      "load_dur_ms": 109.96,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"PASS\",\"issues\":[]}",
+      "parsed_json": {
+        "status": "PASS",
+        "issues": []
+      },
+      "case_id": "monolingual_weekdays_spacing_error",
+      "variant": "B",
+      "repetition": 3,
+      "verdict": {
+        "catches_real_spacing": false
+      }
+    },
+    {
+      "wall_latency_ms": 9351.47,
+      "ttft_ms": 1580.97,
+      "prompt_tokens": 202,
+      "prompt_eval_time_ms": 1366.82,
+      "prompt_eval_tps": 147.79,
+      "gen_tokens": 66,
+      "gen_time_ms": 7256.03,
+      "gen_tps": 9.1,
+      "total_server_dur_ms": 8741.8,
+      "load_dur_ms": 102.88,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Spelling\",\"originalSegment\":\"합니디\",\"suggestedSegment\":\"합니다\",\"reason\":\"잘못된 종결어미 사용. 올바른 표현은 '-습니다'입니다.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Spelling",
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "잘못된 종결어미 사용. 올바른 표현은 '-습니다'입니다.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "current",
+      "repetition": 3,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 10393.48,
+      "ttft_ms": 1229.72,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1018.65,
+      "prompt_eval_tps": 242.48,
+      "gen_tokens": 77,
+      "gen_time_ms": 8790.84,
+      "gen_tps": 8.76,
+      "total_server_dur_ms": 9931.26,
+      "load_dur_ms": 96.91,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"category\":\"Verb Ending\",\"originalSegment\":\"합니디\",\"suggestedSegment\":\"합니다\",\"reason\":\"어간 '합-'의 어미가 '-니디'에서 '-니다'로 올바르게 끝나야 합니다.\",\"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "category": "Verb Ending",
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "어간 '합-'의 어미가 '-니디'에서 '-니다'로 올바르게 끝나야 합니다.",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "A",
+      "repetition": 3,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    },
+    {
+      "wall_latency_ms": 11157.77,
+      "ttft_ms": 1243.86,
+      "prompt_tokens": 247,
+      "prompt_eval_time_ms": 1100.78,
+      "prompt_eval_tps": 224.39,
+      "gen_tokens": 84,
+      "gen_time_ms": 9484.47,
+      "gen_tps": 8.86,
+      "total_server_dur_ms": 10704.8,
+      "load_dur_ms": 116.05,
+      "json_valid": true,
+      "raw_response": "{\"status\":\"FAIL\",\"issues\":[\n    {\"originalSegment\":\"합니디\", \"suggestedSegment\":\"합니다\", \"reason\":\"동사 끝의 '-니디'는 구어체에서 흔히 사용되지만, 공식적인 문맥에서는 '-습니다'가 적절합니다.\", \"category\":\"Grammar\", \"severity\":\"MEDIUM\"}\n]}",
+      "parsed_json": {
+        "status": "FAIL",
+        "issues": [
+          {
+            "originalSegment": "합니디",
+            "suggestedSegment": "합니다",
+            "reason": "동사 끝의 '-니디'는 구어체에서 흔히 사용되지만, 공식적인 문맥에서는 '-습니다'가 적절합니다.",
+            "category": "Grammar",
+            "severity": "MEDIUM"
+          }
+        ]
+      },
+      "case_id": "monolingual_ordinary_typo_control",
+      "variant": "B",
+      "repetition": 3,
+      "verdict": {
+        "catches_ordinary_typo": true
+      }
+    }
+  ]
+}
