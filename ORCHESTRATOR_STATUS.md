@@ -1,8 +1,38 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-26 (아카이브 UI, obsolete-card 생명주기, 수정이력 Phase 1 + 라이브 버그 2건, 카드 클릭 위치찾기, 다중이슈 프롬프트 개선까지 전부 완료·커밋. 가이드라인 배선(Task T)·수정이력 Phase 2(Task U)·다국어 지원 설계는 사용자 지시로 다음 세션으로 이월.)
+마지막 업데이트: 2026-08-26 후속 세션 (Task T/U, 토큰예산 재설계, source 필드 결함 수정, 다국어 플러밍(Part 1/2) 전부 완료·커밋. 다국어 Part 3(영어 콘텐츠 벤치마크)는 Codex 백그라운드 작업 진행 중이던 상태로 세션 종료.)
 
-## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 최종 인계, 이 절이 최신)
+## ⭐⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 후속 세션 인계, 이 절이 최신 — 아래 "⭐ 2026-08-26 최종 인계" 절보다 이게 더 최근)
+
+1. **`git log --oneline -1`로 최신 커밋이 `33b1cab`(Document the AMBIGUOUS-locate design gap as a monitored backlog item)인지 확인.**
+2. **이번 세션 커밋 요약(순서대로):**
+   - `59796d9` Task T — 가이드라인이 파싱만 되고 LLM 프롬프트엔 안 들어가던 버그 수정. `AnalysisOptions` sibling 파라미터 신설(`ParagraphPayload`는 안 건드림).
+   - `a2348c9` 다중이슈 오탈자("일오일→일요일" 요일나열 패턴) 프롬프트 개선 시도 → **no-ship**. 실측 결과 문구를 어떻게 바꿔도 0/3, 대조군(진짜 스페이싱 오류)도 0/3 → 소형모델(exaone3.5:7.8b) 한계로 결론, 코드 변경 없음.
+   - `8653b76` 위 사건에서 파생된 "결정론적 시퀀스/오탈자 사전 전처리" 아이디어를 백로그로 문서화(`BACKLOG_DETERMINISTIC_SEQUENCE_TYPO_DICTIONARY.md`) — agy+Codex 스코핑 교차검증 완료(3단계 게이팅, v1은 5개 카테고리로 축소, 정적 내장 데이터 우선), **병합 우선순위(결정론적 vs LLM 겹칠 때 누가 이기나)는 미해결로 기록**, 실제 착수 시 재조율 필요.
+   - `6677653` Task U — `appliedCards` 중 관련성 높은 Top-2를 `AnalysisOptions.userPreferences`로 LLM 프롬프트에 주입(dismissed/stale_obsolete 절대 제외, 자동적용 아님).
+   - `0a413d9` 토큰예산 정식 재설계 — 400 nominal/450 hard cap, 트렁케이션 순서는 재조율 끝에 **이력(history)이 먼저 생략 → 가이드라인이 룰단위로 나중에 절삭**(가이드라인=사용자 명시 입력이라 나중까지 보존, 이력=시스템 자동계산이라 먼저 희생). **이 태스크에서 Codex가 지시 범위 밖 19개 무관 파일에 `cargo fmt`를 걸어놓은 걸 발견해 전부 되돌림** — `git diff --stat -w`로 재확인하는 습관이 여기서 생김.
+   - `4da3370` 다국어+source필드 결함 통합 설계문서(`DESIGN_MULTILINGUAL_AND_SOURCE_FIELD_FIX.md`) 커밋 — agy+Codex 2라운드 자문(1차 독립답변→재조율) 거쳐 확정.
+   - `1ee86e3` **Part 1** — `qaStore.ts`가 TM 퍼지매치 결과를 `paragraph.source`(=원문)로 취급하던 결함 수정(Codex가 다국어 자문 중 부수 발견, 한국어 이중언어 플로우에도 이미 있던 버그). TM 매치는 이제 `AnalysisOptions.tmReference`로 advisory 전달, 트렁케이션 시 이력보다도 먼저 생략.
+   - `4744c5f` **Part 2** — `LanguageTag`(ko/en/ja/zh) 신설, `AnalysisOptions.target_lang/explanation_lang` 플러밍(기본 None→ko/ko 100% 하위호환), `GuidelineSet` 언어태깅. 미검증 언어 선택 시 `PromptBuilder::try_build_system_prompt()`가 `Result::Err`로 명확히 거부(한국어 콘텐츠로 조용히 대체 안 함).
+   - `33b1cab` — 사용자 라이브 리포트("위치 보기"가 AMBIGUOUS 반환)를 계기로 `locateParagraph` 설계 재검토, 백로그 문서화(아래 "위치찾기" 절 참고).
+3. **다음 세션 최우선 — 진행 중이던 작업 이어받기:**
+   - **다국어 Part 3(영어 콘텐츠 작성+실측 벤치마크)가 Codex 백그라운드 작업 도중 세션이 끝났을 가능성이 있음.** 재개 시: 이미 실행 중인 Codex 프로세스가 있는지, 또는 `spikes/task3_llm_latency/`에 `english_profile_benchmark_results.json`류 산출물이 이미 생겼는지 먼저 확인. 산출물이 있으면 그 보고서를 읽고 diff를 파일+라인 단위(`-w` 포함)로 검토 → `cargo test`/`npm test`/`npm run test:ui`/`npm run build` 독립 재검증 → 커밋. 없으면 Task 지시서를 다시 보내야 함(사용자가 실제 영어 문서 샘플이 없다고 해서, Codex가 대표 샘플을 직접 만들어 exaone3.5:7.8b로 벤치마크하도록 지시했었음 — 스타일 규칙(능동태/Oxford콤마 등)은 **의도적으로 내장 안 함**, 일반적인(의견 없는) 영어 QA 지시문만 검증해서 넣기로 사용자가 직접 스코프를 단순화함).
+   - Part 3 완료 후: 다국어 Phase 4(UI 언어 선택 드롭다운), 그 다음 ja/zh 콘텐츠는 별도 태스크(급하지 않음).
+   - 그 뒤: 백로그 2건 대기 중 — ①결정론적 오탈자사전(병합규칙 미해결), ②위치찾기 context-fingerprint(실사용에서 AMBIGUOUS 빈도 관찰 후 필요시 착수, 지금은 코드 수정 불필요 결론남).
+4. **위치찾기(locateParagraph) 설계 재검토 — 중요 사고 사례, 상세는 `BACKLOG_LOCATOR_CONTEXT_FINGERPRINT.md` 참고:**
+   - 사용자가 "일오일,월요일,화요일" 카드에서 [위치 보기]가 AMBIGUOUS 뜬 걸 보고 → Claude가 "오늘 커밋과 무관, 반복테스트로 중복텍스트 생겨서 그런 것뿐, 문제없음"이라고 성급히 결론 → **사용자가 "패러그래프 아이디가 고유값인데 왜 다른 ID가 간섭하냐"고 정확히 반박**.
+   - 재조율 결과: `paragraphId`는 애초에 `storyId+index` 위치기반이라 영구식별자가 아니고, fallback이 실패하면 순수 내용해시로 Story 전체를 훑는데(ID 완전 무시), 이게 지적한 대로 설계 약점이 맞음. 단, **agy가 처음 제안한 "최단 인덱스 거리로 강제확정"은 Codex가 Task F→K→L 전례로 반박해 기각** — 최종적으로 "정확히 1개 일치=FOUND, 2개 이상=AMBIGUOUS 정직 거부"라는 **현재 코드가 이미 가장 안전한 설계임을 재확인, 코드 수정 불필요**로 종결.
+   - **핵심 교훈(메모리에도 반영):** "고쳐야 한다"는 전제 자체를 모델에게 묻기 전에 Claude가 관련 함수 1개를 먼저 끝까지 읽어서 이미 안전한지 확인했어야 함 — agy/Codex를 여러 라운드 오갈 필요 없이 `atomic_replacer.jsx`의 `locateParagraph`만 읽었으면 더 빨리 정확한 결론에 도달했을 것. 단, 이 확인도 "관련 함수 1개, 빠르게"로 엄격히 제한 — Claude가 또 혼자 깊게 파고드는 습성으로 되돌아가면 안 됨(사용자가 바로 이어서 재차 경고).
+5. **앱 상태:** 브릿지 서버 실행 중, InDesign 연결됨(Task T/U/토큰예산/Part1/Part2 전부 반영된 최신 빌드). Rust 변경한 태스크 완료 후엔 반드시 서버 재기동(`npx tauri dev --no-watch`, Claude가 직접) 후 사용자에게 "InDesign 연결" 버튼 재클릭만 요청할 것.
+6. **협업 원칙(계속 유지 + 이번 세션 추가분):**
+   - Codex 구현 → Claude가 diff를 파일+라인 단위 **및 `git diff --stat -w`**로 확인(재포맷 노이즈, 이번 세션에 19개 파일 규모로 발생한 전례 있음) → 독립 테스트 재실행 → 커밋.
+   - 원인불명 현상/사용자 제안 모두 가벼운 확인(관련 파일 1~2개, 빠르게) 후 즉시 Codex+agy 공유 → 상충 시 임의로 편들지 말고 재조율 라운드.
+   - **신규: "고쳐야 한다"는 전제 자체도 가벼운 확인(관련 함수 1개)으로 먼저 검증할 것** — 이미 안전한 로직 위에 불필요한 수정을 얹지 않기 위함. 단 이 확인도 얕게, 안 잡히면 바로 모델 공유.
+   - LLM 벤치마크는 항상 실제 선택된 모델(exaone3.5:7.8b) 기준.
+
+---
+
+## ⭐ 2026-08-26 최종 인계 (이전 세션, 이제 지나간 상태 — 위 ⭐⭐ 절 이후 진행됨)
 
 1. **`git log --oneline -1`로 최신 커밋이 `1d8be88`(Instruct the QA prompt to enumerate every issue, not just the first one)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
 2. **이번 세션(2026-08-26) 커밋 요약(순서대로, 상세 서술은 이 파일 하단의 이전 절 참고):**
