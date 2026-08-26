@@ -284,3 +284,72 @@ proposal does not need.
 Per this project's standing collaboration rule, get Codex's and agy's
 explicit read on questions 1-4 before scoping this into an actual task,
 same as every other feature idea in this project's history.
+
+## Merge-priority disagreement -- reconciled (2026-08-26)
+
+Re-presented the disagreement to both models with the distinguishing
+question used successfully for the token-budget truncation-order
+disagreement (commit `0a413d9`): what is the *essential* difference
+between a deterministic result and an LLM result, not just "which is more
+reliable." Both converged fully on Codex's original position; agy
+explicitly withdrew its "deterministic always wins on overlap" proposal.
+
+**Why they converged:** deterministic and LLM results differ in kind, not
+just confidence -- a deterministic hit is narrow, high-confidence evidence
+about one specific occurrence's token substitution; an LLM issue is a
+broader, different hypothesis about a language problem that may or may not
+be the same defect. Discarding an overlapping LLM issue on span-overlap
+alone risks silently dropping a genuinely distinct, valid catch (agy's own
+example: `일오일으로` needs both the deterministic `일오일`->`일요일` fix
+*and* the LLM's particle-agreement fix `일오일으로`->`일요일로`; blind
+deterministic-wins would silently discard the particle fix). agy
+identified this as the same anti-pattern as the Task F->K->L incident
+(estimation-based auto-suppression deleting an unrelated card) and
+reversed its position once framed that way -- see
+[[feedback_blast_radius_underestimation]].
+
+**Final v1 merge table (both models converged, verbatim from Codex's
+second-round answer, agy's third round confirmed no changes):**
+
+| Relationship | v1 handling |
+|---|---|
+| No overlap | Keep both |
+| Same location + same fix | Dedupe to one card, provenance `deterministic + llm` |
+| Same location + conflicting fix | Deterministic card wins; LLM candidate kept in conflict metadata, not shown |
+| Partial overlap | Keep both, tagged as the same conflict group |
+| LLM occurrence position unresolved (segment text appears >1x in paragraph) | Keep both; never auto-suppress |
+
+**Schema change confirmed in-scope for v1 (not deferred to v2 as originally
+worried):** both models independently reviewed the actual `QaIssue`
+structs ([qa_parser.rs](src-tauri/src/ai/qa_parser.rs),
+[types.ts](shared/protocol/types.ts)) and confirmed the change is small
+and fully backward-compatible -- add optional fields only
+(`start_offset`, `end_offset`, `provenance`, `confidence`, `rule_id`,
+`conflict_group_id`), `#[serde(default, skip_serializing_if =
+"Option::is_none")]` on the Rust side, `?:` optional on the TS side.
+Existing 107 Rust tests and all mock/fallback paths are unaffected since
+nothing currently reads these fields. Offsets must be **UTF-16 code
+units** (not Rust byte indices) to stay consistent with the
+frontend/Office.js side and handle non-BMP characters correctly.
+LLM-side offsets are computed post-hoc via a single unambiguous
+`paragraph.text.find(original_segment)` -- if the segment isn't unique in
+the paragraph, offset stays `None` and that issue is never auto-suppressed
+by the merge logic (this is the concrete safety payoff of adding offsets
+at all, per Codex).
+
+**Deferred to v2 (both models agree, not needed for v1):** re-running or
+rebasing the LLM's broader proposal after the deterministic fix is known;
+any conflict-resolution UI beyond just showing both cards.
+
+**What this reconciliation does NOT resolve:** everything else in this
+backlog is still exactly where the original 2026-08-26 scoping conversation
+left it -- category list (agy's 5-group cut + Codex's business-title
+addition), 3-tier gating (Codex's refinements: protected-span exclusion,
+list/table-block detection before Tier 2, Tier 3 skipped-marker as
+low-confidence not auto-correct), static embedded data format (plain JSON
+preferred over `phf` per Codex, agy did not push back), and the
+per-language BCP-47-keyed schema Codex proposed. None of those were flagged
+as blocking disagreements requiring reconciliation the way merge-priority
+was -- they can be taken as converged working assumptions for a v1 scoping
+doc, but a corpus-based precision test (both models insist on this before
+shipping, not just recall) still has not been built or run.
