@@ -146,7 +146,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
       } ${
         card.status === 'failed' ? 'border-rose-900/80 bg-rose-950/20' : ''
       } ${
-        isFocused ? 'ring-1 ring-sky-400/70 border-sky-400/50' : ''
+        isFocused ? 'ring-[1.5px] ring-sky-400/70 border-sky-400/50' : ''
       } ${className}`}
     >
       {/* Stale Document Modified Notification Badge (Task 16 UX) */}
