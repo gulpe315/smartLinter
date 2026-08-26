@@ -5,6 +5,7 @@
 
 pub mod ai;
 pub mod commands;
+pub mod deterministic_qa;
 pub mod indesign_com;
 pub mod language;
 pub mod protocol;

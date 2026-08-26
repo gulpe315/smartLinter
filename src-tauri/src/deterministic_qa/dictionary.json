@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "languages": {
+    "ko": {
+      "categories": [
+        {
+          "id": "calendar.weekday.full",
+          "tier": 1,
+          "sequence": ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일", "1월", "2월", "3월", "4월", "1분기", "2분기", "3분기", "4분기"],
+          "typo_dictionary": {"일오일": "일요일", "화요알": "화요일", "삼분기": "3분기"}
+        },
+        {
+          "id": "sdlc.deployment.priority",
+          "tier": 1,
+          "sequence": ["요구사항", "설계", "구현", "테스트", "배포", "운영", "개발", "스테이징", "프로덕션", "P0", "P1", "P2", "P3"],
+          "typo_dictionary": {"스테이징으": "스테이징", "프로덕숀": "프로덕션", "우선순위이": "우선순위"}
+        },
+        {
+          "id": "workflow.status",
+          "tier": 1,
+          "sequence": ["대기", "진행 중", "검토", "완료", "보류"],
+          "typo_dictionary": {"진행주": "진행 중", "검토오": "검토", "완료오": "완료"}
+        },
+        {
+          "id": "sizing.scale",
+          "tier": 2,
+          "sequence": ["XS", "S", "M", "L", "XL", "2XL", "3XL", "상", "중", "하"],
+          "typo_dictionary": {"엠": "M", "엘": "L", "쥬": "중"}
+        },
+        {
+          "id": "business.title.status",
+          "tier": 1,
+          "sequence": ["사원", "주임", "대리", "과장", "차장", "부장", "임원", "승인", "반려", "보류"],
+          "typo_dictionary": {"과쟝": "과장", "부쟝": "부장", "승이인": "승인"}
+        }
+      ],
+      "list_markers": {
+        "tier": 3,
+        "families": {
+          "circled_number": ["①", "②", "③", "④", "⑤", "⑥"],
+          "hangul": ["가", "나", "다", "라", "마", "바"],
+          "roman": ["I", "II", "III", "IV", "V", "VI"]
+        }
+      }
+    }
+  }
+}
