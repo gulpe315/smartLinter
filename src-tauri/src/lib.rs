@@ -6,6 +6,7 @@
 pub mod ai;
 pub mod commands;
 pub mod indesign_com;
+pub mod language;
 pub mod protocol;
 pub mod server;
 pub mod tm;

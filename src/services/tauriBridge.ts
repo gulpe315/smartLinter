@@ -16,6 +16,7 @@ import {
 import {
   type ModelInfo,
   type GuidelineSet,
+  type LanguageTag,
   type TmEntry,
   evaluateVramWarning,
 } from '../types/config.ts';
@@ -40,6 +41,8 @@ export interface AnalysisOptions {
   guidelines?: GuidelineSet;
   userPreferences?: AcceptedCorrectionPromptItem[];
   tmReference?: TmReferencePromptItem;
+  targetLang?: LanguageTag;
+  explanationLang?: LanguageTag;
 }
 
 /** A compact, previously accepted correction used only as advisory QA context. */

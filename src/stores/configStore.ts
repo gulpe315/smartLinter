@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import {
   type ModelInfo,
   type GuidelineSet,
+  type LanguageTag,
   type TmEntry,
   DEFAULT_GUIDELINES,
 } from '../types/config.ts';
@@ -22,11 +23,16 @@ const STORAGE_KEYS = {
   OLLAMA_HOST: 'smartlinter_ollama_host',
   CUSTOM_GUIDELINE_RAW: 'smartlinter_custom_guideline_raw',
   CUSTOM_GUIDELINE_NAME: 'smartlinter_custom_guideline_name',
+  TARGET_LANG: 'smartlinter_target_lang',
+  EXPLANATION_LANG: 'smartlinter_explanation_lang',
 };
 
 let llmHealthRequestVersion = 0;
 
 export interface ConfigState {
+  // --- QA Language Configuration ---
+  targetLang: LanguageTag;
+  explanationLang: LanguageTag;
   // --- Ollama Model Configuration ---
   ollamaHost: string;
   installedModels: ModelInfo[];
@@ -63,6 +69,8 @@ export interface ConfigState {
   refreshLlmHealth: () => Promise<void>;
   setSelectedModel: (modelName: string) => Promise<void>;
   syncSelectedModel: () => Promise<void>;
+  setTargetLang: (language: LanguageTag) => void;
+  setExplanationLang: (language: LanguageTag) => void;
 
   // --- Actions: Guidelines Management ---
   loadGuidelineFile: (fileOrData: File | { name: string; content: string }) => Promise<void>;
@@ -98,12 +106,29 @@ const getInitialOllamaHost = (): string => {
   return 'http://127.0.0.1:11434';
 };
 
+const getInitialLanguage = (key: string): LanguageTag => {
+  const saved = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(key) : null;
+  return saved === 'ko' || saved === 'en' || saved === 'ja' || saved === 'zh' ? saved : 'ko';
+};
+
 export const useConfigStore = create<ConfigState>((set, get) => ({
+  targetLang: getInitialLanguage(STORAGE_KEYS.TARGET_LANG),
+  explanationLang: getInitialLanguage(STORAGE_KEYS.EXPLANATION_LANG),
   ollamaHost: getInitialOllamaHost(),
   installedModels: [],
   selectedModel: getInitialSelectedModel(),
   isLoadingModels: false,
   modelError: null,
+
+  setTargetLang: (language) => {
+    set({ targetLang: language });
+    if (typeof window !== 'undefined' && window.localStorage) localStorage.setItem(STORAGE_KEYS.TARGET_LANG, language);
+  },
+
+  setExplanationLang: (language) => {
+    set({ explanationLang: language });
+    if (typeof window !== 'undefined' && window.localStorage) localStorage.setItem(STORAGE_KEYS.EXPLANATION_LANG, language);
+  },
 
   guidelines: DEFAULT_GUIDELINES,
   guidelineFileName: null,
@@ -357,6 +382,8 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   reset: () => {
     set({
       installedModels: [],
+      targetLang: 'ko',
+      explanationLang: 'ko',
       isLoadingModels: false,
       modelError: null,
       guidelines: DEFAULT_GUIDELINES,

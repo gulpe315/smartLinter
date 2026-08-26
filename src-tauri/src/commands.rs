@@ -17,6 +17,7 @@ use tauri::{State, WebviewWindow};
 use tracing::debug;
 
 use crate::indesign_com;
+use crate::language::LanguageTag;
 
 const BRIDGE_HEALTH_URL: &str = "http://127.0.0.1:49152/health";
 
@@ -57,6 +58,12 @@ pub struct AnalysisOptions {
     pub guidelines: Option<GuidelineSet>,
     pub user_preferences: Option<Vec<CorrectionPreferenceDto>>,
     pub tm_reference: Option<TmReferenceDto>,
+    pub target_lang: Option<LanguageTag>,
+    pub explanation_lang: Option<LanguageTag>,
+}
+
+fn guidelines_for_language(guidelines: GuidelineSet, target_lang: LanguageTag) -> Option<GuidelineSet> {
+    (guidelines.language == target_lang).then_some(guidelines)
 }
 
 /// A TM fuzzy-match candidate supplied only as non-authoritative QA context.
@@ -175,12 +182,29 @@ pub async fn analyze_paragraph(
         paragraph.text.len()
     );
 
+    let target_lang = options
+        .as_ref()
+        .and_then(|options| options.target_lang)
+        .unwrap_or(LanguageTag::Ko);
+    let explanation_lang = options
+        .as_ref()
+        .and_then(|options| options.explanation_lang)
+        .unwrap_or(LanguageTag::Ko);
     let mut builder = PromptBuilder::new()
         .source(&paragraph.source)
-        .target(&paragraph.text);
+        .target(&paragraph.text)
+        .languages(target_lang, explanation_lang);
 
     if let Some(guidelines) = options.as_ref().and_then(|options| options.guidelines.clone()) {
-        builder = builder.guideline_set(guidelines);
+        if let Some(guidelines) = guidelines_for_language(guidelines.clone(), target_lang) {
+            builder = builder.guideline_set(guidelines);
+        } else {
+            debug!(
+                guideline_language = ?guidelines.language,
+                target_language = ?target_lang,
+                "Skipping guidelines whose language does not match the active target language"
+            );
+        }
     }
 
     if let Some(preferences) = options.as_ref().and_then(|options| options.user_preferences.clone()) {
@@ -191,7 +215,9 @@ pub async fn analyze_paragraph(
         builder = builder.tm_reference(reference.into());
     }
 
-    let req = builder.build_queue_request(&paragraph.paragraph_id);
+    let req = builder
+        .try_build_queue_request(&paragraph.paragraph_id)
+        .map_err(|error| format!("QA analysis unavailable: {error}"))?;
 
     let job_result = queue
         .submit(req)
@@ -633,6 +659,14 @@ mod tests {
         assert_eq!(report.issues.len(), 1);
         assert_eq!(report.issues[0].category, "번역투");
         assert_eq!(report.issues[0].suggested_segment, "업데이트됩니다");
+    }
+
+    #[test]
+    fn guidelines_with_a_different_language_are_excluded() {
+        let mut guidelines = GuidelineSet::default_rules();
+        guidelines.language = LanguageTag::En;
+
+        assert!(guidelines_for_language(guidelines, LanguageTag::Ko).is_none());
     }
 
     #[tokio::test]

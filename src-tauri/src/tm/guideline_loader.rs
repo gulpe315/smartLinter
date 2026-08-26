@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::tm::types::TmError;
+use crate::language::LanguageTag;
 
 /// Standard file names searched in project roots for project guidelines.
 pub const CANDIDATE_GUIDELINE_FILES: &[&str] = &[
@@ -86,6 +87,9 @@ impl QaRule {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GuidelineSet {
+    /// Language this rule set was authored for. Missing legacy data is Korean.
+    #[serde(default)]
+    pub language: LanguageTag,
     /// Name or source of the guideline set.
     pub name: String,
     /// Optional overview description.
@@ -101,6 +105,7 @@ impl GuidelineSet {
     /// Creates an empty guideline set with a name.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
+            language: LanguageTag::Ko,
             name: name.into(),
             description: None,
             rules: Vec::new(),
@@ -154,6 +159,7 @@ impl GuidelineSet {
         ];
 
         Self {
+            language: LanguageTag::Ko,
             name: "Default Standard Guidelines".to_string(),
             description: Some("Built-in standard Korean technical documentation guidelines".to_string()),
             rules,
@@ -226,6 +232,8 @@ impl GuidelineLoader {
 #[derive(Debug, Deserialize)]
 struct JsonGuidelineWrapper {
     #[serde(default)]
+    language: Option<LanguageTag>,
+    #[serde(default)]
     name: Option<String>,
     #[serde(default)]
     description: Option<String>,
@@ -258,6 +266,7 @@ fn parse_json_guidelines(json_str: &str, fallback_name: &str) -> Result<Guidelin
             .collect();
 
         return Ok(GuidelineSet {
+            language: LanguageTag::Ko,
             name: fallback_name.to_string(),
             description: None,
             rules,
@@ -273,6 +282,7 @@ fn parse_json_guidelines(json_str: &str, fallback_name: &str) -> Result<Guidelin
         .collect();
 
     Ok(GuidelineSet {
+        language: wrapper.language.unwrap_or(LanguageTag::Ko),
         name: wrapper.name.unwrap_or_else(|| fallback_name.to_string()),
         description: wrapper.description,
         rules,
@@ -357,6 +367,7 @@ fn parse_markdown_guidelines(md_str: &str, name: &str) -> Result<GuidelineSet, T
     }
 
     Ok(GuidelineSet {
+        language: LanguageTag::Ko,
         name: set_name,
         description: set_description,
         rules,

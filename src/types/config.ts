@@ -36,7 +36,11 @@ export interface QaRule {
   example?: string;
 }
 
+/** v1 QA languages use BCP-47 primary subtags; extend this union with future profiles. */
+export type LanguageTag = 'ko' | 'en' | 'ja' | 'zh';
+
 export interface GuidelineSet {
+  language: LanguageTag;
   name: string;
   description?: string;
   rules: QaRule[];
@@ -99,6 +103,7 @@ export function evaluateVramWarning(
  * Built-in default guidelines when no custom project file is provided.
  */
 export const DEFAULT_GUIDELINES: GuidelineSet = {
+  language: 'ko',
   name: '기본 표준 가이드라인 (Built-in)',
   description: 'SmartLinter 기본 제공 한국어 기술문서 표준 번역 및 교정 규칙',
   rules: [

@@ -620,10 +620,11 @@ export const useQaStore = create<QAState>((set, get) => ({
               ...payload,
               source: '',
             };
-            const guidelines = useConfigStore.getState().guidelines;
+            const { guidelines, targetLang, explanationLang } = useConfigStore.getState();
             const userPreferences = getRelevantAcceptedCorrectionPreferences(get().appliedCards, payload.text);
-            const options = guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 || userPreferences.length > 0 || tmReference !== undefined
-              ? {
+            const options = {
+                targetLang,
+                explanationLang,
                 ...(guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 ? { guidelines } : {}),
                 ...(userPreferences.length > 0 ? { userPreferences } : {}),
                 ...(tmReference ? {
@@ -633,11 +634,8 @@ export const useQaStore = create<QAState>((set, get) => ({
                     score: tmReference.score,
                   },
                 } : {}),
-              }
-              : undefined;
-            const report = options
-              ? await bridgeService.analyzeParagraph(analysisPayload, options)
-              : await bridgeService.analyzeParagraph(analysisPayload);
+              };
+            const report = await bridgeService.analyzeParagraph(analysisPayload, options);
 
             if (analysisRequestVersions.get(payload.paragraphId) !== requestVersion) {
               return;

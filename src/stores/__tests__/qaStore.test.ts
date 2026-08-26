@@ -667,7 +667,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({
       paragraphId: 'para-analyze-1',
       text: 'This is teh paragraph.',
-    }));
+    }), expect.any(Object));
     expect(useQaStore.getState().cards).toEqual([
       expect.objectContaining({
         paragraphId: 'para-analyze-1',
@@ -684,6 +684,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
   it('forwards configured guidelines from configStore with the QA analysis request', async () => {
     vi.useFakeTimers();
     const guidelines = {
+      language: 'ko' as const,
       name: 'Project rules',
       rules: [{ category: 'Terminology', description: 'Keep product names untranslated.' }],
       rawContent: '',
@@ -698,12 +699,16 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
 
-    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), { guidelines });
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), {
+      guidelines,
+      targetLang: 'ko',
+      explanationLang: 'ko',
+    });
     unlisten();
     vi.useRealTimers();
   });
 
-  it('does not forward options when configStore has no guidelines', async () => {
+  it('forwards the default QA languages when configStore has no guidelines', async () => {
     vi.useFakeTimers();
     const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
     const unlisten = useQaStore.getState().initEventListener(mockBridge);
@@ -714,7 +719,10 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
 
-    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object));
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), {
+      targetLang: 'ko',
+      explanationLang: 'ko',
+    });
     unlisten();
     vi.useRealTimers();
   });
@@ -738,6 +746,8 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
 
     expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), {
+      targetLang: 'ko',
+      explanationLang: 'ko',
       userPreferences: [expect.objectContaining({ originalSegment: 'teh', suggestedSegment: 'the' })],
     });
     unlisten();
@@ -762,7 +772,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
 
-    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object));
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), { targetLang: 'ko', explanationLang: 'ko' });
     unlisten();
     vi.useRealTimers();
   });
@@ -785,7 +795,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
 
-    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object));
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), { targetLang: 'ko', explanationLang: 'ko' });
     unlisten();
     vi.useRealTimers();
   });
@@ -859,6 +869,8 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(analyzeSpy).toHaveBeenCalledWith(
       expect.objectContaining({ source: '' }),
       {
+        targetLang: 'ko',
+        explanationLang: 'ko',
         tmReference: expect.objectContaining({
           source: tmSource,
           score: 1,
@@ -893,7 +905,10 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
-    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ source: '' }));
+    expect(analyzeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ source: '' }),
+      { targetLang: 'ko', explanationLang: 'ko' },
+    );
 
     unlisten();
     vi.useRealTimers();
@@ -999,7 +1014,10 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(analyzeSpy).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(analyzeSpy).toHaveBeenCalledTimes(1);
-    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ text: 'abc', hash: 'hash-abc' }));
+    expect(analyzeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'abc', hash: 'hash-abc' }),
+      { targetLang: 'ko', explanationLang: 'ko' },
+    );
 
     unlisten();
     vi.useRealTimers();

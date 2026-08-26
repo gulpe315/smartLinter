@@ -7,6 +7,7 @@
 
 import {
   type GuidelineSet,
+  type LanguageTag,
   type QaRule,
   type TmEntry,
 } from '../types/config.ts';
@@ -19,6 +20,7 @@ export function parseGuidelineContent(content: string, fallbackName = '프로젝
   const trimmed = content.trim();
   if (!trimmed) {
     return {
+      language: 'ko',
       name: fallbackName,
       rules: [],
       rawContent: '',
@@ -46,10 +48,15 @@ interface JsonRuleRaw {
 }
 
 interface JsonGuidelineWrapper {
+  language?: string;
   name?: string;
   description?: string;
   rules?: JsonRuleRaw[];
   guidelines?: JsonRuleRaw[];
+}
+
+function parseLanguageTag(value: string | undefined): LanguageTag {
+  return value === 'ko' || value === 'en' || value === 'ja' || value === 'zh' ? value : 'ko';
 }
 
 function parseJsonGuidelines(jsonStr: string, fallbackName: string): GuidelineSet {
@@ -62,6 +69,7 @@ function parseJsonGuidelines(jsonStr: string, fallbackName: string): GuidelineSe
         .filter((r): r is QaRule => r !== null);
 
       return {
+        language: 'ko',
         name: fallbackName,
         rules,
         rawContent: jsonStr,
@@ -76,6 +84,7 @@ function parseJsonGuidelines(jsonStr: string, fallbackName: string): GuidelineSe
         .filter((r): r is QaRule => r !== null);
 
       return {
+        language: parseLanguageTag(wrapper.language),
         name: wrapper.name || fallbackName,
         description: wrapper.description,
         rules,
@@ -157,6 +166,7 @@ function parseMarkdownGuidelines(mdStr: string, defaultName: string): GuidelineS
   }
 
   return {
+    language: 'ko',
     name: setName,
     description: setDescription,
     rules,

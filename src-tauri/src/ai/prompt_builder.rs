@@ -6,6 +6,7 @@
 
 use crate::{
     ai::types::{GenerateOptions, QueueJobRequest},
+    language::LanguageTag,
     tm::GuidelineSet,
 };
 use tracing::debug;
@@ -37,11 +38,38 @@ pub struct TmReference {
     pub score: f64,
 }
 
-/// Canonical compressed system instruction for fast paragraph QA linting.
-pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+/// Korean bilingual profile, retained byte-for-byte for backward compatibility.
+pub const KO_COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+
+/// Backward-compatible name for the Korean bilingual profile.
+pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = KO_COMPRESSED_SYSTEM_INSTRUCTION;
 
 /// System instruction used when no source text is available for comparison.
-pub const MONOLINGUAL_SYSTEM_INSTRUCTION: &str = "You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+pub const KO_MONOLINGUAL_SYSTEM_INSTRUCTION: &str = "You are a fast Korean monolingual paragraph QA linter. Inspect the Korean text itself for spelling, typos, spacing, particles, verb endings, grammar, unnatural expressions, passive voice, and punctuation. Do not return PASS merely because source evidence is unavailable; always inspect the target text itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
+
+/// Backward-compatible name for the Korean monolingual profile.
+pub const MONOLINGUAL_SYSTEM_INSTRUCTION: &str = KO_MONOLINGUAL_SYSTEM_INSTRUCTION;
+
+/// Returns an error instead of silently applying Korean content to an unvalidated language.
+pub fn get_system_instruction(is_bilingual: bool, target_lang: LanguageTag) -> Result<&'static str, String> {
+    match target_lang {
+        LanguageTag::Ko => Ok(if is_bilingual {
+            KO_COMPRESSED_SYSTEM_INSTRUCTION
+        } else {
+            KO_MONOLINGUAL_SYSTEM_INSTRUCTION
+        }),
+        language => Err(format!("QA profile for language '{language:?}' is not yet validated")),
+    }
+}
+
+/// Korean output is already specified by the unchanged Korean base profiles.
+/// Keeping this empty preserves the legacy prompt bytes for default `ko`/`ko` analysis.
+fn get_explanation_directive(explanation_lang: LanguageTag) -> Result<&'static str, String> {
+    match explanation_lang {
+        LanguageTag::Ko => Ok(""),
+        language => Err(format!("QA explanation language '{language:?}' is not yet validated")),
+    }
+}
 
 /// Embedded raw Tera/template string.
 pub const QA_COMPRESSED_TEMPLATE: &str = include_str!("templates/qa_compressed.tera");
@@ -54,6 +82,8 @@ pub struct PromptBuilder {
     guidelines: Option<GuidelineContext>,
     user_preferences: Vec<CorrectionPreference>,
     tm_reference: Option<TmReference>,
+    target_language: LanguageTag,
+    explanation_language: LanguageTag,
     temperature: Option<f32>,
     num_ctx: Option<u32>,
     model_override: Option<String>,
@@ -68,6 +98,8 @@ impl PromptBuilder {
             guidelines: None,
             user_preferences: Vec::new(),
             tm_reference: None,
+            target_language: LanguageTag::Ko,
+            explanation_language: LanguageTag::Ko,
             temperature: Some(0.1),
             num_ctx: Some(2048),
             model_override: None,
@@ -83,6 +115,13 @@ impl PromptBuilder {
     /// Sets the target (translated / Korean) paragraph text.
     pub fn target(mut self, target: impl Into<String>) -> Self {
         self.target = target.into();
+        self
+    }
+
+    /// Selects the document language and independent issue-explanation language.
+    pub fn languages(mut self, target_language: LanguageTag, explanation_language: LanguageTag) -> Self {
+        self.target_language = target_language;
+        self.explanation_language = explanation_language;
         self
     }
 
@@ -151,15 +190,18 @@ impl PromptBuilder {
 
     /// Builds the system prompt component with optional project and preference context.
     pub fn build_system_prompt(&self) -> String {
-        self.build_budgeted_system_prompt(&self.build_user_prompt())
+        self.try_build_system_prompt()
+            .expect("PromptBuilder default Korean profile must be available")
     }
 
-    fn build_budgeted_system_prompt(&self, user_prompt: &str) -> String {
-        let instruction = if self.source.trim().is_empty() {
-            MONOLINGUAL_SYSTEM_INSTRUCTION
-        } else {
-            COMPRESSED_SYSTEM_INSTRUCTION
-        };
+    /// Builds a prompt only when both selected language profiles are validated.
+    pub fn try_build_system_prompt(&self) -> Result<String, String> {
+        self.try_build_budgeted_system_prompt(&self.build_user_prompt())
+    }
+
+    fn try_build_budgeted_system_prompt(&self, user_prompt: &str) -> Result<String, String> {
+        let instruction = get_system_instruction(!self.source.trim().is_empty(), self.target_language)?;
+        let explanation_directive = get_explanation_directive(self.explanation_language)?;
         let original_history_count = self.user_preferences.len();
         let mut history_count = original_history_count;
         let mut tm_reference_included = self.tm_reference.is_some();
@@ -226,12 +268,17 @@ impl PromptBuilder {
             );
         }
 
-        self.render_system_prompt(
+        let mut prompt = self.render_system_prompt(
             instruction,
             &guideline_lines,
             history_count,
             tm_reference_included,
-        )
+        );
+        if !explanation_directive.is_empty() {
+            prompt.push_str("\n\n");
+            prompt.push_str(explanation_directive);
+        }
+        Ok(prompt)
     }
 
     fn guideline_lines(&self) -> Vec<String> {
@@ -313,7 +360,9 @@ impl PromptBuilder {
     /// Builds the full single-string prompt (combining system instructions and SRC/TGT payload).
     pub fn build_prompt(&self) -> String {
         let user = self.build_user_prompt();
-        let system = self.build_budgeted_system_prompt(&user);
+        let system = self
+            .try_build_budgeted_system_prompt(&user)
+            .expect("PromptBuilder default Korean profile must be available");
         format!("{}\n{}", system, user)
     }
 
@@ -330,16 +379,25 @@ impl PromptBuilder {
 
     /// Constructs a fully configured `QueueJobRequest` with JSON format enforced.
     pub fn build_queue_request(&self, paragraph_id: impl Into<String>) -> QueueJobRequest {
+        self.try_build_queue_request(paragraph_id)
+            .expect("PromptBuilder default Korean profile must be available")
+    }
+
+    /// Constructs a request only when the selected language profiles are validated.
+    pub fn try_build_queue_request(
+        &self,
+        paragraph_id: impl Into<String>,
+    ) -> Result<QueueJobRequest, String> {
         let user = self.build_user_prompt();
         let mut req = QueueJobRequest::new(paragraph_id, user.clone())
-            .with_system(self.build_budgeted_system_prompt(&user))
+            .with_system(self.try_build_budgeted_system_prompt(&user)?)
             .with_options(self.build_generate_options());
 
         if let Some(ref m) = self.model_override {
             req = req.with_model(m.clone());
         }
 
-        req
+        Ok(req)
     }
 
     /// Constructs a single-prompt `QueueJobRequest` (system prompt combined into main prompt)
@@ -685,6 +743,35 @@ mod tests {
 
         assert!(COMPRESSED_SYSTEM_INSTRUCTION.contains(CLAUSE));
         assert!(MONOLINGUAL_SYSTEM_INSTRUCTION.contains(CLAUSE));
+    }
+
+    #[test]
+    fn default_korean_prompt_is_byte_identical_to_the_legacy_instruction() {
+        let builder = PromptBuilder::new().target("Korean target text");
+
+        assert_eq!(builder.build_system_prompt(), MONOLINGUAL_SYSTEM_INSTRUCTION);
+        assert_eq!(get_system_instruction(false, LanguageTag::Ko).unwrap(), MONOLINGUAL_SYSTEM_INSTRUCTION);
+        assert_eq!(get_explanation_directive(LanguageTag::Ko).unwrap(), "");
+    }
+
+    #[test]
+    fn unvalidated_language_profiles_fail_instead_of_using_korean_content() {
+        for language in [LanguageTag::En, LanguageTag::Ja, LanguageTag::Zh] {
+            let error = PromptBuilder::new()
+                .target("Target")
+                .languages(language, LanguageTag::Ko)
+                .try_build_system_prompt()
+                .unwrap_err();
+            assert!(error.contains("not yet validated"));
+            assert!(!error.contains(KO_MONOLINGUAL_SYSTEM_INSTRUCTION));
+        }
+
+        let error = PromptBuilder::new()
+            .target("Target")
+            .languages(LanguageTag::Ko, LanguageTag::En)
+            .try_build_system_prompt()
+            .unwrap_err();
+        assert!(error.contains("not yet validated"));
     }
 
     #[test]

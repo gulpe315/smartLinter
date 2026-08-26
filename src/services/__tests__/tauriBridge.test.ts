@@ -112,6 +112,7 @@ describe('TauriBridgeService & IPC Integration', () => {
       paragraphId: 'para-guidelines', text: 'Text', hash: 'hash', source: '', timestamp: 1, editorType: 'InDesign',
     };
     const guidelines: GuidelineSet = {
+      language: 'ko',
       name: 'Project rules', rules: [{ category: 'Terminology', description: 'Keep product names.' }], rawContent: '',
     };
 

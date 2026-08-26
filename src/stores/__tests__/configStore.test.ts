@@ -22,10 +22,22 @@ describe('useConfigStore', () => {
   it('should initialize with default state and guidelines', () => {
     const state = useConfigStore.getState();
     expect(state.selectedModel).toBe('qwen2.5:7b');
+    expect(state.targetLang).toBe('ko');
+    expect(state.explanationLang).toBe('ko');
     expect(state.guidelines.rules.length).toBe(DEFAULT_GUIDELINES.rules.length);
     expect(state.isCustomGuideline).toBe(false);
     expect(state.tmEntries.length).toBe(0);
     expect(state.isSettingsModalOpen).toBe(false);
+  });
+
+  it('persists independently selected QA language settings', () => {
+    useConfigStore.getState().setTargetLang('ja');
+    useConfigStore.getState().setExplanationLang('en');
+
+    expect(useConfigStore.getState().targetLang).toBe('ja');
+    expect(useConfigStore.getState().explanationLang).toBe('en');
+    expect(localStorage.getItem('smartlinter_target_lang')).toBe('ja');
+    expect(localStorage.getItem('smartlinter_explanation_lang')).toBe('en');
   });
 
   it('should fetch installed Ollama models successfully', async () => {
