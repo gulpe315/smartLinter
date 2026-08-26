@@ -32,6 +32,7 @@ import {
 import { getStaleConflictResolver } from '../services/stale_conflict_resolver.ts';
 import { getRollbackGuard } from '../services/rollback_guard.ts';
 import { useTmStore } from './tmStore.ts';
+import { useConfigStore } from './configStore.ts';
 import { normalizeText } from '../utils/tmMatcher.ts';
 
 export interface AcceptCardOptions {
@@ -559,7 +560,13 @@ export const useQaStore = create<QAState>((set, get) => ({
               ...payload,
               source: tmMatches[0]?.source ?? '',
             };
-            const report = await bridgeService.analyzeParagraph(analysisPayload);
+            const guidelines = useConfigStore.getState().guidelines;
+            const options = guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0
+              ? { guidelines }
+              : undefined;
+            const report = options
+              ? await bridgeService.analyzeParagraph(analysisPayload, options)
+              : await bridgeService.analyzeParagraph(analysisPayload);
 
             if (analysisRequestVersions.get(payload.paragraphId) !== requestVersion) {
               return;

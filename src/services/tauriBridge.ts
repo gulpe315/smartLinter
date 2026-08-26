@@ -35,6 +35,11 @@ export interface BridgeStatusPayload {
   version?: string;
 }
 
+/** Optional dashboard-side context for a QA paragraph analysis request. */
+export interface AnalysisOptions {
+  guidelines?: GuidelineSet;
+}
+
 /** LLM health and connectivity payload */
 export interface LlmStatusPayload {
   isAlive: boolean;
@@ -118,7 +123,7 @@ export interface IBridgeService {
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
 
   /** Analyzes paragraph text with LLM and returns structured QaReport */
-  analyzeParagraph(paragraph: ParagraphPayload): Promise<QaReport>;
+  analyzeParagraph(paragraph: ParagraphPayload, options?: AnalysisOptions): Promise<QaReport>;
 
   /** Executes an interactive AI natural language revision command on a paragraph */
   executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult>;
@@ -353,7 +358,7 @@ export class MockBridgeService implements IBridgeService {
     }
   }
 
-  async analyzeParagraph(paragraph: ParagraphPayload): Promise<QaReport> {
+  async analyzeParagraph(paragraph: ParagraphPayload, _options?: AnalysisOptions): Promise<QaReport> {
     const report = generateMockQaReport(paragraph.text);
     this.emit('qa-report-received', {
       paragraphId: paragraph.paragraphId,
@@ -691,18 +696,18 @@ export class TauriBridgeService implements IBridgeService {
     return this.fallbackService.fetchBridgeHealth();
   }
 
-  async analyzeParagraph(paragraph: ParagraphPayload): Promise<QaReport> {
+  async analyzeParagraph(paragraph: ParagraphPayload, options?: AnalysisOptions): Promise<QaReport> {
     if (!this.isTauriAvailable()) {
-      return this.fallbackService.analyzeParagraph(paragraph);
+      return this.fallbackService.analyzeParagraph(paragraph, options);
     }
 
     try {
-      return await invoke('analyze_paragraph', { paragraph });
+      return await invoke('analyze_paragraph', options ? { paragraph, options } : { paragraph });
     } catch (e) {
       console.warn('Tauri invoke analyze_paragraph failed, using fallback:', e);
     }
 
-    return this.fallbackService.analyzeParagraph(paragraph);
+    return this.fallbackService.analyzeParagraph(paragraph, options);
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {

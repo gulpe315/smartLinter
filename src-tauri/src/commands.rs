@@ -47,6 +47,16 @@ impl From<HealthResponse> for BridgeStatusDto {
     }
 }
 
+/// Optional QA-only context supplied by the dashboard for paragraph analysis.
+///
+/// This intentionally stays separate from `ParagraphPayload`, which is shared
+/// editor telemetry used by both editor integrations.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisOptions {
+    pub guidelines: Option<GuidelineSet>,
+}
+
 /// Fetches the current Local Bridge health state for the dashboard.
 #[tauri::command]
 pub async fn get_bridge_status() -> Result<BridgeStatusDto, String> {
@@ -112,6 +122,7 @@ pub async fn set_always_on_top(window: WebviewWindow, pinned: bool) -> Result<bo
 #[tauri::command]
 pub async fn analyze_paragraph(
     paragraph: ParagraphPayload,
+    options: Option<AnalysisOptions>,
     queue: State<'_, MicroScopingQueue>,
 ) -> Result<QaReport, String> {
     debug!(
@@ -120,9 +131,16 @@ pub async fn analyze_paragraph(
         paragraph.text.len()
     );
 
-    let builder = PromptBuilder::new()
+    let mut builder = PromptBuilder::new()
         .source(&paragraph.source)
         .target(&paragraph.text);
+
+    if let Some(guidelines) = options.and_then(|options| options.guidelines) {
+        let prompt_rules = guidelines.build_prompt_rules();
+        if !prompt_rules.trim().is_empty() {
+            builder = builder.guidelines(prompt_rules);
+        }
+    }
 
     let req = builder.build_queue_request(&paragraph.paragraph_id);
 

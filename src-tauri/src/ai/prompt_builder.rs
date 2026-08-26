@@ -259,6 +259,21 @@ mod tests {
     }
 
     #[test]
+    fn test_queue_request_includes_supplied_guidelines_in_system_prompt() {
+        let req = PromptBuilder::new()
+            .source("Test source")
+            .target("Test target")
+            .guidelines("- [Terminology] Keep product names untranslated.")
+            .build_queue_request("para-guidelines");
+
+        assert!(req
+            .system
+            .as_deref()
+            .unwrap()
+            .contains("Guidelines:\n- [Terminology] Keep product names untranslated."));
+    }
+
+    #[test]
     fn test_prompt_builder_queue_request_forces_json() {
         let req = PromptBuilder::new()
             .source("Test source")

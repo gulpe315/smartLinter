@@ -6,7 +6,8 @@ import {
   getBridgeService,
   setBridgeService,
 } from '../tauriBridge.ts';
-import { type ReplacementCommand } from '../../../shared/protocol/types.ts';
+import { type ParagraphPayload, type ReplacementCommand } from '../../../shared/protocol/types.ts';
+import { type GuidelineSet } from '../../types/config.ts';
 
 vi.mock('@tauri-apps/api/event', () => ({
   emit: vi.fn(),
@@ -99,6 +100,26 @@ describe('TauriBridgeService & IPC Integration', () => {
     expect(status.connected).toBe(true);
     expect(status.editorType).toBe('Word');
 
+    service.destroy();
+  });
+
+  it('forwards analysis options to Tauri only when guidelines are present', async () => {
+    const invokeMock = vi.fn().mockResolvedValue({ status: 'PASS', issues: [] });
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
+    const service = new TauriBridgeService();
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'para-guidelines', text: 'Text', hash: 'hash', source: '', timestamp: 1, editorType: 'InDesign',
+    };
+    const guidelines: GuidelineSet = {
+      name: 'Project rules', rules: [{ category: 'Terminology', description: 'Keep product names.' }], rawContent: '',
+    };
+
+    await service.analyzeParagraph(paragraph, { guidelines });
+    await service.analyzeParagraph(paragraph);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, 'analyze_paragraph', { paragraph, options: { guidelines } }, undefined);
+    expect(invokeMock).toHaveBeenNthCalledWith(2, 'analyze_paragraph', { paragraph }, undefined);
     service.destroy();
   });
 

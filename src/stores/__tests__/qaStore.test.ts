@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useQaStore } from '../qaStore.ts';
 import { useTmStore } from '../tmStore.ts';
+import { useConfigStore } from '../configStore.ts';
 import { MockBridgeService, setBridgeService } from '../../services/tauriBridge.ts';
 import { type QaReport } from '../../../shared/protocol/types.ts';
 
@@ -10,6 +11,11 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
   beforeEach(() => {
     useQaStore.getState().reset();
     useTmStore.getState().reset();
+    useConfigStore.setState({
+      guidelines: { name: 'No guidelines', rules: [], rawContent: '' },
+      guidelineFileName: null,
+      isCustomGuideline: false,
+    });
     mockBridge = new MockBridgeService();
     setBridgeService(mockBridge);
   });
@@ -671,6 +677,44 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
       }),
     ]);
 
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it('forwards configured guidelines from configStore with the QA analysis request', async () => {
+    vi.useFakeTimers();
+    const guidelines = {
+      name: 'Project rules',
+      rules: [{ category: 'Terminology', description: 'Keep product names untranslated.' }],
+      rawContent: '',
+    };
+    useConfigStore.setState({ guidelines, guidelineFileName: '.agents', isCustomGuideline: true });
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-guidelines', text: 'Text', hash: 'hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), { guidelines });
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it('does not forward options when configStore has no guidelines', async () => {
+    vi.useFakeTimers();
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-no-guidelines', text: 'Text', hash: 'hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object));
     unlisten();
     vi.useRealTimers();
   });
