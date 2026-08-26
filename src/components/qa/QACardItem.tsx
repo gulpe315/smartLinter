@@ -5,7 +5,7 @@
  * severity indicator, reason tooltip, inline diff viewer, and [Accept] / [Dismiss] actions.
  */
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Check,
   X,
@@ -60,6 +60,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const [locateError, setLocateError] = useState<string | null>(null);
   const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
   const [editedSuggestion, setEditedSuggestion] = useState(card.suggestedSegment);
+  const pointerDownPosition = useRef<{ clientX: number; clientY: number } | null>(null);
   const updateSuggestedSegment = useQaStore((state) => state.updateSuggestedSegment);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isObsolete = card.status === 'stale_obsolete';
@@ -107,6 +108,37 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     }
   };
 
+  const handleCardPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    pointerDownPosition.current = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+  };
+
+  const handleCardClick = (event: React.MouseEvent<HTMLElement>) => {
+    const pointerDown = pointerDownPosition.current;
+    pointerDownPosition.current = null;
+
+    if (readOnly || isLocating || !card.paragraphId) return;
+
+    const target = event.target as HTMLElement;
+    if (target.closest('button, a, input, textarea, select, [contenteditable="true"], [role="button"], [role="link"], [role="checkbox"], [data-card-click-exempt]')) {
+      return;
+    }
+
+    if (
+      pointerDown &&
+      Math.hypot(event.clientX - pointerDown.clientX, event.clientY - pointerDown.clientY) > 5
+    ) {
+      return;
+    }
+
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && selection.toString().trim()) return;
+
+    void handleLocate();
+  };
+
   const startEditingSuggestion = () => {
     setEditedSuggestion(card.suggestedSegment);
     setIsEditingSuggestion(true);
@@ -141,13 +173,15 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     <article
       data-testid={`qa-card-item-${card.id}`}
       data-focused={isFocused ? 'true' : undefined}
+      onPointerDown={handleCardPointerDown}
+      onClick={handleCardClick}
       className={`group relative rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 shadow-md p-4 transition-all duration-300 ease-out hover:shadow-indigo-950/20 hover:shadow-lg ${
         isObsolete ? 'ring-1 ring-slate-500/60 border-slate-500/60 bg-slate-950/90 opacity-85' : isStale ? 'ring-1 ring-amber-500/50 border-amber-500/40 bg-slate-900' : card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
       } ${
         card.status === 'failed' ? 'border-rose-900/80 bg-rose-950/20' : ''
       } ${
         isFocused ? 'ring-[1.5px] ring-sky-400/70 border-sky-400/50' : ''
-      } ${className}`}
+      } ${!readOnly && card.paragraphId && !isLocating ? 'cursor-pointer' : ''} ${className}`}
     >
       {/* Stale Document Modified Notification Badge (Task 16 UX) */}
       {isStale && (
@@ -235,6 +269,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
             {showTooltip && (
               <div
                 data-testid="reason-tooltip-content"
+                data-card-click-exempt
                 className="absolute right-0 top-6 z-30 w-72 p-3 rounded-lg bg-slate-950 border border-slate-700 shadow-xl text-xs text-slate-200 animate-in fade-in zoom-in-95 duration-150"
               >
                 <div className="flex items-center gap-1.5 font-semibold text-indigo-300 mb-1 text-[11px]">

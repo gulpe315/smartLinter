@@ -182,6 +182,87 @@ describe('QACardItem Component', () => {
     });
   });
 
+  it('locates the card paragraph when its non-interactive body is clicked', async () => {
+    const service = new MockBridgeService();
+    const locateParagraph = vi.spyOn(service, 'locateParagraph');
+    setBridgeService(service);
+    render(<QACardItem card={sampleCard} />);
+
+    fireEvent.click(screen.getByTestId('qa-card-reason'));
+
+    await waitFor(() => {
+      expect(locateParagraph).toHaveBeenCalledTimes(1);
+      expect(locateParagraph).toHaveBeenCalledWith('para-word-1', 'hash-abc-123');
+    });
+  });
+
+  it('does not locate when card controls or the tooltip content are clicked', () => {
+    const service = new MockBridgeService();
+    const locateParagraph = vi.spyOn(service, 'locateParagraph');
+    setBridgeService(service);
+    const handleAccept = vi.fn();
+    const handleDismiss = vi.fn();
+    render(<QACardItem card={sampleCard} onAccept={handleAccept} onDismiss={handleDismiss} />);
+
+    fireEvent.click(screen.getByTestId('qa-accept-action-btn'));
+    fireEvent.click(screen.getByTestId('qa-dismiss-action-btn'));
+    fireEvent.click(screen.getByTestId('dismiss-qa-btn'));
+    fireEvent.click(screen.getByTestId('reason-tooltip-trigger'));
+    fireEvent.click(screen.getByTestId('reason-tooltip-content'));
+    fireEvent.click(screen.getByTestId('qa-edit-suggestion-btn'));
+    fireEvent.click(screen.getByTestId('qa-suggestion-editor'));
+    fireEvent.click(screen.getByTestId('qa-suggestion-save-btn'));
+
+    fireEvent.click(screen.getByTestId('qa-edit-suggestion-btn'));
+    fireEvent.click(screen.getByTestId('qa-suggestion-cancel-btn'));
+
+    expect(handleAccept).toHaveBeenCalledTimes(1);
+    expect(handleDismiss).toHaveBeenCalledTimes(2);
+    expect(locateParagraph).not.toHaveBeenCalled();
+  });
+
+  it('does not locate after a significant pointer drag or when text is selected', () => {
+    const service = new MockBridgeService();
+    const locateParagraph = vi.spyOn(service, 'locateParagraph');
+    setBridgeService(service);
+    render(<QACardItem card={sampleCard} />);
+    const card = screen.getByTestId('qa-card-item-card-101');
+
+    fireEvent.pointerDown(card, { clientX: 10, clientY: 10 });
+    fireEvent.pointerUp(card, { clientX: 20, clientY: 20 });
+    fireEvent.click(card, { clientX: 20, clientY: 20 });
+    expect(locateParagraph).not.toHaveBeenCalled();
+
+    const getSelection = vi.spyOn(window, 'getSelection').mockReturnValue({
+      isCollapsed: false,
+      toString: () => 'selected text',
+    } as Selection);
+    fireEvent.click(card);
+    expect(locateParagraph).not.toHaveBeenCalled();
+    getSelection.mockRestore();
+  });
+
+  it('does not locate from readOnly, locating, or paragraph-less card bodies', () => {
+    const service = new MockBridgeService();
+    const locateParagraph = vi.spyOn(service, 'locateParagraph').mockImplementation(
+      () => new Promise(() => {})
+    );
+    setBridgeService(service);
+    const { rerender } = render(<QACardItem card={sampleCard} readOnly />);
+
+    fireEvent.click(screen.getByTestId('qa-card-reason'));
+    expect(locateParagraph).not.toHaveBeenCalled();
+
+    rerender(<QACardItem card={{ ...sampleCard, paragraphId: undefined }} />);
+    fireEvent.click(screen.getByTestId('qa-card-reason'));
+    expect(locateParagraph).not.toHaveBeenCalled();
+
+    rerender(<QACardItem card={sampleCard} />);
+    fireEvent.click(screen.getByTestId('qa-card-reason'));
+    fireEvent.click(screen.getByTestId('qa-card-reason'));
+    expect(locateParagraph).toHaveBeenCalledTimes(1);
+  });
+
   it('shows a clear notice when the paragraph cannot be located', async () => {
     const service = new MockBridgeService();
     const markObsolete = vi.fn();
