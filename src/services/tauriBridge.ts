@@ -38,6 +38,15 @@ export interface BridgeStatusPayload {
 /** Optional dashboard-side context for a QA paragraph analysis request. */
 export interface AnalysisOptions {
   guidelines?: GuidelineSet;
+  userPreferences?: AcceptedCorrectionPromptItem[];
+}
+
+/** A compact, previously accepted correction used only as advisory QA context. */
+export interface AcceptedCorrectionPromptItem {
+  originalSegment: string;
+  suggestedSegment: string;
+  category?: string;
+  reason?: string;
 }
 
 /** LLM health and connectivity payload */

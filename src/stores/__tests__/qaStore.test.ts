@@ -719,6 +719,77 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     vi.useRealTimers();
   });
 
+  it('forwards a relevant applied correction as advisory user-preference context', async () => {
+    vi.useFakeTimers();
+    useQaStore.setState({
+      appliedCards: [{
+        id: 'accepted-preference', paragraphId: 'old-para', paragraphHash: 'old-hash', paragraphText: 'This is teh text.',
+        category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Accepted typo',
+        severity: 'LOW', status: 'applied', createdAt: Date.now(),
+      }],
+    });
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-preference', text: 'Another teh paragraph.', hash: 'hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object), {
+      userPreferences: [expect.objectContaining({ originalSegment: 'teh', suggestedSegment: 'the' })],
+    });
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it('never forwards dismissed or stale_obsolete history as user-preference context', async () => {
+    vi.useFakeTimers();
+    useQaStore.setState({
+      dismissedCards: [{
+        id: 'stale-history', paragraphId: 'old-para', paragraphHash: 'old-hash', paragraphText: 'This is teh text.',
+        category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Stale typo',
+        severity: 'LOW', status: 'stale_obsolete', createdAt: Date.now(),
+      }],
+    });
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-stale-history', text: 'Another teh paragraph.', hash: 'hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object));
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it('does not forward user-preference context when no applied correction is relevant', async () => {
+    vi.useFakeTimers();
+    useQaStore.setState({
+      appliedCards: [{
+        id: 'unrelated-preference', paragraphId: 'old-para', paragraphHash: 'old-hash', paragraphText: 'A different sentence.',
+        category: 'Spelling', originalSegment: 'colour', suggestedSegment: 'color', reason: 'Accepted spelling',
+        severity: 'LOW', status: 'applied', createdAt: Date.now(),
+      }],
+    });
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-no-preference', text: 'A wholly unrelated paragraph.', hash: 'hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.any(Object));
+    unlisten();
+    vi.useRealTimers();
+  });
+
   it('instantly replays accepted corrections and still runs debounced analysis', async () => {
     vi.useFakeTimers();
     useQaStore.setState({

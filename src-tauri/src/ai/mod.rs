@@ -16,7 +16,7 @@ pub use micro_queue::{
 };
 pub use ollama_client::{OllamaProvider, DEFAULT_OLLAMA_TIMEOUT, DEFAULT_OLLAMA_URL};
 pub use prompt_builder::{
-    format_compressed_prompt, format_compressed_prompt_with_guidelines, PromptBuilder,
+    format_compressed_prompt, format_compressed_prompt_with_guidelines, CorrectionPreference, PromptBuilder,
     COMPRESSED_SYSTEM_INSTRUCTION, QA_COMPRESSED_TEMPLATE,
 };
 pub use provider::{LocalLlmProvider, MockLlmProvider};

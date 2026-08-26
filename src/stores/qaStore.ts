@@ -17,6 +17,7 @@ import {
 } from '../../shared/engine/diff_engine.ts';
 import { computeParagraphHash } from '../../shared/engine/hash_util.ts';
 import {
+  type AcceptedCorrectionPromptItem,
   type IBridgeService,
   type QaReportPayload,
   getBridgeService,
@@ -33,7 +34,10 @@ import { getStaleConflictResolver } from '../services/stale_conflict_resolver.ts
 import { getRollbackGuard } from '../services/rollback_guard.ts';
 import { useTmStore } from './tmStore.ts';
 import { useConfigStore } from './configStore.ts';
-import { normalizeText } from '../utils/tmMatcher.ts';
+import { normalizeText, TsFuzzyMatcher } from '../utils/tmMatcher.ts';
+
+const USER_PREFERENCE_LIMIT = 2;
+const USER_PREFERENCE_MIN_SIMILARITY = 0.9;
 
 export interface AcceptCardOptions {
   autoResolveStale?: boolean;
@@ -61,6 +65,59 @@ export function findAcceptedCorrectionForText(appliedCards: QACardData[], text: 
   }
 
   return null;
+}
+
+/**
+ * Selects up to two relevant, previously applied corrections for LLM advisory context.
+ * This is deliberately separate from `findAcceptedCorrectionForText`, the exact-match
+ * history replay path that creates a deterministic QA card.
+ */
+export function getRelevantAcceptedCorrectionPreferences(
+  appliedCards: QACardData[],
+  text: string,
+): AcceptedCorrectionPromptItem[] {
+  const normalizedText = normalizeText(text);
+  if (!normalizedText) return [];
+
+  const eligibleCards = appliedCards.filter((card) =>
+    card.status === 'applied'
+      && normalizeText(card.originalSegment).length > 0
+      && normalizeText(card.suggestedSegment).length > 0
+  );
+  const selected: AcceptedCorrectionPromptItem[] = [];
+  const seen = new Set<string>();
+  const addCard = (card: QACardData) => {
+    const key = `${normalizeText(card.originalSegment)}\u0000${normalizeText(card.suggestedSegment)}`;
+    if (seen.has(key) || selected.length >= USER_PREFERENCE_LIMIT) return;
+    seen.add(key);
+    selected.push({
+      originalSegment: card.originalSegment,
+      suggestedSegment: card.suggestedSegment,
+      category: card.category,
+      reason: card.reason,
+    });
+  };
+
+  for (const card of eligibleCards) {
+    if (normalizedText.includes(normalizeText(card.originalSegment))) {
+      addCard(card);
+    }
+  }
+  if (selected.length >= USER_PREFERENCE_LIMIT || eligibleCards.length === 0) return selected;
+
+  const matcher = new TsFuzzyMatcher(eligibleCards.map((card, index) => ({
+    id: String(index),
+    source: card.paragraphText || card.originalSegment,
+    target: card.suggestedSegment,
+  })));
+  const fuzzyMatches = matcher.search(text, USER_PREFERENCE_LIMIT, USER_PREFERENCE_MIN_SIMILARITY);
+  for (const match of fuzzyMatches) {
+    const index = Number(match.tuId);
+    if (Number.isInteger(index) && eligibleCards[index]) {
+      addCard(eligibleCards[index]);
+    }
+  }
+  return selected;
 }
 
 export function buildDismissedIssueKeySet(dismissedCards: QACardData[]): Set<string> {
@@ -561,8 +618,12 @@ export const useQaStore = create<QAState>((set, get) => ({
               source: tmMatches[0]?.source ?? '',
             };
             const guidelines = useConfigStore.getState().guidelines;
-            const options = guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0
-              ? { guidelines }
+            const userPreferences = getRelevantAcceptedCorrectionPreferences(get().appliedCards, payload.text);
+            const options = guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 || userPreferences.length > 0
+              ? {
+                ...(guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 ? { guidelines } : {}),
+                ...(userPreferences.length > 0 ? { userPreferences } : {}),
+              }
               : undefined;
             const report = options
               ? await bridgeService.analyzeParagraph(analysisPayload, options)

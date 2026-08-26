@@ -6,6 +6,15 @@
 
 use crate::ai::types::{GenerateOptions, QueueJobRequest};
 
+/// A compact, previously accepted correction supplied as advisory QA context.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CorrectionPreference {
+    pub original_segment: String,
+    pub suggested_segment: String,
+    pub category: Option<String>,
+    pub reason: Option<String>,
+}
+
 /// Canonical compressed system instruction for fast paragraph QA linting.
 pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
 
@@ -21,6 +30,7 @@ pub struct PromptBuilder {
     source: String,
     target: String,
     guidelines: Option<String>,
+    user_preferences: Vec<CorrectionPreference>,
     temperature: Option<f32>,
     num_ctx: Option<u32>,
     model_override: Option<String>,
@@ -33,6 +43,7 @@ impl PromptBuilder {
             source: String::new(),
             target: String::new(),
             guidelines: None,
+            user_preferences: Vec::new(),
             temperature: Some(0.1),
             num_ctx: Some(2048),
             model_override: None,
@@ -60,6 +71,22 @@ impl PromptBuilder {
         self
     }
 
+    /// Sets compact, previously accepted corrections as advisory context for QA.
+    pub fn user_preferences(
+        mut self,
+        preferences: impl IntoIterator<Item = CorrectionPreference>,
+    ) -> Self {
+        self.user_preferences = preferences
+            .into_iter()
+            .filter(|preference| {
+                !preference.original_segment.trim().is_empty()
+                    && !preference.suggested_segment.trim().is_empty()
+            })
+            .take(2)
+            .collect();
+        self
+    }
+
     /// Sets optional sampling temperature (defaults to 0.1 for deterministic QA).
     pub fn temperature(mut self, temp: f32) -> Self {
         self.temperature = Some(temp);
@@ -78,18 +105,30 @@ impl PromptBuilder {
         self
     }
 
-    /// Builds the system prompt component (instruction + optional guidelines).
+    /// Builds the system prompt component with optional project and preference context.
     pub fn build_system_prompt(&self) -> String {
         let instruction = if self.source.trim().is_empty() {
             MONOLINGUAL_SYSTEM_INSTRUCTION
         } else {
             COMPRESSED_SYSTEM_INSTRUCTION
         };
-        if let Some(ref g) = self.guidelines {
-            format!("{}\n\nGuidelines:\n{}", instruction, g.trim())
-        } else {
-            instruction.to_string()
+        let mut prompt = instruction.to_string();
+        if let Some(ref guidelines) = self.guidelines {
+            prompt.push_str("\n\nGuidelines:\n");
+            prompt.push_str(guidelines.trim());
         }
+        if !self.user_preferences.is_empty() {
+            prompt.push_str("\n\nUser Preferences (prior accepted; use only if applicable):\n");
+            for preference in &self.user_preferences {
+                prompt.push_str(&format!(
+                    "- \"{}\" -> \"{}\"\n",
+                    preference.original_segment.trim(),
+                    preference.suggested_segment.trim()
+                ));
+            }
+            prompt.pop();
+        }
+        prompt
     }
 
     /// Builds the user prompt component containing the source and target paragraphs.
@@ -271,6 +310,27 @@ mod tests {
             .as_deref()
             .unwrap()
             .contains("Guidelines:\n- [Terminology] Keep product names untranslated."));
+    }
+
+    #[test]
+    fn test_user_preferences_are_included_only_when_supplied() {
+        let with_preferences = PromptBuilder::new()
+            .source("Test source")
+            .target("Test target")
+            .user_preferences([CorrectionPreference {
+                original_segment: "teh".to_string(),
+                suggested_segment: "the".to_string(),
+                category: Some("Spelling".to_string()),
+                reason: None,
+            }])
+            .build_system_prompt();
+        let without_preferences = PromptBuilder::new()
+            .source("Test source")
+            .target("Test target")
+            .build_system_prompt();
+
+        assert!(with_preferences.contains("User Preferences (prior accepted; use only if applicable):\n- \"teh\" -> \"the\""));
+        assert!(!without_preferences.contains("User Preferences:"));
     }
 
     #[test]

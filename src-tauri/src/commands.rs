@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use crate::ai::{
-    GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
+    CorrectionPreference, GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
     QaReport, QueueJobRequest,
 };
 use crate::protocol::{EditorType, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
@@ -55,6 +55,30 @@ impl From<HealthResponse> for BridgeStatusDto {
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisOptions {
     pub guidelines: Option<GuidelineSet>,
+    pub user_preferences: Option<Vec<CorrectionPreferenceDto>>,
+}
+
+/// A previously accepted correction supplied by the dashboard as advisory context.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorrectionPreferenceDto {
+    pub original_segment: String,
+    pub suggested_segment: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+impl From<CorrectionPreferenceDto> for CorrectionPreference {
+    fn from(preference: CorrectionPreferenceDto) -> Self {
+        Self {
+            original_segment: preference.original_segment,
+            suggested_segment: preference.suggested_segment,
+            category: preference.category,
+            reason: preference.reason,
+        }
+    }
 }
 
 /// Fetches the current Local Bridge health state for the dashboard.
@@ -135,11 +159,15 @@ pub async fn analyze_paragraph(
         .source(&paragraph.source)
         .target(&paragraph.text);
 
-    if let Some(guidelines) = options.and_then(|options| options.guidelines) {
+    if let Some(guidelines) = options.as_ref().and_then(|options| options.guidelines.clone()) {
         let prompt_rules = guidelines.build_prompt_rules();
         if !prompt_rules.trim().is_empty() {
             builder = builder.guidelines(prompt_rules);
         }
+    }
+
+    if let Some(preferences) = options.and_then(|options| options.user_preferences) {
+        builder = builder.user_preferences(preferences.into_iter().map(Into::into));
     }
 
     let req = builder.build_queue_request(&paragraph.paragraph_id);
