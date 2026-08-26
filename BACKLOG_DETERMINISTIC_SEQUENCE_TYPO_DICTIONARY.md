@@ -353,3 +353,49 @@ as blocking disagreements requiring reconciliation the way merge-priority
 was -- they can be taken as converged working assumptions for a v1 scoping
 doc, but a corpus-based precision test (both models insist on this before
 shipping, not just recall) still has not been built or run.
+
+## Precision spike -- run, reviewed, GO (2026-08-26, commit `e1ad66b`)
+
+Codex built an isolated Python prototype (`spikes/deterministic_typo_dictionary/`)
+implementing the reconciled 3-tier gating against a newly authored Korean
+corpus: 18 seeded true positives across the v1 categories, 18
+false-positive traps (short/common tokens used as ordinary prose, not
+sequence members -- e.g. `화`, `수정`, `가장`, `상담`), and 5 clean
+business/technical paragraphs.
+
+**Result: 0 false positives** across all 23 trap/clean cases (100%
+precision) -- the core worry raised throughout this feature's design
+(over-triggering on short common tokens) did not materialize. **Recall
+83.3% (15/18)**, with all 3 misses sharing one root cause: the exact
+token-boundary regex breaks when a Korean particle attaches directly to
+the typo with no delimiter (e.g. `우선순위이` + `는` -> `우선순위이는`).
+
+agy independently reviewed the spike and recommends **GO** on all three
+points asked:
+1. Architecture-level precision is validated by this corpus (0 FPR across
+   deliberately adversarial short-token traps); the *dictionary* will need
+   an ongoing collision-check (against standard dictionary/proper nouns)
+   as entries grow past v1's ~15, but that's a maintenance practice, not a
+   blocker.
+2. Recall fix: extend Tier 1's trailing boundary with a whitelist of
+   Korean case/auxiliary particles (은/는/이/가/을/를/의/에/와/과/로/으로/
+   에서/에게/부터/까지/도/만/조차/마저) instead of requiring a hard
+   non-Hangul boundary. When the particle itself needs to change form
+   (morphophonemic cases like `일오일으로` -> `일요일로`), the
+   deterministic pass should NOT attempt that -- substitute only the noun
+   and leave the particle as-is; the LLM's grammar/particle correction
+   coexists safely via the already-agreed partial-overlap merge rule.
+3. Schema backward-compatibility re-confirmed independently (agy read
+   `qa_parser.rs`/`types.ts` again): optional fields, 107 existing tests
+   unaffected.
+
+**Recommended implementation order (agy):** 1) schema fields first
+(UTF-16 offsets) 2) deterministic Rust module (3-tier gating + particle
+whitelist boundary) 3) v1 `dictionary.json` embedded via `include_str!`,
+BCP-47-keyed 4) merge logic wired into `analyze_paragraph` per the
+5-row merge table, plus regression tests.
+
+Both models have now independently said GO with no open disagreements.
+Implementation has not started -- awaiting explicit user go-ahead given
+the scope (schema change touching `QaIssue` + new Rust module + merge
+logic + data files).
