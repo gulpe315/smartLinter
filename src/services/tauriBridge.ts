@@ -39,6 +39,7 @@ export interface BridgeStatusPayload {
 export interface AnalysisOptions {
   guidelines?: GuidelineSet;
   userPreferences?: AcceptedCorrectionPromptItem[];
+  tmReference?: TmReferencePromptItem;
 }
 
 /** A compact, previously accepted correction used only as advisory QA context. */
@@ -47,6 +48,13 @@ export interface AcceptedCorrectionPromptItem {
   suggestedSegment: string;
   category?: string;
   reason?: string;
+}
+
+/** A TM fuzzy-match candidate used only as non-authoritative QA context. */
+export interface TmReferencePromptItem {
+  source: string;
+  target: string;
+  score: number;
 }
 
 /** LLM health and connectivity payload */

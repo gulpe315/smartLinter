@@ -611,18 +611,28 @@ export const useQaStore = create<QAState>((set, get) => ({
           pendingAnalysisTimers.delete(payload.paragraphId);
           try {
             const tmMatches = await useTmStore.getState().search(payload.text);
-            // `payload.source` identifies the document, not the source-language text.
-            // Keep the telemetry payload unchanged because other stores use that identifier.
+            const { minScore } = useTmStore.getState();
+            const tmReference = tmMatches[0]?.score >= minScore ? tmMatches[0] : undefined;
+            // Editor telemetry currently supplies only a document/context identifier,
+            // not an aligned source-language segment. Do not let either it or a TM
+            // fuzzy match be treated as confirmed bilingual source text.
             const analysisPayload = {
               ...payload,
-              source: tmMatches[0]?.source ?? '',
+              source: '',
             };
             const guidelines = useConfigStore.getState().guidelines;
             const userPreferences = getRelevantAcceptedCorrectionPreferences(get().appliedCards, payload.text);
-            const options = guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 || userPreferences.length > 0
+            const options = guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 || userPreferences.length > 0 || tmReference !== undefined
               ? {
                 ...(guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 ? { guidelines } : {}),
                 ...(userPreferences.length > 0 ? { userPreferences } : {}),
+                ...(tmReference ? {
+                  tmReference: {
+                    source: tmReference.source,
+                    target: tmReference.target,
+                    score: tmReference.score,
+                  },
+                } : {}),
               }
               : undefined;
             const report = options

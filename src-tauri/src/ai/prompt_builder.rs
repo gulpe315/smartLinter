@@ -29,6 +29,14 @@ pub struct CorrectionPreference {
     pub reason: Option<String>,
 }
 
+/// A TM fuzzy-match candidate used only as non-authoritative QA context.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TmReference {
+    pub source: String,
+    pub target: String,
+    pub score: f64,
+}
+
 /// Canonical compressed system instruction for fast paragraph QA linting.
 pub const COMPRESSED_SYSTEM_INSTRUCTION: &str = "You are a fast bilingual paragraph QA linter. Check the Korean target against the source for translation fidelity, terminology, numbers, omissions, grammar, passive voice, and punctuation. Do not return PASS merely because source evidence is limited; always inspect the target itself. Detect and list all distinct issues found; do not stop after the first one. Return issues: [] only if the text is completely clean.\nOutput JSON only matching this schema:\n{\"status\":\"PASS\"|\"FAIL\",\"issues\":[{\"category\":\"...\",\"originalSegment\":\"...\",\"suggestedSegment\":\"...\",\"reason\":\"...\",\"severity\":\"LOW\"|\"MEDIUM\"|\"HIGH\"}]}";
 
@@ -45,6 +53,7 @@ pub struct PromptBuilder {
     target: String,
     guidelines: Option<GuidelineContext>,
     user_preferences: Vec<CorrectionPreference>,
+    tm_reference: Option<TmReference>,
     temperature: Option<f32>,
     num_ctx: Option<u32>,
     model_override: Option<String>,
@@ -58,6 +67,7 @@ impl PromptBuilder {
             target: String::new(),
             guidelines: None,
             user_preferences: Vec::new(),
+            tm_reference: None,
             temperature: Some(0.1),
             num_ctx: Some(2048),
             model_override: None,
@@ -113,6 +123,14 @@ impl PromptBuilder {
         self
     }
 
+    /// Sets a TM fuzzy-match candidate as advisory, non-authoritative context.
+    pub fn tm_reference(mut self, reference: TmReference) -> Self {
+        if !reference.source.trim().is_empty() && !reference.target.trim().is_empty() {
+            self.tm_reference = Some(reference);
+        }
+        self
+    }
+
     /// Sets optional sampling temperature (defaults to 0.1 for deterministic QA).
     pub fn temperature(mut self, temp: f32) -> Self {
         self.temperature = Some(temp);
@@ -144,32 +162,62 @@ impl PromptBuilder {
         };
         let original_history_count = self.user_preferences.len();
         let mut history_count = original_history_count;
+        let mut tm_reference_included = self.tm_reference.is_some();
         let mut guideline_lines = self.guideline_lines();
         let original_guideline_count = guideline_lines.len();
 
-        while self.prompt_token_count(instruction, &guideline_lines, history_count, user_prompt)
-            > HARD_PROMPT_TOKEN_CAP
+        while self.prompt_token_count(
+            instruction,
+            &guideline_lines,
+            history_count,
+            tm_reference_included,
+            user_prompt,
+        ) > HARD_PROMPT_TOKEN_CAP
+            && tm_reference_included
+        {
+            tm_reference_included = false;
+        }
+
+        while self.prompt_token_count(
+            instruction,
+            &guideline_lines,
+            history_count,
+            tm_reference_included,
+            user_prompt,
+        ) > HARD_PROMPT_TOKEN_CAP
             && history_count > 0
         {
             history_count -= 1;
         }
 
-        while self.prompt_token_count(instruction, &guideline_lines, history_count, user_prompt)
-            > HARD_PROMPT_TOKEN_CAP
+        while self.prompt_token_count(
+            instruction,
+            &guideline_lines,
+            history_count,
+            tm_reference_included,
+            user_prompt,
+        ) > HARD_PROMPT_TOKEN_CAP
             && !guideline_lines.is_empty()
         {
             guideline_lines.pop();
         }
 
-        let total_tokens =
-            self.prompt_token_count(instruction, &guideline_lines, history_count, user_prompt);
-        if history_count != original_history_count
+        let total_tokens = self.prompt_token_count(
+            instruction,
+            &guideline_lines,
+            history_count,
+            tm_reference_included,
+            user_prompt,
+        );
+        if tm_reference_included != self.tm_reference.is_some()
+            || history_count != original_history_count
             || guideline_lines.len() != original_guideline_count
         {
             debug!(
                 nominal_budget = NOMINAL_PROMPT_TOKEN_BUDGET,
                 hard_cap = HARD_PROMPT_TOKEN_CAP,
                 estimated_tokens = total_tokens,
+                tm_reference_kept = tm_reference_included,
                 history_kept = history_count,
                 history_dropped = original_history_count - history_count,
                 guidelines_kept = guideline_lines.len(),
@@ -178,7 +226,12 @@ impl PromptBuilder {
             );
         }
 
-        self.render_system_prompt(instruction, &guideline_lines, history_count)
+        self.render_system_prompt(
+            instruction,
+            &guideline_lines,
+            history_count,
+            tm_reference_included,
+        )
     }
 
     fn guideline_lines(&self) -> Vec<String> {
@@ -195,6 +248,7 @@ impl PromptBuilder {
         instruction: &str,
         guideline_lines: &[String],
         history_count: usize,
+        tm_reference_included: bool,
     ) -> String {
         let mut prompt = instruction.to_string();
         if !guideline_lines.is_empty() {
@@ -212,6 +266,18 @@ impl PromptBuilder {
             }
             prompt.pop();
         }
+        if tm_reference_included {
+            let reference = self
+                .tm_reference
+                .as_ref()
+                .expect("TM reference must exist when rendered");
+            prompt.push_str(&format!(
+                "\n\nTM Reference (advisory, not a confirmed source -- may not exactly match):\n- \"{}\" -> \"{}\" (score: {:.2})",
+                reference.source.trim(),
+                reference.target.trim(),
+                reference.score,
+            ));
+        }
         prompt
     }
 
@@ -220,11 +286,17 @@ impl PromptBuilder {
         instruction: &str,
         guideline_lines: &[String],
         history_count: usize,
+        tm_reference_included: bool,
         user_prompt: &str,
     ) -> usize {
         Self::estimate_tokens(&format!(
             "{}\n{}",
-            self.render_system_prompt(instruction, guideline_lines, history_count),
+            self.render_system_prompt(
+                instruction,
+                guideline_lines,
+                history_count,
+                tm_reference_included,
+            ),
             user_prompt
         ))
     }
@@ -432,6 +504,23 @@ mod tests {
         assert!(!without_preferences.contains("User Preferences:"));
     }
 
+    #[test]
+    fn tm_reference_is_advisory_and_does_not_switch_monolingual_mode() {
+        let request = PromptBuilder::new()
+            .target("Korean target text")
+            .tm_reference(TmReference {
+                source: "Related TM source".to_string(),
+                target: "Related TM target".to_string(),
+                score: 0.87,
+            })
+            .build_queue_request("para-tm-reference");
+
+        let system = request.system.as_deref().unwrap();
+        assert!(system.contains("Korean monolingual paragraph QA linter."));
+        assert!(system.contains("TM Reference (advisory, not a confirmed source -- may not exactly match):\n- \"Related TM source\" -> \"Related TM target\" (score: 0.87)"));
+        assert_eq!(request.prompt, "TEXT: Korean target text");
+    }
+
     fn preference(original: &str, suggested: &str) -> CorrectionPreference {
         CorrectionPreference {
             original_segment: original.to_string(),
@@ -471,6 +560,29 @@ mod tests {
         let prompt = builder.build_prompt();
         assert!(prompt.contains(&guideline));
         assert!(!prompt.contains("User Preferences"));
+        assert!(PromptBuilder::estimate_tokens(&prompt) <= HARD_PROMPT_TOKEN_CAP);
+    }
+
+    #[test]
+    fn budget_drops_tm_reference_before_history_or_guidelines() {
+        let guideline = format!("- [Priority] {}", "guideline ".repeat(70));
+        let history = preference(&"accepted ".repeat(25), &"replacement ".repeat(25));
+        let tm_source = "tm source ".repeat(180);
+        let prompt = PromptBuilder::new()
+            .source("Source")
+            .target("Target")
+            .guidelines(&guideline)
+            .user_preferences([history.clone()])
+            .tm_reference(TmReference {
+                source: tm_source.clone(),
+                target: "tm target ".repeat(180),
+                score: 0.75,
+            })
+            .build_prompt();
+
+        assert!(prompt.contains(&guideline));
+        assert!(prompt.contains(history.original_segment.trim()));
+        assert!(!prompt.contains(tm_source.trim()));
         assert!(PromptBuilder::estimate_tokens(&prompt) <= HARD_PROMPT_TOKEN_CAP);
     }
 

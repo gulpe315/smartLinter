@@ -828,7 +828,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     vi.useRealTimers();
   });
 
-  it('uses the best TM source for analysis without changing the document payload source', async () => {
+  it('sends a qualifying TM match only as advisory context, not paragraph source', async () => {
     vi.useFakeTimers();
     const tmSource = 'Click the Settings button to configure bridge preferences.';
     vi.spyOn(useTmStore.getState(), 'search').mockResolvedValueOnce([{
@@ -856,8 +856,44 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
-    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ source: tmSource }));
+    expect(analyzeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ source: '' }),
+      {
+        tmReference: expect.objectContaining({
+          source: tmSource,
+          score: 1,
+        }),
+      },
+    );
     expect(payload.source).toBe('SLinter.indd');
+
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it('does not send a TM reference below the configured matching threshold', async () => {
+    vi.useFakeTimers();
+    useTmStore.setState({ minScore: 0.85 });
+    vi.spyOn(useTmStore.getState(), 'search').mockResolvedValueOnce([{
+      source: 'Loosely related TM source.',
+      target: 'Loosely related TM target.',
+      score: 0.84,
+      scorePercent: 84,
+      grade: 'MEDIUM',
+    }]);
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValueOnce({
+      status: 'PASS',
+      issues: [],
+    });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-low-tm-reference', text: 'Text', hash: 'hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
+    expect(analyzeSpy).toHaveBeenCalledWith(expect.objectContaining({ source: '' }));
 
     unlisten();
     vi.useRealTimers();

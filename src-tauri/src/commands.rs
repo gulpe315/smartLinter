@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use crate::ai::{
     CorrectionPreference, GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
-    QaReport, QueueJobRequest,
+    QaReport, QueueJobRequest, TmReference,
 };
 use crate::protocol::{EditorType, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
 use crate::server::{HealthResponse, ServerHandle};
@@ -56,6 +56,26 @@ impl From<HealthResponse> for BridgeStatusDto {
 pub struct AnalysisOptions {
     pub guidelines: Option<GuidelineSet>,
     pub user_preferences: Option<Vec<CorrectionPreferenceDto>>,
+    pub tm_reference: Option<TmReferenceDto>,
+}
+
+/// A TM fuzzy-match candidate supplied only as non-authoritative QA context.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TmReferenceDto {
+    pub source: String,
+    pub target: String,
+    pub score: f64,
+}
+
+impl From<TmReferenceDto> for TmReference {
+    fn from(reference: TmReferenceDto) -> Self {
+        Self {
+            source: reference.source,
+            target: reference.target,
+            score: reference.score,
+        }
+    }
 }
 
 /// A previously accepted correction supplied by the dashboard as advisory context.
@@ -163,8 +183,12 @@ pub async fn analyze_paragraph(
         builder = builder.guideline_set(guidelines);
     }
 
-    if let Some(preferences) = options.and_then(|options| options.user_preferences) {
+    if let Some(preferences) = options.as_ref().and_then(|options| options.user_preferences.clone()) {
         builder = builder.user_preferences(preferences.into_iter().map(Into::into));
+    }
+
+    if let Some(reference) = options.and_then(|options| options.tm_reference) {
+        builder = builder.tm_reference(reference.into());
     }
 
     let req = builder.build_queue_request(&paragraph.paragraph_id);
