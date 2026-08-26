@@ -1,17 +1,26 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-25 (Task 19 시나리오 1~3 사실상 전부 검증·종료. 실사용 중 발견된 버그 12건(Task A~L) 전부 수정·라이브 검증 완료. 다음 세션은 백로그 착수부터 시작.)
+마지막 업데이트: 2026-08-26 (백로그 아카이브 UI 완료 + 실사용 중 발견된 obsolete-card 버그 수정 + 수정이력 피드백 Phase 1 완료. Phase 2/나머지 백로그는 다음 세션.)
 
-## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-25 최종 인계, 이 절이 최신)
+## ⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 최종 인계, 이 절이 최신)
 
-1. **`git log --oneline -1`로 최신 커밋이 `f6b4d1e`(Remove cross-paragraph text-matching fallback from direct-edit reconciliation)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
-2. **협업 원칙 (이번 세션에 두 번 강화됨, [[feedback_agy_consult_when_stuck]] / [[feedback_blast_radius_underestimation]] 필독):**
+1. **`git log --oneline -1`로 최신 커밋이 `56ce32c`(Instantly replay accepted corrections and silently suppress dismissed ones)인지 확인.** 아니라면 이 파일 아래 절들을 시간순으로 훑어 파악할 것.
+2. **이번 세션(2026-08-26) 요약, 커밋 순서대로:**
+   - `9039a38` — **완료 카드 아카이브 UI(Task M).** 백로그 우선순위 목록(구 4번 항목)엔 순서가 다르게 적혀 있었지만, FEATURE_REVIEW2_CODEX.md/FEATURE_REVIEW2_AGY.md에서 두 모델이 이미 합의한 실제 권고 순서(아카이브 UI가 가장 저위험·최우선)를 따름 — 이 파일 백로그 절의 번호 순서보다 FEATURE_REVIEW2 문서의 합의가 우선한다는 걸 기억할 것. `appliedCards`/`dismissedCards`를 "기록" 탭에서 읽기전용으로 노출(`QACardItem`에 `readOnly` prop 추가).
+   - `1edb2ec` — **obsolete 카드가 영원히 안 사라지는 버그 수정.** 사용자가 InDesign에서 문단을 통째로 지웠는데 "찾을 수 없음" 카드가 활성 목록에 영구 잔류하는 걸 발견 → Codex/agy 2라운드 교차검증(1라운드는 정면 상충: agy는 "위치보기 1회 실패로 충분", Codex는 "2차 확인 필요" — Claude가 `locateParagraph` 실제 코드를 읽어 `NOT_FOUND`가 진짜소멸/모호함(2개+ 후보)/선택실패 3가지를 뭉뚱그리고 있음을 확인해 양쪽에 다시 제시 → 완전 수렴) → `locateParagraph`를 `FOUND`/`NOT_FOUND`/`AMBIGUOUS`/`SELECTION_FAILED`/`ERROR`로 세분화, 진짜 `NOT_FOUND`(후보 0개)일 때만 `markCardObsolete`가 `dismissedCards`로 이동(기존엔 상태만 바꾸고 안 옮겼음 — 이게 원래 버그의 핵심). ExtendScript(`atomic_replacer.jsx`)/Rust(`indesign_com.rs`)/프론트(`tauriBridge.ts`/`QACardItem.tsx`/`qaStore.ts`) 전체 관통 수정 — `findParagraphById`의 기존 계약·테스트는 안 건드림(공유 헬퍼로 추출). `cargo test`(99)까지 포함 4개 명령 전부 독립 재검증.
+   - `56ce32c` — **수정 이력 피드백 루프 Phase 1.** 사용자가 "기록에 저장되는데, 같은 문제 재발 시 기계적으로 보여줄지 AI가 참조할지"를 직접 질문 → Codex/agy 둘 다 "둘 다, 계층 구조로"에 수렴(1단계: 정확일치 즉시 재사용+조용한 무시 필터링 / 2단계: LLM 프롬프트에 소량 컨텍스트 주입, 아직 미착수). 사용자가 1단계 즉시 착수 + "무시 처리는 조용히 숨김"(agy 안, Codex는 "이전에 무시함 표시 후 복원 가능" 안이었으나 사용자가 agy 안 선택)으로 결정. `appliedCards`에서 정확히 일치하는 원문이 새 문단에 다시 나타나면 LLM 호출 없이 즉시 카드 생성(`historyReplay: true`, "이력 기반" 배지) + `dismissedCards`(단, `status==='dismissed'`인 것만, `stale_obsolete`는 제외)와 정확히 일치하는 이슈는 `addReport`에서 조용히 필터링. 새 영구 저장소 안 만들고 기존 배열에서 파생 인덱스만 계산 — 퍼지매칭 절대 사용 안 함(Task F→K→L 재발 방지). Codex 산출물에 영어 배지 텍스트("History-based") 발견 → Claude가 직접 한글("이력 기반")로 수정 후 커밋.
+3. **다음 세션 최우선:**
+   - 수정 이력 피드백 **Phase 2**(관련성 높은 과거 수정 상위 1~2건을 LLM 프롬프트에 짧게 주입, Rust/프롬프트 레이어) — 설계는 CODEX_ANSWER_CORRECTION_HISTORY.md/AGY_ANSWER_CORRECTION_HISTORY.md에 이미 합의돼 있음, 착수만 하면 됨.
+   - Phase 1 기능(이력 기반 즉시 카드, 무시 필터링)은 아직 실제 InDesign에서 라이브 검증 안 함 — 자동테스트만 통과. 다음 세션에서 문단 하나 고치고→같은 오탈자를 다른 문단에 입력→즉시 "이력 기반" 배지 카드가 뜨는지, 무시한 제안이 다른 문단에서 안 뜨는지 확인 필요.
+   - 이 세션에서 안내했던 obsolete-card 수정 라이브 검증 절차(재연결 → 문단 삭제 → 위치보기 → 기록 탭 확인)도 사용자가 아직 실행 전이었음 — 이어서 확인.
+   - 그 뒤 백로그: `start_batch_scan`(문서 전체 일괄 검사), 동일 이슈 일괄 적용, Word taskpane 인프라.
+4. **협업 원칙 (계속 유지, [[feedback_agy_consult_when_stuck]] / [[feedback_blast_radius_underestimation]] 필독):**
    - 원인 불명 현상이든 사용자 제안이든, Claude 혼자 깊게 파고들지 말 것 — 가벼운 확인(파일 1~2개)만 하고 곧바로 Codex(`codex exec -C "D:\data\dev\App\SmartLinter" --approve-for-me '...'`)와 agy(`agy -p '...' --add-dir "D:\data\dev\App\SmartLinter" --print-timeout 15m --dangerously-skip-permissions --sandbox`) 양쪽에 공유.
-   - **(신규, 중요) 두 모델 의견이 상충하거나 한쪽만 잔여위험을 경고했을 때, Claude가 톤/확신도로 스스로 편들어 조용히 결정하지 말 것.** 그 상충/경고 차이 자체를 다시 양쪽에 명시적으로 보여주고 재조율된 답을 받는 라운드를 한 번 더 거칠 것 — 이번 세션에 이걸 안 지켜서 Task K가 Task L로 롤백되는 사고가 남(상세: [[feedback_blast_radius_underestimation]]).
-   - Codex 구현 → Claude가 `git diff`를 **파일 단위 + 라인 단위** 둘 다 확인(지시 범위 밖 변경 없는지, 같은 파일 안에서도 불필요한 부분 안 건드렸는지) → `cargo test`/`npm test`/`npm run test:ui`/`npm run build` 독립 재실행 → 통과하면 즉시 커밋(uncommitted 오래 방치 금지).
+   - **두 모델 의견이 상충하거나 한쪽만 잔여위험을 경고했을 때, Claude가 톤/확신도로 스스로 편들어 조용히 결정하지 말 것.** 그 상충/경고 차이 자체를 다시 양쪽에 명시적으로 보여주고 재조율된 답을 받는 라운드를 한 번 더 거칠 것 — 이번 세션 obsolete-card 버그에서 실제로 이 라운드를 거쳐 정확한 결론에 도달함(위 1edb2ec 참고). 과거 Task K→L 사고도 이 원칙을 안 지켜서 발생했었음.
+   - Codex 구현 → Claude가 `git diff`를 **파일 단위 + 라인 단위** 둘 다 확인(지시 범위 밖 변경 없는지, 같은 파일 안에서도 불필요한 부분 안 건드렸는지, 텍스트 언어 등 사소한 디테일도) → `cargo test`/`npm test`/`npm run test:ui`/`npm run build` 독립 재실행 → 통과하면 즉시 커밋(uncommitted 오래 방치 금지).
    - **ExtendScript(`plugins/indesign/extendscript/*.jsx`) 파일엔 비ASCII 문자열(한글 등)을 절대 직접 넣지 말 것 — 반드시 `\uXXXX` 유니코드 이스케이프.** Node 테스트는 통과해도 실제 ExtendScript 엔진에서 daemon 평가 자체가 깨짐(3번째로 겪은 동일 패턴 버그, Task I). Codex에게 이 디렉토리 작업을 시킬 때마다 매번 이 제약을 지시서에 명시할 것.
    - 프롬프트에 큰따옴표(`"`)를 넣으면 PowerShell/CLI 인자가 깨짐 — 본문에 큰따옴표 아예 넣지 말 것.
-3. **앱 클린 재기동 절차(Rust/ExtendScript 변경 후 필요, 프론트엔드 TS/React만 바뀌었으면 재기동 불필요 — Vite HMR로 충분):**
+5. **앱 클린 재기동 절차(Rust/ExtendScript 변경 후 필요, 프론트엔드 TS/React만 바뀌었으면 재기동 불필요 — Vite HMR로 충분):**
    ```
    tasklist | grep -iE "smart-linter"
    taskkill //F //IM smart-linter.exe //T
@@ -21,13 +30,7 @@
    ```
    `Local Bridge server listening on 127.0.0.1:49152` 로그 확인 후, 사용자에게 InDesign 창에서 "InDesign 연결" 버튼을 눌러달라고 요청(ExtendScript는 이 클릭 한 번으로 `$.evalFile`이 디스크에서 새로 읽어오므로 별도 동기화 불필요) → `curl http://127.0.0.1:49152/health`로 `connected:true` 확인.
    **`cargo test` 전에는 반드시 `smart-linter.exe`를 먼저 종료할 것**(실행 중이면 파일 잠금으로 빌드 실패) — 종료 후 테스트 끝나면 다시 위 명령으로 재기동해서 사용자에게 돌려줄 것.
-4. **Task 19는 사실상 종료됨** — 시나리오 1(기본 QA 사이클) 라이브 확인 완료, 시나리오 2(Stale 재스캔)는 이번 세션의 광범위한 버그헌팅으로 충분히 검증됨, 시나리오 3(롤백 안전망)은 라이브 재현 방법 자체가 잘못됐었다는 걸 확인(잠금은 ExtendScript 쓰기를 안 막음) 후 기존 `simulateErrorAtHunk` 자동테스트로 이미 검증되고 있다고 결론. 재검증이 더 필요하다고 판단되면 그때 다시 논의.
-5. **다음 착수할 백로그 (우선순위, 아래 "참고" 절의 상세 설계 메모 함께 볼 것):**
-   1. `start_batch_scan`/`abort_batch_scan`(문서 전체 일괄 검사 버튼) — agy+Codex 설계 합의 완료(3단계 구조), 아직 미착수. 인프라(문단 열거)가 없어서 새로 설계 필요.
-   2. 동일 이슈 일괄 적용 — 인라인 수정(Task J, 완료) 위에 자연스럽게 얹을 수 있음.
-   3. 완료 카드 아카이브 UI — agy+Codex 교차검증 끝남(`appliedCards` 이미 존재, 재수정은 새 명령으로 처리), 착수 전.
-   4. 수정 이력 캐시 + 무시 이력 억제 — 설계 방향 agy/Codex 의견 갈림, 착수 시 다시 물어볼 것.
-   5. Word taskpane 인프라 — 완전 미착수.
+6. **Task 19는 사실상 종료됨** — 시나리오 1(기본 QA 사이클) 라이브 확인 완료, 시나리오 2(Stale 재스캔)는 광범위한 버그헌팅으로 충분히 검증됨, 시나리오 3(롤백 안전망)은 라이브 재현 방법 자체가 잘못됐었다는 걸 확인(잠금은 ExtendScript 쓰기를 안 막음) 후 기존 `simulateErrorAtHunk` 자동테스트로 이미 검증되고 있다고 결론.
 
 ## 이번 세션(2026-08-25) 요약 — Task A~L, 총 12건 수정, 전부 라이브 검증 완료
 
