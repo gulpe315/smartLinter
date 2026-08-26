@@ -1,6 +1,6 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-26 후속 세션 (Task T/U, 토큰예산 재설계, source 필드 결함 수정, 다국어 플러밍(Part 1/2) 전부 완료·커밋. 다국어 Part 3(영어 콘텐츠 벤치마크) 완료 — no-ship, 재현율 71.43%로 기준 미달. 사용자가 no-ship 후속으로 "UI 드롭다운 먼저"를 선택해 Phase 4(언어선택 드롭다운) 완료·커밋.)
+마지막 업데이트: 2026-08-26 후속 세션 (Task T/U, 토큰예산 재설계, source 필드 결함 수정, 다국어 플러밍(Part 1/2) 전부 완료·커밋. 다국어 Part 3(영어 콘텐츠 벤치마크) 완료 — no-ship, 재현율 71.43%로 기준 미달. 사용자가 no-ship 후속으로 "UI 드롭다운 먼저"를 선택해 Phase 4(언어선택 드롭다운) 완료·커밋. 미검증 언어 선택 시 가짜 Mock 결과로 대체되던 문제도 발견·수정·커밋(`85eeafc`).)
 
 ## ⭐⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 후속 세션 인계, 이 절이 최신 — 아래 "⭐ 2026-08-26 최종 인계" 절보다 이게 더 최근)
 
@@ -18,7 +18,7 @@
 3. **Part 3 완료·커밋됨 (`f852b27`, no-ship).** Codex가 대표 영어 문서 9개 샘플(오탈자7+클린2)을 직접 만들어 exaone3.5:7.8b로 실측 → 재현율 71.43%(관사 누락, 어색한 수동태/명확성 케이스를 일관되게 놓침) → Codex 자체 기준(80%) 미달로 no-ship. `prompt_builder.rs`는 그대로, `LanguageTag::En`은 여전히 "not yet validated" 에러 반환. 벤치마크 산출물만 기록용 커밋(`spikes/task3_llm_latency/english_profile_*`).
    - **⚠️ 이 no-ship 커밋과 인계 갱신(`f852b27`/`495d21f`)은 Claude가 아니라 동시에 떠 있던 다른 세션(또는 백그라운드로 계속 돌던 Codex 프로세스)이 만든 것으로 추정됨.** Claude가 같은 벤치마크 데이터를 먼저 읽고 "korean_baseline 대비 개선"이라는 잘못된 상대평가로 "ship 가능"이라 판단했다가, 대화 중간에 리포가 바뀐 걸 발견하고 정정함. **교훈: 이 프로젝트는 no-ship 판정 기준이 절대 재현율 80%(a2348c9 선례)로 이미 확립돼 있음 — 다음에 비슷한 벤치마크를 볼 때 상대비교로 성급히 판단하지 말고 이 80% 기준부터 확인할 것.** 또한 같은 리포를 동시에 여러 세션이 다룰 수 있다는 신호이므로, 작업 시작 전 `git log`로 최신 커밋을 재확인하는 습관이 이번 일로 한 번 더 중요해짐.
    - **Part 3 후속 방향은 사용자가 "③ UI 드롭다운 먼저" 선택.** Phase 4(언어선택 드롭다운, en/ja/zh "미검증" 배지) Codex 구현 → Claude가 diff 파일+라인 단위(`-w` 포함, 재포맷 노이즈 없음 확인) 검토 → `npm test` 162/162, `npm run test:ui` 250/250, `npm run build` 클린 독립 재검증 → 커밋(`fe34d2c`). 프론트엔드(TS/React)만 바뀌어서 서버 재기동 불필요(Vite HMR).
-     - **알려진 후속 미해결 사항(의도적으로 이번 스코프에서 제외, 다음에 볼 때 참고):** `qaStore.ts`의 `analyze_paragraph` catch 블록이 지금 `console.warn`만 하고 있어서, en/ja/zh를 실제로 선택해 QA를 시도하면 "not yet validated" 에러가 콘솔에만 찍히고 UI엔 카드도 에러 메시지도 전혀 안 뜸(조용히 아무 일도 안 일어나는 것처럼 보임). 드롭다운 선택 시점의 "미검증" 배지가 사전 경고 역할은 하지만, 사용자가 실제로 en을 골라서 써보면 여전히 "왜 아무 반응이 없지"로 느껴질 수 있음 — 별도 작업으로 에러를 QA 패널에 가시화할지 사용자에게 확인 필요.
+     - **알려진 후속 미해결 사항 → 완료(커밋 `85eeafc`).** 사용자가 "어쨌든 해결해야 한다"고 확인해서 처리함. 실제로는 콘솔 경고보다 더 심각한 문제였음: `tauriBridge.ts`의 `TauriBridgeService.analyzeParagraph`가 invoke() 실패를 종류 구분 없이 전부 삼켜서 `MockBridgeService`(가짜 리포트)로 대체하고 있었음 — 즉 en/ja/zh를 선택하면 "이슈 없음"처럼 보이는 **가짜** 결과가 나올 뻔했음(콘솔에만 안 뜨는 정도가 아니었음). Claude가 이번엔 agy 설계검증을 건너뛰고 바로 Codex에게 구현시켰다가 사용자가 "혼자 판단해서 건너뛰지 말라"고 지적 → agy에게 병렬로 설계검증 요청. agy가 방향 자체는 타당하다고 확인하면서 2가지 보완 제시: ①Tauri invoke가 원시 문자열로 reject하는 특성 때문에 rethrow 시 `Error` 인스턴스로 정규화 안 하면 하위 호출부(`stale_conflict_resolver.ts`)의 `.message` 접근이 조용히 `undefined`로 빠질 위험 ②언어 설정을 다시 ko로 바꿔도 에러 배너가 다음 분석 성공까지 안 사라지는 문제. 둘 다 Codex에게 반영 지시 → `configStore.ts`의 `setTargetLang`/`setExplanationLang`이 `useQaStore.getState().setAnalysisError(null)`을 호출하도록 추가(qaStore↔configStore 순환 import 발생하나 런타임 함수 내부 호출이라 문제없음, 빌드/테스트로 확인). diff 파일+라인 단위 검토, `npm test` 162/162·`npm run test:ui` 255/255·`npm run build` 클린 독립 재검증 후 커밋. **교훈: "이미 문서화된 의도를 기계적으로 맞추는 것뿐"이라는 판단으로 agy 라운드를 스스로 생략하면 안 됨 — 특히 이 fallback 메커니즘처럼 과거 사고 이력이 있는 파일은 더더욱.**
    - 남은 no-ship 후속 옵션(①다른 모델 재시도 ②few-shot 프롬프트 보강 ④사용자 제공 실문서 재벤치마크)은 미착수 상태로 대기.
    - 그 뒤: 백로그 2건 대기 중 — ①결정론적 오탈자사전(병합규칙 미해결), ②위치찾기 context-fingerprint(실사용에서 AMBIGUOUS 빈도 관찰 후 필요시 착수, 지금은 코드 수정 불필요 결론남).
 4. **위치찾기(locateParagraph) 설계 재검토 — 중요 사고 사례, 상세는 `BACKLOG_LOCATOR_CONTEXT_FINGERPRINT.md` 참고:**
