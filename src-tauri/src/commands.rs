@@ -360,6 +360,28 @@ pub async fn locate_paragraph_in_editor(
         .map_err(|error| format!("InDesign paragraph location task failed: {error}"))?
 }
 
+/// Gets current QA paragraph contents in InDesign without changing selection or focus.
+#[tauri::command]
+pub async fn get_live_paragraph_snapshot(
+    paragraph_id: String,
+    base_hash: Option<String>,
+    server_handle: State<'_, ServerHandle>,
+) -> Result<crate::indesign_com::LiveParagraphSnapshotResult, String> {
+    let session = server_handle
+        .session_manager()
+        .get_snapshot()
+        .await
+        .ok_or_else(|| "No active editor session".to_string())?;
+
+    if session.editor_type != EditorType::InDesign {
+        return Err("Live paragraph snapshot is supported only for InDesign".to_string());
+    }
+
+    tokio::task::spawn_blocking(move || indesign_com::get_live_paragraph_snapshot(paragraph_id, base_hash))
+        .await
+        .map_err(|error| format!("InDesign live paragraph snapshot task failed: {error}"))?
+}
+
 /// Lists models available from the configured Ollama host or the queue's provider.
 #[tauri::command]
 pub async fn list_ollama_models(

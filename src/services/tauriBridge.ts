@@ -123,6 +123,15 @@ export interface LocateParagraphResult {
   message?: string;
 }
 
+export type LiveParagraphSnapshotStatus = 'FOUND' | 'NOT_FOUND' | 'AMBIGUOUS' | 'ERROR' | 'BUSY';
+export interface LiveParagraphSnapshotResult {
+  commandId: string;
+  status: LiveParagraphSnapshotStatus;
+  currentText?: string;
+  currentHash?: string;
+  message?: string;
+}
+
 /**
  * Abstract interface for event subscription & backend communication
  */
@@ -138,6 +147,9 @@ export interface IBridgeService {
 
   /** Selects a QA paragraph in InDesign without editing its document contents. */
   locateParagraph(paragraphId: string, baseHash?: string): Promise<LocateParagraphResult>;
+
+  /** Returns current paragraph contents without changing editor selection or focus. */
+  getLiveParagraphSnapshot(paragraphId: string, baseHash?: string): Promise<LiveParagraphSnapshotResult>;
 
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
@@ -459,6 +471,16 @@ export class MockBridgeService implements IBridgeService {
     return { status: 'FOUND', message: 'Mock paragraph located successfully' };
   }
 
+  async getLiveParagraphSnapshot(paragraphId: string, _baseHash?: string): Promise<LiveParagraphSnapshotResult> {
+    return {
+      commandId: `live-snapshot-${paragraphId}`,
+      status: 'FOUND',
+      currentText: '',
+      currentHash: '',
+      message: 'Mock live paragraph snapshot returned successfully',
+    };
+  }
+
   async fetchBridgeHealth(): Promise<BridgeStatusPayload> {
     return {
       connected: false,
@@ -699,6 +721,22 @@ export class TauriBridgeService implements IBridgeService {
       return result;
     } catch (e) {
       return { status: 'ERROR', message: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  async getLiveParagraphSnapshot(paragraphId: string, baseHash?: string): Promise<LiveParagraphSnapshotResult> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.getLiveParagraphSnapshot(paragraphId, baseHash);
+    }
+
+    try {
+      return await invoke('get_live_paragraph_snapshot', { paragraphId, baseHash });
+    } catch (e) {
+      return {
+        commandId: `live-snapshot-${paragraphId}`,
+        status: 'ERROR',
+        message: e instanceof Error ? e.message : String(e),
+      };
     }
   }
 

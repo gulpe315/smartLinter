@@ -276,6 +276,63 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(targetParagraph.contents, paragraphText);
         });
 
+        it('gets a live snapshot at the indexed paragraph even when its hash has changed, without selecting or activating', () => {
+            const currentText = 'Current paragraph text after user edits.';
+            const targetParagraph = env.createParagraph(currentText, 'live-snapshot-index');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'live-snapshot-index'
+                    ? { paragraphs: [targetParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            app.select = () => { throw new Error('select must not be called'); };
+            (env.activeDocument as any).windows = [{ activate: () => { throw new Error('activate must not be called'); } }];
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.getLiveParagraphSnapshot({
+                commandId: 'live-snapshot-index-001',
+                paragraphId: 'indesign-para-live-snapshot-index-0',
+                baseHash: computeParagraphHash('Original paragraph text.')
+            });
+
+            assert.equal(result.status, 'FOUND');
+            assert.equal(result.currentText, currentText);
+            assert.equal(result.currentHash, computeParagraphHash(currentText));
+        });
+
+        it('gets one moved paragraph by hash and reports no or duplicate matches without selecting', () => {
+            const originalText = 'Original paragraph moved in this story.';
+            const movedParagraph = env.createParagraph(originalText, 'live-snapshot-scan');
+            const app = env.getApp();
+            app.select = () => { throw new Error('select must not be called'); };
+            (env.activeDocument as any).windows = [{ activate: () => { throw new Error('activate must not be called'); } }];
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'live-snapshot-scan'
+                    ? { paragraphs: [env.createParagraph('Replacement at the old index.', 'live-snapshot-scan'), movedParagraph] }
+                    : null
+            };
+            const found = replacer.getLiveParagraphSnapshot({
+                commandId: 'live-snapshot-scan-001',
+                paragraphId: 'indesign-para-live-snapshot-scan-99',
+                baseHash: computeParagraphHash(originalText)
+            });
+            assert.equal(found.status, 'FOUND');
+            assert.equal(found.currentText, originalText);
+
+            (env.activeDocument as any).stories.itemByID = () => ({ paragraphs: [env.createParagraph('No matching paragraph.', 'live-snapshot-scan')] });
+            const notFound = replacer.getLiveParagraphSnapshot({ commandId: 'live-snapshot-scan-002', paragraphId: 'indesign-para-live-snapshot-scan-2', baseHash: computeParagraphHash(originalText) });
+            assert.equal(notFound.status, 'NOT_FOUND');
+
+            const duplicate = env.createParagraph(originalText, 'live-snapshot-scan');
+            (env.activeDocument as any).stories.itemByID = () => ({ paragraphs: [env.createParagraph('Replacement at the old index.', 'live-snapshot-scan'), movedParagraph, duplicate] });
+            const ambiguous = replacer.getLiveParagraphSnapshot({ commandId: 'live-snapshot-scan-003', paragraphId: 'indesign-para-live-snapshot-scan-99', baseHash: computeParagraphHash(originalText) });
+            assert.equal(ambiguous.status, 'AMBIGUOUS');
+        });
+
         it('rejects replacement before opening a transaction when the text frame is locked', () => {
             const text = 'This approved copy must remain unchanged.';
             const paragraph = env.getSelectedParagraph()!;

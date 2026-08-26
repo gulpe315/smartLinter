@@ -452,6 +452,25 @@
         });
     };
 
+    /** Returns the current QA paragraph contents without changing selection or focus. */
+    SmartLinterDaemon.prototype.getLiveParagraphSnapshot = function(command, options) {
+        options = options || {};
+        if (!this.replacer) {
+            var ReplacerClass = (typeof SmartLinterAtomicReplacer !== 'undefined')
+                ? SmartLinterAtomicReplacer
+                : (global.SmartLinterAtomicReplacer || null);
+            if (ReplacerClass) {
+                this.replacer = new ReplacerClass({ appInstance: this.appInstance });
+            }
+        }
+        if (!this.replacer || typeof this.replacer.getLiveParagraphSnapshot !== 'function') {
+            return { commandId: command ? (command.commandId || 'unknown') : 'unknown', status: 'ERROR', message: 'AtomicReplacer not initialized in daemon' };
+        }
+        return this.replacer.getLiveParagraphSnapshot(command, {
+            appInstance: options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null)
+        });
+    };
+
     // Auto-instantiate singleton in ExtendScript environment
     var daemonInstance = null;
     if (typeof $ !== 'undefined' && $.global) {

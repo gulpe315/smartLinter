@@ -250,6 +250,64 @@
     };
 
     /**
+     * Returns the current contents of a QA paragraph without changing selection or focus.
+     * @param {{commandId: string, paragraphId: string, baseHash?: string}} command
+     * @returns {{commandId: string, status: string, currentText?: string, currentHash?: string, message?: string}}
+     */
+    SmartLinterAtomicReplacer.prototype.getLiveParagraphSnapshot = function(command) {
+        var commandId = command && command.commandId ? command.commandId : 'unknown';
+        if (!command || typeof command.paragraphId !== 'string') {
+            return { commandId: commandId, status: 'ERROR', message: 'Invalid live paragraph snapshot command' };
+        }
+
+        try {
+            var inApp = this.appInstance || (typeof app !== 'undefined' ? app : null);
+            var doc = inApp ? inApp.activeDocument : null;
+            var resolved = resolveStoryForParagraphId(doc, command.paragraphId);
+            if (!resolved) {
+                return { commandId: commandId, status: 'ERROR', message: 'Unable to resolve the paragraph story.' };
+            }
+
+            var story = resolved.story;
+            var paragraph = null;
+            if (resolved.paragraphIndex >= 0 && resolved.paragraphIndex < story.paragraphs.length) {
+                paragraph = story.paragraphs[resolved.paragraphIndex];
+                if (paragraph && paragraph.isValid !== false) {
+                    var currentText = this.normalizeContents(paragraph.contents);
+                    return {
+                        commandId: commandId,
+                        status: 'FOUND',
+                        currentText: currentText,
+                        currentHash: getHashUtil().computeParagraphHash(currentText, true)
+                    };
+                }
+            }
+
+            if (!command.baseHash) {
+                return { commandId: commandId, status: 'ERROR', message: 'A paragraph hash is required to search the story.' };
+            }
+
+            var matches = scanStoryForHashMatches(story, command.baseHash);
+            if (matches.length === 0) {
+                return { commandId: commandId, status: 'NOT_FOUND', message: 'The paragraph could not be found in the story.' };
+            }
+            if (matches.length > 1) {
+                return { commandId: commandId, status: 'AMBIGUOUS', message: 'Multiple paragraphs match the stored paragraph hash.' };
+            }
+
+            var matchedText = this.normalizeContents(matches[0].contents);
+            return {
+                commandId: commandId,
+                status: 'FOUND',
+                currentText: matchedText,
+                currentHash: getHashUtil().computeParagraphHash(matchedText, true)
+            };
+        } catch (e) {
+            return { commandId: commandId, status: 'ERROR', message: e.message };
+        }
+    };
+
+    /**
      * Locates and selects a QA paragraph without changing document contents.
      * @param {{commandId: string, paragraphId: string, baseHash?: string}} command
      * @param {Object} [options]
