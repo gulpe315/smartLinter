@@ -48,6 +48,14 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
   const { activeParagraph, editorConnected, editorType } = useBridgeStore();
 
   const filteredCards = getFilteredCards();
+  const focusedCardIds = useMemo(
+    () => new Set(
+      filteredCards
+        .filter((card) => card.paragraphId === activeParagraph?.paragraphId)
+        .map((card) => card.id)
+    ),
+    [filteredCards, activeParagraph?.paragraphId]
+  );
   const counts = getCardCountBySeverity();
   const historyCards = useMemo(
     () => [...appliedCards, ...dismissedCards].sort((a, b) => b.createdAt - a.createdAt),
@@ -207,6 +215,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
               >
                 <QACardItem
                   card={card}
+                  isFocused={focusedCardIds.has(card.id)}
                   onAccept={(id) => acceptCard(id, undefined, { autoResolveStale: true })}
                   onDismiss={(id) => dismissCard(id)}
                   onMarkObsolete={(id) => markCardObsolete(id)}

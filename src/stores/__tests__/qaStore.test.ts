@@ -184,6 +184,71 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeUndefined();
   });
 
+  it('retains and refreshes a history replay card when a later report omits it', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-history', paragraphHash: 'old-hash', paragraphText: 'The teh sentence.', isLocked: false,
+      category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Accepted typo', historyReplay: true,
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-history', paragraphHash: 'new-hash', paragraphText: 'An edited teh sentence.', isLocked: true,
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards).toEqual([
+      expect.objectContaining({
+        id: cardId, historyReplay: true, paragraphText: 'An edited teh sentence.', paragraphHash: 'new-hash', isLocked: true,
+      }),
+    ]);
+  });
+
+  it('does not force-keep a history replay card whose original segment is gone', () => {
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-history-gone', paragraphText: 'The teh sentence.',
+      category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Accepted typo', historyReplay: true,
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-history-gone', paragraphHash: 'new-hash', paragraphText: 'The sentence is clean.',
+      report: { status: 'PASS', issues: [] },
+    });
+
+    expect(useQaStore.getState().cards.find((card) => card.id === cardId)).toBeUndefined();
+  });
+
+  it('deduplicates a literal-identical LLM issue against a history replay card', () => {
+    useQaStore.getState().addCard({
+      paragraphId: 'para-identical', paragraphText: 'The teh sentence.',
+      category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Accepted typo', historyReplay: true,
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-identical', paragraphHash: 'new-hash', paragraphText: 'The teh sentence.',
+      report: { status: 'FAIL', issues: [{ category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'LLM typo', severity: 'LOW' }] },
+    });
+
+    expect(useQaStore.getState().cards).toHaveLength(1);
+    expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({ historyReplay: true }));
+  });
+
+  it('keeps a different-tuple LLM issue alongside a history replay card', () => {
+    useQaStore.getState().addCard({
+      paragraphId: 'para-coexist', paragraphText: 'The teh very sentence.',
+      category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Accepted typo', historyReplay: true,
+    });
+
+    useQaStore.getState().addReport({
+      paragraphId: 'para-coexist', paragraphHash: 'new-hash', paragraphText: 'The teh very sentence.',
+      report: { status: 'FAIL', issues: [{ category: 'Style', originalSegment: 'very', suggestedSegment: '', reason: 'Wordy', severity: 'LOW' }] },
+    });
+
+    expect(useQaStore.getState().cards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ historyReplay: true, originalSegment: 'teh' }),
+      expect.objectContaining({ historyReplay: undefined, originalSegment: 'very' }),
+    ]));
+    expect(useQaStore.getState().cards).toHaveLength(2);
+  });
+
   it('removes only resolved pending cards when a paragraph re-analysis still has other issues', () => {
     const resolvedCardId = useQaStore.getState().addCard({
       paragraphId: 'para-partially-cleaned',
@@ -640,6 +705,7 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(analyzeSpy).toHaveBeenCalledTimes(1));
     expect(useQaStore.getState().cards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ originalSegment: 'teh', suggestedSegment: 'the', historyReplay: true }),
       expect.objectContaining({ originalSegment: 'is bad', historyReplay: undefined }),
     ]));
 

@@ -51,6 +51,17 @@ describe('QACardItem Component', () => {
     expect(screen.queryByTestId('qa-card-history-badge')).not.toBeInTheDocument();
   });
 
+  it('renders a focus indicator only when focused and preserves normal pending actions', () => {
+    const { rerender } = render(<QACardItem card={sampleCard} isFocused />);
+
+    expect(screen.getByTestId('qa-card-item-card-101')).toHaveAttribute('data-focused', 'true');
+    expect(screen.getByTestId('qa-accept-action-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('qa-dismiss-action-btn')).not.toBeDisabled();
+
+    rerender(<QACardItem card={sampleCard} isFocused={false} />);
+    expect(screen.getByTestId('qa-card-item-card-101')).not.toHaveAttribute('data-focused');
+  });
+
   it('renders interactive reason tooltip popover on hover', () => {
     render(<QACardItem card={sampleCard} />);
 

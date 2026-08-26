@@ -70,6 +70,37 @@ describe('QACardList Component', () => {
     expect(screen.queryByTestId('qa-empty-state')).not.toBeInTheDocument();
   });
 
+  it('highlights every rendered card for the active paragraph without changing card order', () => {
+    useQaStore.getState().addCard({ id: 'older-other', paragraphId: 'para-other', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Other', severity: 'LOW' });
+    useQaStore.getState().addCard({ id: 'focused-two', paragraphId: 'para-focused', category: 'Style', originalSegment: 'very', suggestedSegment: '', reason: 'Wordy', severity: 'LOW' });
+    useQaStore.getState().addCard({ id: 'focused-one', paragraphId: 'para-focused', category: 'Spelling', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', severity: 'LOW' });
+    const originalOrder = useQaStore.getState().cards.map((card) => card.id);
+    useBridgeStore.getState().addParagraph({ paragraphId: 'para-focused', text: 'The teh very sentence.', hash: 'hash-focused', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+
+    render(<QACardList />);
+    expect(screen.getByTestId('qa-card-item-focused-one')).toHaveAttribute('data-focused', 'true');
+    expect(screen.getByTestId('qa-card-item-focused-two')).toHaveAttribute('data-focused', 'true');
+    expect(screen.getByTestId('qa-card-item-older-other')).not.toHaveAttribute('data-focused');
+    expect(Array.from(document.querySelectorAll('[data-testid^="qa-card-item-"]')).map((element) => element.getAttribute('data-testid'))).toEqual(originalOrder.map((id) => `qa-card-item-${id}`));
+
+    act(() => {
+      useBridgeStore.getState().addParagraph({ paragraphId: 'para-other', text: 'A bad sentence.', hash: 'hash-other', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    });
+    expect(screen.getByTestId('qa-card-item-focused-one')).not.toHaveAttribute('data-focused');
+    expect(screen.getByTestId('qa-card-item-focused-two')).not.toHaveAttribute('data-focused');
+    expect(screen.getByTestId('qa-card-item-older-other')).toHaveAttribute('data-focused', 'true');
+    expect(useQaStore.getState().cards.map((card) => card.id)).toEqual(originalOrder);
+  });
+
+  it('does not render a focused card excluded by the active severity filter', () => {
+    useQaStore.getState().addCard({ id: 'focused-low', paragraphId: 'para-filtered', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Low', severity: 'LOW' });
+    useBridgeStore.getState().addParagraph({ paragraphId: 'para-filtered', text: 'A bad sentence.', hash: 'hash-filtered', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    useQaStore.getState().setSeverityFilter('HIGH');
+
+    render(<QACardList />);
+    expect(screen.queryByTestId('qa-card-item-focused-low')).not.toBeInTheDocument();
+  });
+
   it('shows applied and dismissed cards in read-only history and returns to the active empty state', () => {
     useQaStore.setState({
       appliedCards: [{

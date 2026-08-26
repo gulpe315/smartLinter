@@ -40,6 +40,7 @@ export interface QACardItemProps {
   onDismiss?: (cardId: string) => void;
   onMarkObsolete?: (cardId: string) => void;
   isApplying?: boolean;
+  isFocused?: boolean;
   readOnly?: boolean;
   className?: string;
 }
@@ -50,6 +51,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   onDismiss,
   onMarkObsolete,
   isApplying: propIsApplying,
+  isFocused = false,
   readOnly = false,
   className = '',
 }) => {
@@ -138,10 +140,13 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   return (
     <article
       data-testid={`qa-card-item-${card.id}`}
+      data-focused={isFocused ? 'true' : undefined}
       className={`group relative rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 shadow-md p-4 transition-all duration-300 ease-out hover:shadow-indigo-950/20 hover:shadow-lg ${
         isObsolete ? 'ring-1 ring-slate-500/60 border-slate-500/60 bg-slate-950/90 opacity-85' : isStale ? 'ring-1 ring-amber-500/50 border-amber-500/40 bg-slate-900' : card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
       } ${
         card.status === 'failed' ? 'border-rose-900/80 bg-rose-950/20' : ''
+      } ${
+        isFocused ? 'ring-1 ring-sky-400/70 border-sky-400/50' : ''
       } ${className}`}
     >
       {/* Stale Document Modified Notification Badge (Task 16 UX) */}

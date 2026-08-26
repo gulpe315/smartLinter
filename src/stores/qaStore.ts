@@ -210,13 +210,28 @@ export const useQaStore = create<QAState>((set, get) => ({
         .map((card) => ({ ...card, status: 'stale_obsolete' as QACardStatus }));
 
       return {
-        cards: state.cards.filter((card) =>
-          !obsoleteCardIds.has(card.id) && (
-            card.paragraphId !== payload.paragraphId ||
-            card.status !== 'pending' ||
-            issueKeys.has(`${card.category}\u0000${card.originalSegment}\u0000${card.suggestedSegment}`)
+        cards: state.cards
+          .filter((card) =>
+            !obsoleteCardIds.has(card.id) && (
+              card.paragraphId !== payload.paragraphId ||
+              card.status !== 'pending' ||
+              (card.historyReplay && payload.paragraphText.includes(card.originalSegment)) ||
+              issueKeys.has(`${card.category}\u0000${card.originalSegment}\u0000${card.suggestedSegment}`)
+            )
           )
-        ),
+          .map((card) =>
+            card.paragraphId === payload.paragraphId &&
+            card.status === 'pending' &&
+            card.historyReplay &&
+            payload.paragraphText.includes(card.originalSegment)
+              ? {
+                  ...card,
+                  paragraphText: payload.paragraphText,
+                  paragraphHash: payload.paragraphHash,
+                  isLocked: payload.isLocked,
+                }
+              : card
+          ),
         dismissedCards: newlyObsolete.length > 0
           ? [...newlyObsolete, ...state.dismissedCards]
           : state.dismissedCards,
