@@ -1,0 +1,582 @@
+{
+  "records": [
+    {
+      "group": "true_positive",
+      "id": "TP-CAL-01",
+      "category": "calendar",
+      "text": "일정은 일오일, 월요일, 화요일 순으로 진행됩니다.",
+      "expected": [
+        "일오일"
+      ],
+      "hits": [
+        {
+          "category": "calendar",
+          "tier": 1,
+          "token": "일오일",
+          "correction": "일요일",
+          "span": [
+            4,
+            7
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-CAL-02",
+      "category": "calendar",
+      "text": "화요알 오전에 고객 검토 회의를 예약했습니다.",
+      "expected": [
+        "화요알"
+      ],
+      "hits": [
+        {
+          "category": "calendar",
+          "tier": 1,
+          "token": "화요알",
+          "correction": "화요일",
+          "span": [
+            0,
+            3
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-CAL-03",
+      "category": "calendar",
+      "text": "삼분기 매출 전망은 3분기 이사회에서 확정합니다.",
+      "expected": [
+        "삼분기"
+      ],
+      "hits": [
+        {
+          "category": "calendar",
+          "tier": 1,
+          "token": "삼분기",
+          "correction": "3분기",
+          "span": [
+            0,
+            3
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-SDLC-01",
+      "category": "sdlc_deployment_priority",
+      "text": "스테이징으 환경에서 회귀 테스트를 끝낸 뒤 배포합니다.",
+      "expected": [
+        "스테이징으"
+      ],
+      "hits": [
+        {
+          "category": "sdlc_deployment_priority",
+          "tier": 1,
+          "token": "스테이징으",
+          "correction": "스테이징",
+          "span": [
+            0,
+            5
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-SDLC-02",
+      "category": "sdlc_deployment_priority",
+      "text": "프로덕숀 장애 대응 절차를 운영 위키에 등록했습니다.",
+      "expected": [
+        "프로덕숀"
+      ],
+      "hits": [
+        {
+          "category": "sdlc_deployment_priority",
+          "tier": 1,
+          "token": "프로덕숀",
+          "correction": "프로덕션",
+          "span": [
+            0,
+            4
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-SDLC-03",
+      "category": "sdlc_deployment_priority",
+      "text": "이번 결함의 우선순위이는 P1으로 분류합니다.",
+      "expected": [
+        "우선순위이"
+      ],
+      "hits": []
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-WF-01",
+      "category": "workflow_status",
+      "text": "요청 상태가 진행주에서 검토로 바뀌었습니다.",
+      "expected": [
+        "진행주"
+      ],
+      "hits": []
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-WF-02",
+      "category": "workflow_status",
+      "text": "담당자는 검토오 결과를 오늘 안에 공유해야 합니다.",
+      "expected": [
+        "검토오"
+      ],
+      "hits": [
+        {
+          "category": "workflow_status",
+          "tier": 1,
+          "token": "검토오",
+          "correction": "검토",
+          "span": [
+            5,
+            8
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-WF-03",
+      "category": "workflow_status",
+      "text": "완료오 처리된 티켓은 감사 로그에 남깁니다.",
+      "expected": [
+        "완료오"
+      ],
+      "hits": [
+        {
+          "category": "workflow_status",
+          "tier": 1,
+          "token": "완료오",
+          "correction": "완료",
+          "span": [
+            0,
+            3
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-SIZE-01",
+      "category": "sizing",
+      "text": "옵션은 XS, S, 엠, L, XL 순으로 제공합니다.",
+      "expected": [
+        "엠"
+      ],
+      "hits": [
+        {
+          "category": "sizing",
+          "tier": 2,
+          "token": "엠",
+          "correction": "M",
+          "span": [
+            11,
+            12
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-SIZE-02",
+      "category": "sizing",
+      "text": "포장 규격은 XS / S / M / 엘 / XL입니다.",
+      "expected": [
+        "엘"
+      ],
+      "hits": [
+        {
+          "category": "sizing",
+          "tier": 2,
+          "token": "엘",
+          "correction": "L",
+          "span": [
+            20,
+            21
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-SIZE-03",
+      "category": "sizing",
+      "text": "위험도는 상 · 쥬 · 하 세 단계로 보고합니다.",
+      "expected": [
+        "쥬"
+      ],
+      "hits": [
+        {
+          "category": "sizing",
+          "tier": 2,
+          "token": "쥬",
+          "correction": "중",
+          "span": [
+            9,
+            10
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-TITLE-01",
+      "category": "business_titles_status",
+      "text": "과쟝과 부장은 예산안을 함께 검토했습니다.",
+      "expected": [
+        "과쟝"
+      ],
+      "hits": []
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-TITLE-02",
+      "category": "business_titles_status",
+      "text": "부쟝 승인 후 계약서를 고객에게 발송합니다.",
+      "expected": [
+        "부쟝"
+      ],
+      "hits": [
+        {
+          "category": "business_titles_status",
+          "tier": 1,
+          "token": "부쟝",
+          "correction": "부장",
+          "span": [
+            0,
+            2
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-TITLE-03",
+      "category": "business_titles_status",
+      "text": "승이인 대기 건은 주임에게 자동 배정됩니다.",
+      "expected": [
+        "승이인"
+      ],
+      "hits": [
+        {
+          "category": "business_titles_status",
+          "tier": 1,
+          "token": "승이인",
+          "correction": "승인",
+          "span": [
+            0,
+            3
+          ],
+          "confidence": "high"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-MARK-01",
+      "category": "list_markers",
+      "text": "가. 요구사항 확정\n나. 설계 검토\n나. 구현 시작",
+      "expected": [
+        "나"
+      ],
+      "hits": [
+        {
+          "category": "list_markers",
+          "tier": 3,
+          "token": "나",
+          "correction": null,
+          "span": [
+            20,
+            21
+          ],
+          "confidence": "low",
+          "reason": "non-monotonic marker progression; no auto-correction"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-MARK-02",
+      "category": "list_markers",
+      "text": "① 데이터 수집\n② 정제\n④ 모델 학습",
+      "expected": [
+        "④"
+      ],
+      "hits": [
+        {
+          "category": "list_markers",
+          "tier": 3,
+          "token": "④",
+          "correction": null,
+          "span": [
+            14,
+            15
+          ],
+          "confidence": "low",
+          "reason": "non-monotonic marker progression; no auto-correction"
+        }
+      ]
+    },
+    {
+      "group": "true_positive",
+      "id": "TP-MARK-03",
+      "category": "list_markers",
+      "text": "I. 준비\nII. 검토\nII. 승인",
+      "expected": [
+        "II"
+      ],
+      "hits": [
+        {
+          "category": "list_markers",
+          "tier": 3,
+          "token": "II",
+          "correction": null,
+          "span": [
+            13,
+            15
+          ],
+          "confidence": "low",
+          "reason": "non-monotonic marker progression; no auto-correction"
+        }
+      ]
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-CAL-01",
+      "category": "calendar",
+      "text": "오늘은 화가 나도 고객에게 차분히 답변해야 합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-CAL-02",
+      "category": "calendar",
+      "text": "수정 버튼을 누른 뒤 저장 여부를 확인하세요.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-CAL-03",
+      "category": "calendar",
+      "text": "일이 많아도 우선순위를 하나씩 정리합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-SDLC-01",
+      "category": "sdlc_deployment_priority",
+      "text": "배포된 안내문은 개발자가 아니라 운영팀이 검수합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-SDLC-02",
+      "category": "sdlc_deployment_priority",
+      "text": "P1 고객의 요청은 개인정보 보호 정책에 따라 처리합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-SDLC-03",
+      "category": "sdlc_deployment_priority",
+      "text": "설계자는 테스트 결과를 읽고 다음 작업을 정했습니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-WF-01",
+      "category": "workflow_status",
+      "text": "검토 의견을 반영한 문서는 완료 전에 다시 읽어 주세요.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-WF-02",
+      "category": "workflow_status",
+      "text": "대기 시간이 길어도 보류 중인 계약을 임의로 변경하지 마세요.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-WF-03",
+      "category": "workflow_status",
+      "text": "진행 중인 화면은 고객 교육용으로만 사용합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-SIZE-01",
+      "category": "sizing",
+      "text": "이 화면에서 수정 버튼을 누르세요.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-SIZE-02",
+      "category": "sizing",
+      "text": "가장 중요한 것은 변경 사유를 남기는 일입니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-SIZE-03",
+      "category": "sizing",
+      "text": "상담 기록은 중복 없이 저장하고 하단에서 검색합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-TITLE-01",
+      "category": "business_titles_status",
+      "text": "과장된 표현은 고객 제안서에서 삭제합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-TITLE-02",
+      "category": "business_titles_status",
+      "text": "부장품은 별도 보관함에서 관리합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-TITLE-03",
+      "category": "business_titles_status",
+      "text": "승인 절차는 문서 게시 전에 완료되어야 합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-MARK-01",
+      "category": "list_markers",
+      "text": "가장 먼저 고객의 요청 범위를 확인합니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-MARK-02",
+      "category": "list_markers",
+      "text": "II형 인증은 이번 계약의 적용 대상이 아닙니다.",
+      "hits": []
+    },
+    {
+      "group": "false_positive_traps",
+      "id": "FP-MARK-03",
+      "category": "list_markers",
+      "text": "①번 항목은 본문 안에서 인용한 화면 번호입니다.",
+      "hits": []
+    },
+    {
+      "group": "clean_paragraphs",
+      "id": "CLEAN-01",
+      "text": "이번 주 고객 인터뷰에서 수집한 요구를 기준으로 화면 흐름을 정리했습니다. 변경 요청은 추적 가능한 티켓으로만 접수합니다.",
+      "hits": []
+    },
+    {
+      "group": "clean_paragraphs",
+      "id": "CLEAN-02",
+      "text": "API 응답 시간은 기준값 이내였으며, 오류 로그에는 민감한 식별자를 기록하지 않도록 필터를 적용했습니다.",
+      "hits": []
+    },
+    {
+      "group": "clean_paragraphs",
+      "id": "CLEAN-03",
+      "text": "계약 갱신 안내는 담당자 확인을 거쳐 발송합니다. 첨부 파일의 접근 권한은 수신자별로 분리했습니다.",
+      "hits": []
+    },
+    {
+      "group": "clean_paragraphs",
+      "id": "CLEAN-04",
+      "text": "데이터 이전 작업은 백업 검증이 끝난 후 시작합니다. 예상하지 못한 형식의 값은 별도 대기열로 보냅니다.",
+      "hits": []
+    },
+    {
+      "group": "clean_paragraphs",
+      "id": "CLEAN-05",
+      "text": "사용자 교육 자료에는 실제 화면과 동일한 용어를 사용하고, 문의 채널과 응답 기준을 명확히 기재합니다.",
+      "hits": []
+    }
+  ],
+  "metrics": {
+    "business_titles_status": {
+      "expected_true_positives": 3,
+      "detected_true_positives": 2,
+      "recall": 0.6666666666666666,
+      "flags": 2,
+      "precision": 1.0,
+      "false_positives": []
+    },
+    "calendar": {
+      "expected_true_positives": 3,
+      "detected_true_positives": 3,
+      "recall": 1.0,
+      "flags": 3,
+      "precision": 1.0,
+      "false_positives": []
+    },
+    "list_markers": {
+      "expected_true_positives": 3,
+      "detected_true_positives": 3,
+      "recall": 1.0,
+      "flags": 3,
+      "precision": 1.0,
+      "false_positives": []
+    },
+    "sdlc_deployment_priority": {
+      "expected_true_positives": 3,
+      "detected_true_positives": 2,
+      "recall": 0.6666666666666666,
+      "flags": 2,
+      "precision": 1.0,
+      "false_positives": []
+    },
+    "sizing": {
+      "expected_true_positives": 3,
+      "detected_true_positives": 3,
+      "recall": 1.0,
+      "flags": 3,
+      "precision": 1.0,
+      "false_positives": []
+    },
+    "workflow_status": {
+      "expected_true_positives": 3,
+      "detected_true_positives": 2,
+      "recall": 0.6666666666666666,
+      "flags": 2,
+      "precision": 1.0,
+      "false_positives": []
+    }
+  },
+  "false_positives": [],
+  "overall": {
+    "expected_true_positives": 18,
+    "detected_true_positives": 15,
+    "recall": 0.8333333333333334,
+    "flags": 15,
+    "precision": 1.0,
+    "false_positive_count": 0
+  }
+}
