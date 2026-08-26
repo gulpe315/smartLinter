@@ -8,7 +8,7 @@
 use serde::{Deserialize, Serialize};
 use crate::ai::{
     CorrectionPreference, GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
-    QaReport, QueueJobRequest, TmReference,
+    QaReport, QaStatus, QueueJobRequest, TmReference,
 };
 use crate::protocol::{EditorType, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
 use crate::server::{HealthResponse, ServerHandle};
@@ -229,7 +229,14 @@ pub async fn analyze_paragraph(
         paragraph.paragraph_id, job_result.duration_ms, job_result.model_used
     );
 
-    let report = QaParser::parse(&job_result.response);
+    let mut report = QaParser::parse(&job_result.response);
+    let deterministic_issues = crate::deterministic_qa::detect(&paragraph.text, target_lang.as_str());
+    report.issues = crate::deterministic_qa::merge(deterministic_issues, report.issues, &paragraph.text);
+    report.status = if report.issues.is_empty() {
+        QaStatus::Pass
+    } else {
+        QaStatus::Fail
+    };
     Ok(report)
 }
 

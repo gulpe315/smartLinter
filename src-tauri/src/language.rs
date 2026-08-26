@@ -12,3 +12,15 @@ pub enum LanguageTag {
     Ja,
     Zh,
 }
+
+impl LanguageTag {
+    /// Returns the BCP-47 primary language subtag used by built-in rules.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Ko => "ko",
+            Self::En => "en",
+            Self::Ja => "ja",
+            Self::Zh => "zh",
+        }
+    }
+}

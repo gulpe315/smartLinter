@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 use serde::Deserialize;
 
 use crate::ai::{QaIssue, QaSeverity};
+use tracing::debug;
 
 const DICTIONARY_JSON: &str = include_str!("dictionary.json");
 const PARTICLES: &[&str] = &[
@@ -81,6 +82,134 @@ pub fn detect(text: &str, target_locale: &str) -> Vec<QaIssue> {
     }
     issues.extend(marker_issues(text, &data.list_markers));
     issues
+}
+
+/// Combines deterministic and LLM QA results using only unambiguous UTF-16 spans.
+///
+/// LLM spans are derived from their original segment only when it occurs exactly
+/// once in the paragraph. Ambiguous LLM results remain visible and are excluded
+/// from all location-based suppression and conflict handling.
+pub fn merge(
+    deterministic: Vec<QaIssue>,
+    mut llm: Vec<QaIssue>,
+    paragraph_text: &str,
+) -> Vec<QaIssue> {
+    for issue in &mut llm {
+        populate_unambiguous_offset(issue, paragraph_text);
+    }
+
+    let mut suppressed_llm = vec![false; llm.len()];
+    let mut result = deterministic;
+
+    for deterministic_issue in &mut result {
+        let Some((d_start, d_end)) = offsets(deterministic_issue) else {
+            continue;
+        };
+        for (llm_index, llm_issue) in llm.iter().enumerate() {
+            let Some((l_start, l_end)) = offsets(llm_issue) else {
+                continue;
+            };
+            if (d_start, d_end) != (l_start, l_end) {
+                continue;
+            }
+            if deterministic_issue.suggested_segment == llm_issue.suggested_segment {
+                deterministic_issue.provenance = Some("deterministic+llm".into());
+                suppressed_llm[llm_index] = true;
+            } else {
+                debug!(
+                    deterministic_rule_id = ?deterministic_issue.rule_id,
+                    deterministic_original = %deterministic_issue.original_segment,
+                    llm_original = %llm_issue.original_segment,
+                    llm_suggested = %llm_issue.suggested_segment,
+                    "Suppressing LLM QA issue that conflicts with a deterministic correction"
+                );
+                suppressed_llm[llm_index] = true;
+            }
+        }
+    }
+
+    let retained_llm: Vec<QaIssue> = llm
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, issue)| (!suppressed_llm[index]).then_some(issue))
+        .collect();
+
+    // A deterministic issue and a retained LLM issue share a group only for a
+    // partial overlap. Exact spans were handled above. Multiple pairwise
+    // overlaps are collapsed into connected components so every member of a
+    // conflict has one common ID.
+    let deterministic_len = result.len();
+    let total_len = deterministic_len + retained_llm.len();
+    let mut parents: Vec<usize> = (0..total_len).collect();
+    let mut has_partial_overlap = vec![false; total_len];
+    for d_index in 0..deterministic_len {
+        let Some(d_span) = offsets(&result[d_index]) else {
+            continue;
+        };
+        for l_index in 0..retained_llm.len() {
+            let Some(l_span) = offsets(&retained_llm[l_index]) else {
+                continue;
+            };
+            if spans_overlap(d_span, l_span) && d_span != l_span {
+                let l_node = deterministic_len + l_index;
+                union(&mut parents, d_index, l_node);
+                has_partial_overlap[d_index] = true;
+                has_partial_overlap[l_node] = true;
+            }
+        }
+    }
+
+    result.extend(retained_llm);
+    for index in 0..result.len() {
+        if has_partial_overlap[index] {
+            let root = find_root(&mut parents, index);
+            result[index].conflict_group_id = Some(format!("qa-conflict-{root}"));
+        }
+    }
+    result
+}
+
+fn populate_unambiguous_offset(issue: &mut QaIssue, paragraph_text: &str) {
+    // LLM-supplied offsets are not trusted: only a unique occurrence in this
+    // paragraph can participate in location-based merging.
+    issue.start_offset = None;
+    issue.end_offset = None;
+    if issue.original_segment.is_empty() {
+        return;
+    }
+    let mut matches = paragraph_text.match_indices(&issue.original_segment);
+    let Some((start, _)) = matches.next() else {
+        return;
+    };
+    if matches.next().is_some() {
+        return;
+    }
+    let end = start + issue.original_segment.len();
+    issue.start_offset = Some(utf16_offset(paragraph_text, start));
+    issue.end_offset = Some(utf16_offset(paragraph_text, end));
+}
+
+fn offsets(issue: &QaIssue) -> Option<(usize, usize)> {
+    Some((issue.start_offset?, issue.end_offset?))
+}
+
+fn spans_overlap((left_start, left_end): (usize, usize), (right_start, right_end): (usize, usize)) -> bool {
+    left_start < right_end && right_start < left_end
+}
+
+fn find_root(parents: &mut [usize], node: usize) -> usize {
+    if parents[node] != node {
+        parents[node] = find_root(parents, parents[node]);
+    }
+    parents[node]
+}
+
+fn union(parents: &mut [usize], left: usize, right: usize) {
+    let left_root = find_root(parents, left);
+    let right_root = find_root(parents, right);
+    if left_root != right_root {
+        parents[right_root] = left_root;
+    }
 }
 
 fn dictionary_issue(
@@ -279,6 +408,68 @@ fn utf16_offset(text: &str, byte_offset: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_issue(original: &str, suggested: &str) -> QaIssue {
+        QaIssue::new("test", original, suggested, "test issue", QaSeverity::Medium)
+    }
+
+    fn deterministic_issue(text: &str, original: &str, suggested: &str) -> QaIssue {
+        let start = text.find(original).expect("test segment is present");
+        let end = start + original.len();
+        let mut issue = test_issue(original, suggested);
+        issue.start_offset = Some(utf16_offset(text, start));
+        issue.end_offset = Some(utf16_offset(text, end));
+        issue.provenance = Some("deterministic".into());
+        issue.rule_id = Some("calendar.weekday.full.일오일".into());
+        issue
+    }
+
+    #[test]
+    fn merge_keeps_non_overlapping_deterministic_and_llm_issues() {
+        let text = "회의는 일오일에 열립니다.";
+        let merged = merge(vec![deterministic_issue(text, "일오일", "일요일")], vec![test_issue("열립니다", "진행됩니다")], text);
+        assert_eq!(merged.len(), 2);
+        assert!(merged.iter().all(|issue| issue.conflict_group_id.is_none()));
+    }
+
+    #[test]
+    fn merge_deduplicates_same_location_and_correction() {
+        let text = "회의는 일오일에 열립니다.";
+        let merged = merge(vec![deterministic_issue(text, "일오일", "일요일")], vec![test_issue("일오일", "일요일")], text);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].provenance.as_deref(), Some("deterministic+llm"));
+    }
+
+    #[test]
+    fn merge_keeps_deterministic_issue_for_same_location_different_correction() {
+        let text = "회의는 일오일에 열립니다.";
+        let merged = merge(vec![deterministic_issue(text, "일오일", "일요일")], vec![test_issue("일오일", "월요일")], text);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].suggested_segment, "일요일");
+        assert_eq!(merged[0].rule_id.as_deref(), Some("calendar.weekday.full.일오일"));
+    }
+
+    #[test]
+    fn merge_groups_partial_overlap_without_suppressing_either_issue() {
+        let text = "회의는 일오일에 열립니다.";
+        let merged = merge(vec![deterministic_issue(text, "일오일", "일요일")], vec![test_issue("일오일에", "일요일에")], text);
+        assert_eq!(merged.len(), 2);
+        assert!(merged.iter().all(|issue| issue.conflict_group_id.is_some()));
+        assert_eq!(merged[0].conflict_group_id, merged[1].conflict_group_id);
+    }
+
+    #[test]
+    fn merge_never_suppresses_llm_issue_with_ambiguous_occurrence() {
+        let text = "일오일 일정 확인 후 다시 확인합니다.";
+        let mut ambiguous_llm_issue = test_issue("확인", "점검");
+        ambiguous_llm_issue.start_offset = Some(0);
+        ambiguous_llm_issue.end_offset = Some(2);
+        let merged = merge(vec![deterministic_issue(text, "일오일", "일요일")], vec![ambiguous_llm_issue], text);
+        assert_eq!(merged.len(), 2);
+        let llm_issue = merged.iter().find(|issue| issue.original_segment == "확인").unwrap();
+        assert_eq!(llm_issue.start_offset, None);
+        assert_eq!(llm_issue.end_offset, None);
+    }
 
     fn tokens(text: &str) -> Vec<String> {
         detect(text, "ko-KR")
