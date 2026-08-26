@@ -1,6 +1,6 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-26 후속 세션 (Task T/U, 토큰예산 재설계, source 필드 결함 수정, 다국어 플러밍(Part 1/2) 전부 완료·커밋. 다국어 Part 3(영어 콘텐츠 벤치마크)는 Codex 백그라운드 작업 진행 중이던 상태로 세션 종료.)
+마지막 업데이트: 2026-08-26 후속 세션 (Task T/U, 토큰예산 재설계, source 필드 결함 수정, 다국어 플러밍(Part 1/2) 전부 완료·커밋. 다국어 Part 3(영어 콘텐츠 벤치마크) 완료 — no-ship, 재현율 71.43%로 기준 미달.)
 
 ## ⭐⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 후속 세션 인계, 이 절이 최신 — 아래 "⭐ 2026-08-26 최종 인계" 절보다 이게 더 최근)
 
@@ -15,9 +15,8 @@
    - `1ee86e3` **Part 1** — `qaStore.ts`가 TM 퍼지매치 결과를 `paragraph.source`(=원문)로 취급하던 결함 수정(Codex가 다국어 자문 중 부수 발견, 한국어 이중언어 플로우에도 이미 있던 버그). TM 매치는 이제 `AnalysisOptions.tmReference`로 advisory 전달, 트렁케이션 시 이력보다도 먼저 생략.
    - `4744c5f` **Part 2** — `LanguageTag`(ko/en/ja/zh) 신설, `AnalysisOptions.target_lang/explanation_lang` 플러밍(기본 None→ko/ko 100% 하위호환), `GuidelineSet` 언어태깅. 미검증 언어 선택 시 `PromptBuilder::try_build_system_prompt()`가 `Result::Err`로 명확히 거부(한국어 콘텐츠로 조용히 대체 안 함).
    - `33b1cab` — 사용자 라이브 리포트("위치 보기"가 AMBIGUOUS 반환)를 계기로 `locateParagraph` 설계 재검토, 백로그 문서화(아래 "위치찾기" 절 참고).
-3. **다음 세션 최우선 — 진행 중이던 작업 이어받기:**
-   - **다국어 Part 3(영어 콘텐츠 작성+실측 벤치마크)가 Codex 백그라운드 작업 도중 세션이 끝났을 가능성이 있음.** 재개 시: 이미 실행 중인 Codex 프로세스가 있는지, 또는 `spikes/task3_llm_latency/`에 `english_profile_benchmark_results.json`류 산출물이 이미 생겼는지 먼저 확인. 산출물이 있으면 그 보고서를 읽고 diff를 파일+라인 단위(`-w` 포함)로 검토 → `cargo test`/`npm test`/`npm run test:ui`/`npm run build` 독립 재검증 → 커밋. 없으면 Task 지시서를 다시 보내야 함(사용자가 실제 영어 문서 샘플이 없다고 해서, Codex가 대표 샘플을 직접 만들어 exaone3.5:7.8b로 벤치마크하도록 지시했었음 — 스타일 규칙(능동태/Oxford콤마 등)은 **의도적으로 내장 안 함**, 일반적인(의견 없는) 영어 QA 지시문만 검증해서 넣기로 사용자가 직접 스코프를 단순화함).
-   - Part 3 완료 후: 다국어 Phase 4(UI 언어 선택 드롭다운), 그 다음 ja/zh 콘텐츠는 별도 태스크(급하지 않음).
+3. **Part 3 완료·커밋됨 (`f852b27`, no-ship).** Codex가 대표 영어 문서 9개 샘플(오탈자7+클린2)을 직접 만들어 exaone3.5:7.8b로 실측 → 재현율 71.43%(관사 누락, 어색한 수동태/명확성 케이스를 일관되게 놓침) → Codex 자체 기준(80%) 미달로 no-ship. `prompt_builder.rs`는 그대로, `LanguageTag::En`은 여전히 "not yet validated" 에러 반환. 벤치마크 산출물만 기록용 커밋(`spikes/task3_llm_latency/english_profile_*`).
+   - **다음 세션 최우선:** 이 no-ship 결과를 사용자에게 보고하고 다음 방향 결정 필요 — ①다른 모델로 재시도(다만 [[feedback_smartlinter_delegation]]의 "실제 선택된 모델로만" 원칙 유지), ②few-shot 예시 추가 등 프롬프트 보강 재시도, ③영어는 당분간 보류하고 UI만 먼저 착수(Phase 4: 언어선택 드롭다운, en 선택 시 "미검증" 표시), ④사용자가 직접 대표 영어 문서를 제공해서 재벤치마크. 사용자 지시 없이 임의로 방향 결정하지 말 것.
    - 그 뒤: 백로그 2건 대기 중 — ①결정론적 오탈자사전(병합규칙 미해결), ②위치찾기 context-fingerprint(실사용에서 AMBIGUOUS 빈도 관찰 후 필요시 착수, 지금은 코드 수정 불필요 결론남).
 4. **위치찾기(locateParagraph) 설계 재검토 — 중요 사고 사례, 상세는 `BACKLOG_LOCATOR_CONTEXT_FINGERPRINT.md` 참고:**
    - 사용자가 "일오일,월요일,화요일" 카드에서 [위치 보기]가 AMBIGUOUS 뜬 걸 보고 → Claude가 "오늘 커밋과 무관, 반복테스트로 중복텍스트 생겨서 그런 것뿐, 문제없음"이라고 성급히 결론 → **사용자가 "패러그래프 아이디가 고유값인데 왜 다른 ID가 간섭하냐"고 정확히 반박**.
