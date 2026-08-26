@@ -1,6 +1,47 @@
 # SmartLinter — 오케스트레이터 현황판
 
-마지막 업데이트: 2026-08-26 후속 세션 (Task T/U, 토큰예산 재설계, source 필드 결함 수정, 다국어 플러밍(Part 1/2) 전부 완료·커밋. 다국어 Part 3(영어 콘텐츠 벤치마크) 완료 — no-ship, 재현율 71.43%로 기준 미달. 사용자가 no-ship 후속으로 "UI 드롭다운 먼저"를 선택해 Phase 4(언어선택 드롭다운) 완료·커밋. 미검증 언어 선택 시 가짜 Mock 결과로 대체되던 문제도 발견·수정·커밋(`85eeafc`). 그 뒤 결정론적 오탈자사전 설계→구현→라이브검증 전부 완료(`c3cfef2`). 라이브 사용 중 발견된 stale QA카드 버그 계기로 "QA 카드 생명주기 전체 정합성" 설계까지 완료 — 아직 미구현, 다음 세션 시작점은 `DESIGN_QA_CARD_LIVE_INTEGRITY.md`.)
+마지막 업데이트: 2026-08-27 세션 — `DESIGN_QA_CARD_LIVE_INTEGRITY.md`의 Suggested
+implementation order 1번(non-invasive 실시간 스냅샷 primitive) 구현·검증·커밋 완료
+(`0909ec5`). 아래 "⭐⭐⭐⭐" 절 참고.
+
+## ⭐⭐⭐⭐ 2026-08-27 세션 — Step 1(실시간 스냅샷 primitive) 완료, 다음은 Step 2
+
+1. **`git log --oneline -1`로 최신 커밋이 `0909ec5`(Add non-invasive live paragraph snapshot primitive)인지 확인.**
+2. **한 일:** `DESIGN_QA_CARD_LIVE_INTEGRITY.md`의 Part 1 계약대로
+   `getLiveParagraphSnapshot`를 ExtendScript(`atomic_replacer.jsx`+
+   `smartlinter_daemon.jsx`)/Rust(`indesign_com.rs`+`commands.rs`+`main.rs`
+   핸들러 등록)/TS(`tauriBridge.ts`, `IBridgeService`+Mock+Tauri 구현체) 전
+   레이어에 배선(Codex 구현, 작업지시서 `TASK_REQUEST_LIVE_SNAPSHOT_STEP1.md`).
+   `locateParagraph`와 달리 `select`/`activate`를 절대 호출하지 않음(신규 테스트에
+   spy로 명시 검증). 인덱스로 찾은 문단은 해시가 달라도 무조건 FOUND로 현재
+   내용을 그대로 보고하도록 구현(= `findParagraphById`와의 핵심 차이 — "바뀌었는지"
+   판단은 호출자 몫). Rust 쪽에 `inject_daemon_script`와 동일한 3회 busy 재시도
+   (100/300/900ms) + `tracing::debug!`로 왕복 지연시간 계측(설계 문서가 "실측 없이
+   가정하지 말라"고 명시한 부분) 추가. **아직 어떤 스토어/UI도 이 메서드를 호출하지
+   않음** — 이번 단계는 primitive와 배선만, Part 2(새 카드 게이팅)는 다음 단계.
+3. **Claude 독립검증:** `git status --short`로 예상 파일(7개+태스크지시서)만
+   바뀌었는지 확인 → 각 파일 diff를 라인 단위로 정독(불필요한 재포맷/범위이탈
+   없음, ExtendScript 비ASCII 리터럴 없음, `main.rs` 핸들러 등록 확인) →
+   `cargo test`(34/34) / `npm test`(164/164) / `npm run test:ui`(255/255) /
+   `npm run build` 전부 독립 재실행해서 Codex 보고와 일치 확인 → 커밋. 아직 실제
+   InDesign 라이브 검증은 안 함(설계 문서상 이 단계는 자동테스트만으로 충분,
+   라이브 검증은 Step 2에서 원래 버그가 실제로 사라지는지 확인할 때 같이 함).
+4. **다음 세션 최우선:** Step 2 — 이 primitive를 새 카드 게이팅(Part 2)에 실제로
+   연결. `commands.rs::analyze_paragraph`가 LLM+결정론적 병합 결과를 반환하기
+   직전(또는 `qaStore.ts`가 그 결과를 카드로 승격하기 직전)에
+   `getLiveParagraphSnapshot`을 한 번 호출해서, 반환된 `currentHash`가 분석에 실제
+   쓰인 문단 해시와 일치할 때만 카드를 노출하도록 게이팅. `BUSY`/`ERROR`/
+   `AMBIGUOUS`면 이번 라운드 결과를 통째로 버림(재시도 없음 — 다음 진짜 텔레메트리가
+   새 분석을 트리거함). **이 단계가 끝나면 원래 리포트된 버그("일오일→일요일" 유령
+   카드)가 실제로 재현 안 되는지 InDesign 라이브로 반드시 확인할 것** — 설계
+   문서 Step 2 설명에 명시된 대로 여기서부터는 라이브 검증 필요.
+5. **참고:** Step 3~5(배치 폼+Part 3 Layer 1, Layer2+오프라인/재연결, F5차단+영속화)는
+   설계가 이미 끝난 상태라 재자문 불필요 — `DESIGN_QA_CARD_LIVE_INTEGRITY.md`의
+   "Suggested implementation order" 그대로 순서대로 진행.
+
+---
+
+## 2026-08-26 후속 세션 (지나간 상태, 참고용) — Task T/U, 토큰예산 재설계, source 필드 결함 수정, 다국어 플러밍(Part 1/2) 전부 완료·커밋. 다국어 Part 3(영어 콘텐츠 벤치마크) 완료 — no-ship, 재현율 71.43%로 기준 미달. 사용자가 no-ship 후속으로 "UI 드롭다운 먼저"를 선택해 Phase 4(언어선택 드롭다운) 완료·커밋. 미검증 언어 선택 시 가짜 Mock 결과로 대체되던 문제도 발견·수정·커밋(`85eeafc`). 그 뒤 결정론적 오탈자사전 설계→구현→라이브검증 전부 완료(`c3cfef2`). 라이브 사용 중 발견된 stale QA카드 버그 계기로 "QA 카드 생명주기 전체 정합성" 설계까지 완료.
 
 ## ⭐⭐⭐ 새 세션 시작 시 가장 먼저 할 일 (2026-08-26 최신 — 이 절이 아래 "⭐⭐" 절보다 더 최근, 구현 착수는 여기부터)
 
