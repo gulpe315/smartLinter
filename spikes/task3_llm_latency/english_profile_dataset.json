@@ -1,0 +1,65 @@
+[
+  {
+    "id": "en_mono_typo_receive",
+    "mode": "monolingual",
+    "source": "",
+    "target": "After the deployment completes, the release manager will recieve a notification in the dashboard.",
+    "seeded_error": {"kind": "typo", "original": "recieve", "suggested": "receive"}
+  },
+  {
+    "id": "en_mono_grammar_subject_verb",
+    "mode": "monolingual",
+    "source": "",
+    "target": "Each administrator are responsible for reviewing the quarterly access report before Friday.",
+    "seeded_error": {"kind": "grammar", "original": "Each administrator are", "suggested": "Each administrator is"}
+  },
+  {
+    "id": "en_mono_missing_article",
+    "mode": "monolingual",
+    "source": "",
+    "target": "Open console and select Projects from the navigation menu to create a new workspace.",
+    "seeded_error": {"kind": "missing word", "original": "Open console", "suggested": "Open the console"}
+  },
+  {
+    "id": "en_mono_awkward_passive",
+    "mode": "monolingual",
+    "source": "",
+    "target": "The report was completed by the finance team and was then sent by them to leadership for review.",
+    "seeded_error": {"kind": "clarity", "original": "was then sent by them", "suggested": "the finance team then sent it"}
+  },
+  {
+    "id": "en_mono_missing_comma",
+    "mode": "monolingual",
+    "source": "",
+    "target": "When the migration completes click Restart, then verify that the service health check passes.",
+    "seeded_error": {"kind": "punctuation", "original": "completes click", "suggested": "completes, click"}
+  },
+  {
+    "id": "en_bilingual_omission",
+    "mode": "bilingual",
+    "source": "In the cloud console, select the Billing tab and then choose Export report.",
+    "target": "In the cloud console, select the tab and then choose Export report.",
+    "seeded_error": {"kind": "omission", "original": "select the tab", "suggested": "select the Billing tab"}
+  },
+  {
+    "id": "en_bilingual_number_mismatch",
+    "mode": "bilingual",
+    "source": "The retention policy keeps audit logs for 14 days after the account is closed.",
+    "target": "The retention policy keeps audit logs for 41 days after the account is closed.",
+    "seeded_error": {"kind": "translation fidelity", "original": "41 days", "suggested": "14 days"}
+  },
+  {
+    "id": "en_mono_clean",
+    "mode": "monolingual",
+    "source": "",
+    "target": "To add a user, open Team settings, select Invite member, and enter the user's work email address.",
+    "seeded_error": null
+  },
+  {
+    "id": "en_bilingual_clean",
+    "mode": "bilingual",
+    "source": "The dashboard refreshes automatically every five minutes while the report is open.",
+    "target": "The dashboard refreshes automatically every five minutes while the report is open.",
+    "seeded_error": null
+  }
+]
