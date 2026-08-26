@@ -84,7 +84,7 @@ impl From<&str> for QaStatus {
 }
 
 /// Single structured QA violation issue mapped for UI cards and diff replacement.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QaIssue {
     /// Category or rule name (e.g. "Terminology", "Passive Voice", "Spacing").
@@ -97,6 +97,20 @@ pub struct QaIssue {
     pub reason: String,
     /// Severity level.
     pub severity: QaSeverity,
+    /// Start offset in the target paragraph, measured in UTF-16 code units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_offset: Option<usize>,
+    /// End offset in the target paragraph, measured in UTF-16 code units.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_offset: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conflict_group_id: Option<String>,
 }
 
 impl QaIssue {
@@ -113,12 +127,18 @@ impl QaIssue {
             suggested_segment: suggested_segment.into(),
             reason: reason.into(),
             severity,
+            start_offset: None,
+            end_offset: None,
+            provenance: None,
+            confidence: None,
+            rule_id: None,
+            conflict_group_id: None,
         }
     }
 }
 
 /// Complete QA lint report containing status and list of detected issues.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QaReport {
     /// Overall PASS or FAIL status.
@@ -283,6 +303,12 @@ impl RawIssuePayload {
             suggested_segment: suggested_segment.trim().to_string(),
             reason: reason.trim().to_string(),
             severity,
+            start_offset: None,
+            end_offset: None,
+            provenance: None,
+            confidence: None,
+            rule_id: None,
+            conflict_group_id: None,
         })
     }
 }

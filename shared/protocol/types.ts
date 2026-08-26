@@ -255,6 +255,14 @@ export interface QaIssue {
     reason: string;
     /** Severity level */
     severity: QaSeverity;
+    /** Start offset in the target paragraph, measured in UTF-16 code units */
+    startOffset?: number;
+    /** End offset in the target paragraph, measured in UTF-16 code units */
+    endOffset?: number;
+    provenance?: 'deterministic' | 'llm' | 'deterministic+llm';
+    confidence?: number;
+    ruleId?: string;
+    conflictGroupId?: string;
 }
 
 /** Complete QA lint report containing status and list of detected issues */
