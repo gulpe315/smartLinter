@@ -22,6 +22,7 @@ import {
   Layers,
   ChevronDown,
   Info,
+  Languages,
 } from 'lucide-react';
 import { useConfigStore } from '../../stores/configStore.ts';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
@@ -51,6 +52,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     guidelines,
     tmEntries,
     startBatchScan,
+    targetLang,
+    explanationLang,
+    setTargetLang,
+    setExplanationLang,
   } = useConfigStore();
 
   const {
@@ -83,6 +88,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleModelChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value;
     await setSelectedModel(newModel);
+  };
+
+  const handleTargetLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTargetLang(e.target.value as 'ko' | 'en' | 'ja' | 'zh');
+  };
+
+  const handleExplanationLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setExplanationLang(e.target.value as 'ko' | 'en' | 'ja' | 'zh');
   };
 
   const handleSaveHost = async () => {
@@ -281,7 +294,83 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </section>
 
-          {/* 2. Guidelines & Translation Memory Section */}
+          {/* 2. QA Document Language Section */}
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Languages className="w-4 h-4 text-sky-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                문서 언어 설정
+              </h3>
+            </div>
+
+            <div className="p-4 bg-slate-950/80 rounded-xl border border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="target-language-select"
+                  className="text-xs font-semibold text-slate-300 flex items-center justify-between gap-2"
+                >
+                  <span>검토 대상 문서 언어</span>
+                  {targetLang !== 'ko' && (
+                    <span
+                      data-testid="target-language-unvalidated-badge"
+                      className="px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/80 text-amber-300 text-[10px] font-bold"
+                    >
+                      미검증
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <select
+                    id="target-language-select"
+                    data-testid="target-language-select"
+                    value={targetLang}
+                    onChange={handleTargetLanguageChange}
+                    className="w-full pl-3 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 appearance-none focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                    <option value="zh">中文</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="explanation-language-select"
+                  className="text-xs font-semibold text-slate-300 flex items-center justify-between gap-2"
+                >
+                  <span>오류 설명 언어</span>
+                  {explanationLang !== 'ko' && (
+                    <span
+                      data-testid="explanation-language-unvalidated-badge"
+                      className="px-1.5 py-0.5 rounded bg-amber-950/60 border border-amber-800/80 text-amber-300 text-[10px] font-bold"
+                    >
+                      미검증
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <select
+                    id="explanation-language-select"
+                    data-testid="explanation-language-select"
+                    value={explanationLang}
+                    onChange={handleExplanationLanguageChange}
+                    className="w-full pl-3 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 appearance-none focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                    <option value="zh">中文</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 3. Guidelines & Translation Memory Section */}
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-violet-400" />
@@ -351,7 +440,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           </section>
 
-          {/* 3. Batch Scan Trigger Section (Testing / Large Documents) */}
+          {/* 4. Batch Scan Trigger Section (Testing / Large Documents) */}
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-emerald-400" />

@@ -75,6 +75,23 @@ describe('SettingsModal Component', () => {
     });
   });
 
+  it('should update QA languages and display unvalidated badges for non-Korean selections', async () => {
+    const setTargetLang = vi.spyOn(useConfigStore.getState(), 'setTargetLang');
+    const setExplanationLang = vi.spyOn(useConfigStore.getState(), 'setExplanationLang');
+
+    render(<SettingsModal isOpen={true} />);
+
+    fireEvent.change(screen.getByTestId('target-language-select'), { target: { value: 'en' } });
+    fireEvent.change(screen.getByTestId('explanation-language-select'), { target: { value: 'ja' } });
+
+    await waitFor(() => {
+      expect(setTargetLang).toHaveBeenCalledWith('en');
+      expect(setExplanationLang).toHaveBeenCalledWith('ja');
+      expect(screen.getByTestId('target-language-unvalidated-badge')).toHaveTextContent('미검증');
+      expect(screen.getByTestId('explanation-language-unvalidated-badge')).toHaveTextContent('미검증');
+    });
+  });
+
   it('should trigger manual batch scan when button is clicked', async () => {
     const onCloseMock = vi.fn();
     render(<SettingsModal isOpen={true} onClose={onCloseMock} />);
