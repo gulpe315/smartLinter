@@ -647,6 +647,18 @@ export const useQaStore = create<QAState>((set, get) => ({
               return;
             }
 
+            let snapshot;
+            try {
+              snapshot = await bridgeService.getLiveParagraphSnapshot(payload.paragraphId, payload.hash);
+            } catch (error) {
+              console.warn('QA live paragraph snapshot failed:', error);
+              return;
+            }
+
+            if (snapshot.status !== 'FOUND' || snapshot.currentHash !== payload.hash) {
+              return;
+            }
+
             get().addReport({
               paragraphId: payload.paragraphId,
               paragraphText: payload.text,

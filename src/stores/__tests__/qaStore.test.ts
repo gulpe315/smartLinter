@@ -681,6 +681,63 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     vi.useRealTimers();
   });
 
+  it('does not add cards when the live paragraph hash no longer matches the analyzed hash', async () => {
+    vi.useFakeTimers();
+    const report: QaReport = {
+      status: 'FAIL',
+      issues: [{ category: 'Terminology', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', severity: 'LOW' }],
+    };
+    vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValueOnce(report);
+    const snapshotSpy = vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValueOnce({
+      commandId: 'live-snapshot-para-stale-live-hash',
+      status: 'FOUND',
+      currentHash: 'different-hash',
+    });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-stale-live-hash', text: 'This is teh paragraph.', hash: 'analyzed-hash',
+      source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await vi.waitFor(() => expect(useQaStore.getState().isAnalyzing).toBe(false));
+
+    expect(snapshotSpy).toHaveBeenCalledWith('para-stale-live-hash', 'analyzed-hash');
+    expect(useQaStore.getState().cards).toEqual([]);
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it.each(['NOT_FOUND', 'BUSY', 'ERROR'] as const)(
+    'does not add cards when the live paragraph snapshot is %s',
+    async (status) => {
+      vi.useFakeTimers();
+      const report: QaReport = {
+        status: 'FAIL',
+        issues: [{ category: 'Terminology', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', severity: 'LOW' }],
+      };
+      vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValueOnce(report);
+      vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValueOnce({
+        commandId: `live-snapshot-para-${status.toLowerCase()}`,
+        status,
+      });
+      const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+      mockBridge.emit('new-paragraph-detected', {
+        paragraphId: `para-${status.toLowerCase()}`, text: 'This is teh paragraph.', hash: 'analyzed-hash',
+        source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+      });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.waitFor(() => expect(useQaStore.getState().isAnalyzing).toBe(false));
+
+      expect(useQaStore.getState().cards).toEqual([]);
+      unlisten();
+      vi.useRealTimers();
+    }
+  );
+
   it('forwards configured guidelines from configStore with the QA analysis request', async () => {
     vi.useFakeTimers();
     const guidelines = {

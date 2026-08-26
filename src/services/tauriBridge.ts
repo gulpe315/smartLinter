@@ -471,12 +471,12 @@ export class MockBridgeService implements IBridgeService {
     return { status: 'FOUND', message: 'Mock paragraph located successfully' };
   }
 
-  async getLiveParagraphSnapshot(paragraphId: string, _baseHash?: string): Promise<LiveParagraphSnapshotResult> {
+  async getLiveParagraphSnapshot(paragraphId: string, baseHash?: string): Promise<LiveParagraphSnapshotResult> {
     return {
       commandId: `live-snapshot-${paragraphId}`,
       status: 'FOUND',
       currentText: '',
-      currentHash: '',
+      currentHash: baseHash ?? '',
       message: 'Mock live paragraph snapshot returned successfully',
     };
   }
