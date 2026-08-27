@@ -1866,6 +1866,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kiwi-rs"
+version = "2026.8.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97883bec2bd3cfa764d059aab950ef2c43feae05f1fe0004616e69b8ef993491"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3361,6 +3370,7 @@ dependencies = [
  "futures-util",
  "hex",
  "keyring",
+ "kiwi-rs",
  "rand",
  "reqwest 0.12.28",
  "serde",
