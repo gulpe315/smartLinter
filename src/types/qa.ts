@@ -25,6 +25,9 @@ export type QACardStatus =
   | 'rollback_aborted'
   | 'rolled_back';
 
+/** Whether a card has passed the current document's live snapshot check. */
+export type QACardValidationState = 'valid' | 'restoring';
+
 /** Enhanced QA Card representation for the UI */
 export interface QACardData {
   id: string;
@@ -51,6 +54,8 @@ export interface QACardData {
   staleMessage?: string;
   /** Epoch milliseconds of the latest successful live snapshot validation. */
   lastValidatedAt?: number;
+  /** Hydrated cards remain hidden until the current document validates them. */
+  validationState?: QACardValidationState;
   rollbackStatus?: 'FAILED' | 'ROLLBACK_ABORTED' | 'ROLLED_BACK';
   rollbackMessage?: string;
   /** Whether the source editor frame/layer is locked. */

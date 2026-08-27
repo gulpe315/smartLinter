@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
-import App from '../App.tsx';
+import App, { isRefreshShortcut } from '../App.tsx';
 import { useBridgeStore } from '../stores/bridgeStore.ts';
 import { setBridgeService, MockBridgeService } from '../services/tauriBridge.ts';
 
@@ -137,5 +137,12 @@ describe('SmartLinter Dashboard App Full Integration', () => {
     expect(pinBtn).toHaveTextContent('핀 고정');
     expect(mockBridge.isAlwaysOnTop()).toBe(false);
     expect(useBridgeStore.getState().pinned).toBe(false);
+  });
+
+  it('recognizes the production-only refresh shortcuts that the app blocks', () => {
+    expect(isRefreshShortcut(new KeyboardEvent('keydown', { key: 'F5' }))).toBe(true);
+    expect(isRefreshShortcut(new KeyboardEvent('keydown', { key: 'r', ctrlKey: true }))).toBe(true);
+    expect(isRefreshShortcut(new KeyboardEvent('keydown', { key: 'R', metaKey: true, shiftKey: true }))).toBe(true);
+    expect(isRefreshShortcut(new KeyboardEvent('keydown', { key: 'r' }))).toBe(false);
   });
 });

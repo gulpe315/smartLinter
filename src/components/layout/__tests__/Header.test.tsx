@@ -4,10 +4,12 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Header } from '../Header.tsx';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
+import { useQaStore } from '../../../stores/qaStore.ts';
 
 describe('Header Component', () => {
   beforeEach(() => {
     useBridgeStore.getState().reset();
+    useQaStore.getState().reset();
     setBridgeService(new MockBridgeService());
   });
 
@@ -181,5 +183,20 @@ describe('Header Component', () => {
     expect(pinBtn).toHaveTextContent('핀 고정');
     expect(pinBtn).toHaveAttribute('aria-pressed', 'false');
     expect(useBridgeStore.getState().pinned).toBe(false);
+  });
+
+  it('offers an explicit QA state reset that clears active and historical cards', () => {
+    useQaStore.getState().addCard({ category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo' });
+    useQaStore.setState({ appliedCards: [{
+      id: 'applied', paragraphId: 'old', paragraphHash: 'hash', paragraphText: 'old', category: 'Grammar',
+      originalSegment: 'old', suggestedSegment: 'new', reason: 'Done', severity: 'LOW', status: 'applied', createdAt: Date.now(),
+    }] });
+    render(<Header />);
+
+    fireEvent.click(screen.getByTestId('qa-reset-btn'));
+
+    expect(useQaStore.getState().cards).toEqual([]);
+    expect(useQaStore.getState().dismissedCards).toEqual([]);
+    expect(useQaStore.getState().appliedCards).toEqual([]);
   });
 });

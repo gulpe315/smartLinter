@@ -9,9 +9,13 @@ import { SettingsModal } from './components/config/SettingsModal.tsx';
 import { GuidelineViewer } from './components/config/GuidelineViewer.tsx';
 import { useBridgeStore } from './stores/bridgeStore.ts';
 import { useConfigStore } from './stores/configStore.ts';
-import { useQaStore } from './stores/qaStore.ts';
+import { persistQaStoreSnapshot, useQaStore } from './stores/qaStore.ts';
 import { useTmStore } from './stores/tmStore.ts';
 import { getBridgeService } from './services/tauriBridge.ts';
+
+export function isRefreshShortcut(event: KeyboardEvent): boolean {
+  return event.key === 'F5' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r');
+}
 
 export const App: React.FC = () => {
   const initEventListener = useBridgeStore((state) => state.initEventListener);
@@ -45,9 +49,31 @@ export const App: React.FC = () => {
     };
   }, [initEventListener, initQaListener, initTmListener, syncSelectedModel]);
 
+  useEffect(() => {
+    // Vite development intentionally keeps browser refresh available: persisted
+    // cards make it useful for exercising reload recovery. Desktop production
+    // treats refresh as an unsupported browser-only operation.
+    if (import.meta.env.DEV) return;
+    const blockRefresh = (event: KeyboardEvent) => {
+      if (isRefreshShortcut(event)) event.preventDefault();
+    };
+    window.addEventListener('keydown', blockRefresh);
+    return () => window.removeEventListener('keydown', blockRefresh);
+  }, []);
+
+  useEffect(() => {
+    // Persist normally writes synchronously on every store update. This covers
+    // only the final renderer-unload edge between a card update and teardown.
+    window.addEventListener('beforeunload', persistQaStoreSnapshot);
+    return () => window.removeEventListener('beforeunload', persistQaStoreSnapshot);
+  }, []);
+
   return (
     <div
       data-testid="smartlinter-app-root"
+      onContextMenu={(event) => {
+        if (!import.meta.env.DEV) event.preventDefault();
+      }}
       className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden relative"
     >
       {/* Top Header & Telemetry Badges */}

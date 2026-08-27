@@ -6,6 +6,7 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import {
   type ReplacementCommand,
   type ReplacementResult,
@@ -42,6 +43,8 @@ import { normalizeText, TsFuzzyMatcher } from '../utils/tmMatcher.ts';
 const USER_PREFERENCE_LIMIT = 2;
 const USER_PREFERENCE_MIN_SIMILARITY = 0.9;
 const LIVE_NOT_FOUND_RECHECK_MS = 2_000;
+const QA_STORE_VERSION = 1;
+const QA_STORE_STORAGE_KEY = 'smartlinter_qa_cards';
 const liveNotFoundCounts = new Map<string, number>();
 const liveNotFoundTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -53,6 +56,13 @@ export interface PendingCommand {
   cardId: string;
   paragraphId: string;
   baseHash: string;
+}
+
+interface QaRestoreContext {
+  documentId: string | null;
+  sessionId: string | null;
+  savedAt: number;
+  schemaVersion: number;
 }
 
 function getNormalizedIssueKey(category: string, originalSegment: string, suggestedSegment: string): string {
@@ -177,6 +187,8 @@ export interface QAState {
   isAnalyzing: boolean;
   analysisError: string | null;
   lastEditorDisconnectAt: number | null;
+  /** Metadata for persisted cards. Hydrated active cards are candidates, never trusted state. */
+  restoreContext: QaRestoreContext | null;
 
   // --- Actions ---
   addCard: (card: Partial<QACardData> & { category: string; originalSegment: string; suggestedSegment: string; reason: string }) => string;
@@ -190,6 +202,7 @@ export interface QAState {
   retryCard: (cardId: string) => void;
   removeCard: (cardId: string) => void;
   clearAll: () => void;
+  resetQaCards: () => void;
   dismissAll: () => void;
   setFilter: (filter: Partial<QAFilterState>) => void;
   setSeverityFilter: (severity: QASeverityFilter) => void;
@@ -223,9 +236,34 @@ const initialState = {
   isAnalyzing: false,
   analysisError: null as string | null,
   lastEditorDisconnectAt: null as number | null,
+  restoreContext: null as QaRestoreContext | null,
 };
 
-export const useQaStore = create<QAState>((set, get) => ({
+function getPersistedQaState(state: QAState) {
+  const bridge = useBridgeStore.getState();
+  return {
+    cards: state.cards,
+    dismissedCards: state.dismissedCards,
+    appliedCards: state.appliedCards,
+    restoreContext: {
+      documentId: bridge.activeDocument,
+      sessionId: bridge.sessionId,
+      savedAt: Date.now(),
+      schemaVersion: QA_STORE_VERSION,
+    },
+  };
+}
+
+/** Synchronous final write for the narrow renderer-unload race window. */
+export function persistQaStoreSnapshot(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  window.localStorage.setItem(QA_STORE_STORAGE_KEY, JSON.stringify({
+    state: getPersistedQaState(useQaStore.getState()),
+    version: QA_STORE_VERSION,
+  }));
+}
+
+export const useQaStore = create<QAState>()(persist((set, get) => ({
   ...initialState,
 
   addCard: (cardInput) => {
@@ -249,6 +287,7 @@ export const useQaStore = create<QAState>((set, get) => ({
       isRefreshing: cardInput.isRefreshing,
       staleMessage: cardInput.staleMessage,
       lastValidatedAt: cardInput.lastValidatedAt,
+      validationState: cardInput.validationState || 'valid',
       isLocked: cardInput.isLocked,
       historyReplay: cardInput.historyReplay,
     };
@@ -600,6 +639,18 @@ export const useQaStore = create<QAState>((set, get) => ({
     });
   },
 
+  resetQaCards: () => {
+    set({
+      cards: [],
+      dismissedCards: [],
+      appliedCards: [],
+      pendingCommands: new Map<string, PendingCommand>(),
+      activeCardId: null,
+      analysisError: null,
+      restoreContext: null,
+    });
+  },
+
   dismissAll: () => {
     set((state) => {
       const newlyDismissed = state.cards.map((c) => ({ ...c, status: 'dismissed' as QACardStatus }));
@@ -638,7 +689,13 @@ export const useQaStore = create<QAState>((set, get) => ({
   setAnalysisError: (analysisError) => set({ analysisError }),
 
   validateLiveCards: async (service) => {
-    if (!useBridgeStore.getState().editorConnected) return;
+    const bridgeState = useBridgeStore.getState();
+    if (!bridgeState.editorConnected) return;
+
+    // Persisted cards are only candidates. Never revive them for a different
+    // document (or before a bridge connection exists), even briefly.
+    const restoreContext = get().restoreContext;
+    if (restoreContext && restoreContext.documentId !== bridgeState.activeDocument) return;
 
     const bridgeService = service || getBridgeService();
     const cards = get().cards.filter((card) => card.paragraphId && card.status !== 'applying');
@@ -666,7 +723,7 @@ export const useQaStore = create<QAState>((set, get) => ({
         if (timer) clearTimeout(timer);
         liveNotFoundTimers.delete(card.id);
         set((state) => ({ cards: state.cards.map((candidate) => candidate.id === card.id
-          ? { ...candidate, isStale: false, isRefreshing: false, staleMessage: undefined, lastValidatedAt: Date.now() }
+          ? { ...candidate, isStale: false, isRefreshing: false, staleMessage: undefined, lastValidatedAt: Date.now(), validationState: 'valid' }
           : candidate) }));
         continue;
       }
@@ -743,6 +800,7 @@ export const useQaStore = create<QAState>((set, get) => ({
       window.addEventListener('focus', validateLiveCards);
       unlisteners.push(() => window.removeEventListener('focus', validateLiveCards));
     }
+    if (useBridgeStore.getState().editorConnected) validateLiveCards();
     const unsubscribeBridge = useBridgeStore.subscribe((state, previousState) => {
       if (previousState.editorConnected && !state.editorConnected) {
         set({ lastEditorDisconnectAt: Date.now() });
@@ -896,6 +954,9 @@ export const useQaStore = create<QAState>((set, get) => ({
     const { cards, filter } = get();
 
     return cards.filter((card) => {
+      // A renderer reload must not make saved cards look current. They become
+      // visible one-by-one only after validateLiveCards confirms the document.
+      if (card.validationState === 'restoring') return false;
       // 1. Severity filter
       if (filter.severity !== 'ALL') {
         const norm = normalizeSeverity(card.severity);
@@ -952,4 +1013,22 @@ export const useQaStore = create<QAState>((set, get) => ({
   },
 
   reset: () => set({ ...initialState }),
+}), {
+  name: QA_STORE_STORAGE_KEY,
+  version: QA_STORE_VERSION,
+  partialize: (state) => {
+    return getPersistedQaState(state);
+  },
+  onRehydrateStorage: () => (state) => {
+    if (!state || !state.restoreContext) return;
+    // Hydrated history remains history; active cards require the same live
+    // validation gate used for newly analyzed cards before appearing again.
+    state.cards = state.cards.map((card) => ({
+      ...card,
+      validationState: 'restoring',
+      isStale: true,
+      isRefreshing: true,
+      staleMessage: 'Restoring saved suggestions; verifying the live document.',
+    }));
+  },
 }));

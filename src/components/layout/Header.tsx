@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
 import { useConfigStore } from '../../stores/configStore.ts';
+import { useQaStore } from '../../stores/qaStore.ts';
 import { PinToggleButton } from './PinToggleButton.tsx';
 import { BatchProgressBar } from '../config/BatchProgressBar.tsx';
 
@@ -45,6 +46,7 @@ export const Header: React.FC = () => {
   } = useBridgeStore();
 
   const { openSettingsModal, openGuidelineViewer } = useConfigStore();
+  const resetQaCards = useQaStore((state) => state.resetQaCards);
 
   return (
     <header className="flex-none bg-slate-900 border-b border-slate-800 text-slate-100 select-none shadow-md z-30">
@@ -187,6 +189,17 @@ export const Header: React.FC = () => {
 
         {/* Right: Layout Switcher, Pin Toggle & Settings Action Controls */}
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="qa-reset-btn"
+            onClick={resetQaCards}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-rose-950/50 active:bg-rose-950 border border-slate-700 hover:border-rose-800 text-slate-300 hover:text-rose-200 text-xs font-medium transition-colors cursor-pointer"
+            title="저장된 QA 카드와 처리 기록을 초기화하고 다시 스캔합니다"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span className="hidden lg:inline text-[11px]">상태 초기화</span>
+          </button>
+
           {/* Always-on-top Pin Mode Toggle Button */}
           <PinToggleButton />
 

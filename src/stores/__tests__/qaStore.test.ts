@@ -37,6 +37,66 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(state.activeCardId).toBeNull();
   });
 
+  it('hydrates saved cards as hidden restore candidates and validates matching documents live', async () => {
+    const savedCard = {
+      id: 'saved-card', paragraphId: 'saved-para', paragraphHash: 'saved-hash', paragraphText: 'teh',
+      category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Saved typo',
+      severity: 'MEDIUM', status: 'pending' as const, createdAt: Date.now(),
+    };
+    localStorage.setItem('smartlinter_qa_cards', JSON.stringify({
+      state: {
+        cards: [savedCard],
+        dismissedCards: [],
+        appliedCards: [],
+        restoreContext: {
+          documentId: 'Saved.indd', sessionId: 'saved-session', savedAt: Date.now(), schemaVersion: 1,
+        },
+      },
+      version: 1,
+    }));
+
+    await useQaStore.persist.rehydrate();
+    expect(useQaStore.getState().cards[0]).toMatchObject({ validationState: 'restoring', isStale: true });
+    expect(useQaStore.getState().getFilteredCards()).toEqual([]);
+
+    useBridgeStore.setState({ editorConnected: true, activeDocument: 'Saved.indd', editorType: 'InDesign' });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([
+      { paragraphId: 'saved-para', status: 'FOUND', currentHash: 'saved-hash' },
+    ]);
+    await useQaStore.getState().validateLiveCards(mockBridge);
+
+    expect(useQaStore.getState().getFilteredCards()).toEqual([
+      expect.objectContaining({ id: 'saved-card', validationState: 'valid' }),
+    ]);
+  });
+
+  it('does not restore active cards for a different document and resets all saved QA card collections', async () => {
+    const card = useQaStore.getState().addCard({ category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo' });
+    useQaStore.getState().dismissCard(card);
+    useQaStore.setState({
+      cards: [{
+        id: 'active', paragraphId: 'active-para', paragraphHash: 'hash', paragraphText: 'bad', category: 'Grammar',
+        originalSegment: 'bad', suggestedSegment: 'good', reason: 'Active', severity: 'LOW', status: 'pending', createdAt: Date.now(), validationState: 'restoring',
+      }],
+      appliedCards: [{
+        id: 'applied', paragraphId: 'old', paragraphHash: 'old', paragraphText: 'old', category: 'Grammar',
+        originalSegment: 'old', suggestedSegment: 'new', reason: 'Applied', severity: 'LOW', status: 'applied', createdAt: Date.now(),
+      }],
+      restoreContext: { documentId: 'Saved.indd', sessionId: 'session', savedAt: Date.now(), schemaVersion: 1 },
+    });
+    useBridgeStore.setState({ editorConnected: true, activeDocument: 'Different.indd' });
+    const snapshotSpy = vi.spyOn(mockBridge, 'getLiveParagraphSnapshots');
+    await useQaStore.getState().validateLiveCards(mockBridge);
+
+    expect(snapshotSpy).not.toHaveBeenCalled();
+    expect(useQaStore.getState().getFilteredCards()).toEqual([]);
+
+    useQaStore.getState().resetQaCards();
+    expect(useQaStore.getState().cards).toEqual([]);
+    expect(useQaStore.getState().dismissedCards).toEqual([]);
+    expect(useQaStore.getState().appliedCards).toEqual([]);
+  });
+
   it('validates deduplicated live paragraph ids in one batch and records successful validation', async () => {
     useBridgeStore.setState({ editorConnected: true, editorType: 'InDesign' });
     const first = useQaStore.getState().addCard({ paragraphId: 'live-1', paragraphHash: 'hash-1', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo' });
