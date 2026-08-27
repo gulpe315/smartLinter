@@ -34,11 +34,26 @@
      새 보호막 코드+실제 오탈자표+코퍼스계획, Part B: 다중후보 스키마 최종
      확정+merge() 변경사항, Part C: Kiwi 스파이크 계획) 동시 요청, 세션 종료
      시점 답변 대기 중.
-   - **다음 세션 최우선: `CODEX_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md`/
-     `AGY_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md` 확인 → 종합 → 상충하면
-     이번에도 임의로 정하지 말고 AskUserQuestion으로 사용자에게 제시 →
-     확정되면 `TASK_REQUEST_*.md` 작성해 Part A/B 실제 구현 착수(Part C는
-     스파이크라 구현이라기보다 실험).**
+   - **구체 설계 도착·종합 완료(커밋 `8d0a2af`).** Part A/B는 사실상 완전
+     수렴(스키마 필드명만 agy `candidates` vs Codex `suggestions` — Codex가
+     실제 구현자라 `suggestions`/`QaSuggestion` 채택 예정, 순수 네이밍이라
+     사용자 재확인 불필요 판단). **중요 발견: 두 모델이 독립적으로 동일한
+     결함을 찾음** — 사용자가 고른 10개 대명사 중 "그"가 실제로는 위험한
+     동음이의 함정(그은=긋다 활용형/그이=배우자 뜻하는 실제 단어/그을=그을다)이라
+     인용부호 보호막으로도 못 막음. 다만 두 설계 다 이미 "스템별 코퍼스
+     게이트에서 오탐 1건이라도 나오면 그 스템은 자동 탈락"이라는 안전장치를
+     내장하고 있어서, "그"는 코퍼스에 포함시켜 테스트하되 실패하면 자동
+     제외되는 흐름 — **재조율/사용자 재확인 불필요, 설계가 이미 이 문제를
+     처리함.** Part C(Kiwi 스파이크)의 구체 수치 기준(RSS/레이턴시 등)은
+     agy·Codex가 다소 다르게 잡았으나 Part C는 아직 착수 전이라 지금 당장
+     막는 문제 아님 — 실제 스파이크 시작할 때 재조율.
+   - **다음 세션 최우선: Part A(`particle.pronoun` 규칙가족)+Part B(`suggestions`
+     스키마 확장) 실제 구현 착수 — Codex 설계(`CODEX_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md`)
+     가 더 상세/실행가능하므로 이를 1차 소스로 `TASK_REQUEST_*.md` 작성 →
+     단계별(Step1처럼 작게 나눠서: ①스키마 확장 ②particle_pronoun 모듈+보호막
+     ③merge() 변경 ④UI pill선택자) Codex 구현 → Claude diff검토+독립테스트
+     → 커밋 사이클로 진행. Part C(Kiwi 스파이크)는 병행 가능하지만 별도
+     트랙 — 착수 전 위 수치기준 재조율부터.**
 
 ## ⭐⭐⭐⭐⭐⭐ 2026-08-27 세션 후반 — Step 3 완료+라이브검증, 별도로 언어품질 서베이 진행 중
 
