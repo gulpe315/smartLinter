@@ -34,6 +34,7 @@ import { StaleNotificationBadge } from './StaleNotificationBadge.tsx';
 import { RollbackAlertCard } from './RollbackAlertCard.tsx';
 import { useQaStore } from '../../stores/qaStore.ts';
 import { useConfigStore } from '../../stores/configStore.ts';
+import { useBridgeStore } from '../../stores/bridgeStore.ts';
 
 export interface QACardItemProps {
   card: QACardData;
@@ -65,11 +66,12 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const pointerDownPosition = useRef<{ clientX: number; clientY: number } | null>(null);
   const updateSuggestedSegment = useQaStore((state) => state.updateSuggestedSegment);
   const selectSuggestion = useQaStore((state) => state.selectSuggestion);
+  const editorConnected = useBridgeStore((state) => state.editorConnected);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isObsolete = card.status === 'stale_obsolete';
   const isApplying = propIsApplying || card.status === 'applying' || isStale;
   const requiresSuggestionSelection = !!card.suggestions && card.suggestions.length >= 2;
-  const isAcceptDisabled = isApplying || isObsolete || card.isLocked === true || (
+  const isAcceptDisabled = !editorConnected || isApplying || isObsolete || card.isLocked === true || (
     requiresSuggestionSelection && !card.selectedSuggestionSegment
   );
   const isEditUnavailable = readOnly || isApplying || isObsolete;
@@ -86,6 +88,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const normSeverity = normalizeSeverity(card.severity);
 
   const handleLocate = async () => {
+    if (!editorConnected) return;
     setIsLocating(true);
     setLocateError(null);
     try {
@@ -125,7 +128,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     const pointerDown = pointerDownPosition.current;
     pointerDownPosition.current = null;
 
-    if (readOnly || isLocating || !card.paragraphId) return;
+    if (readOnly || !editorConnected || isLocating || !card.paragraphId) return;
 
     const target = event.target as HTMLElement;
     if (target.closest('button, a, input, textarea, select, [contenteditable="true"], [role="button"], [role="link"], [role="checkbox"], [data-card-click-exempt]')) {
@@ -203,7 +206,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         card.status === 'failed' ? 'border-rose-900/80 bg-rose-950/20' : ''
       } ${
         isFocused ? 'ring-[1.5px] ring-sky-400/70 border-sky-400/50' : ''
-      } ${!readOnly && card.paragraphId && !isLocating ? 'cursor-pointer' : ''} ${className}`}
+      } ${!readOnly && editorConnected && card.paragraphId && !isLocating ? 'cursor-pointer' : ''} ${className}`}
     >
       {/* Stale Document Modified Notification Badge (Task 16 UX) */}
       {isStale && (
@@ -467,7 +470,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           <button
             type="button"
             data-testid="qa-locate-paragraph-btn"
-            disabled={isLocating || !card.paragraphId}
+            disabled={!editorConnected || isLocating || !card.paragraphId}
             onClick={() => void handleLocate()}
             className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-sky-300 hover:text-sky-100 bg-sky-950/40 hover:bg-sky-900/50 border border-sky-800/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
             title="문단 위치 보기"

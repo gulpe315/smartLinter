@@ -42,10 +42,13 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     analysisError,
     appliedCards,
     dismissedCards,
+    lastEditorDisconnectAt,
+    validateLiveCards,
   } = useQaStore();
 
   const [view, setView] = useState<'active' | 'history'>('active');
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
+  const liveValidationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { activeParagraph, editorConnected, editorType } = useBridgeStore();
 
@@ -81,6 +84,18 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     { label: 'Medium (Warning)', value: 'MEDIUM', count: counts.medium },
     { label: 'Low (Info)', value: 'LOW', count: counts.low + counts.info },
   ];
+
+  useEffect(() => () => {
+    if (liveValidationTimer.current) clearTimeout(liveValidationTimer.current);
+  }, []);
+
+  const handleCardListScroll = () => {
+    if (liveValidationTimer.current) clearTimeout(liveValidationTimer.current);
+    liveValidationTimer.current = setTimeout(() => {
+      liveValidationTimer.current = null;
+      void validateLiveCards();
+    }, 250);
+  };
 
   return (
     <div
@@ -118,6 +133,11 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
               <AlertTriangle className="w-4 h-4 text-rose-400" />
               <span>{analysisError}</span>
             </div>
+          )}
+          {!editorConnected && lastEditorDisconnectAt && (
+            <span data-testid="qa-editor-offline-status" className="text-[10px] text-slate-300 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
+              InDesign 연결 끊김 · 마지막 확인: {new Date(lastEditorDisconnectAt).toLocaleTimeString()}
+            </span>
           )}
         </div>
 
@@ -185,6 +205,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
       {/* Main Scrollable Card List Body */}
       <div
         data-testid="qa-cards-scroll-area"
+        onScroll={handleCardListScroll}
         className="flex-1 overflow-y-auto p-4 space-y-3.5"
       >
         {/* Active Paragraph Telemetry Context Banner */}

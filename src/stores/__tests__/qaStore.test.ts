@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useQaStore } from '../qaStore.ts';
 import { useTmStore } from '../tmStore.ts';
 import { useConfigStore } from '../configStore.ts';
+import { useBridgeStore } from '../bridgeStore.ts';
 import { MockBridgeService, setBridgeService } from '../../services/tauriBridge.ts';
 import { type QaReport } from '../../../shared/protocol/types.ts';
 
@@ -10,11 +11,14 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
   beforeEach(() => {
     useQaStore.getState().reset();
+    useBridgeStore.getState().reset();
     useTmStore.getState().reset();
     useConfigStore.setState({
       guidelines: { name: 'No guidelines', rules: [], rawContent: '' },
       guidelineFileName: null,
       isCustomGuideline: false,
+      targetLang: 'ko',
+      explanationLang: 'ko',
     });
     mockBridge = new MockBridgeService();
     setBridgeService(mockBridge);
@@ -31,6 +35,70 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
       searchQuery: '',
     });
     expect(state.activeCardId).toBeNull();
+  });
+
+  it('validates deduplicated live paragraph ids in one batch and records successful validation', async () => {
+    useBridgeStore.setState({ editorConnected: true, editorType: 'InDesign' });
+    const first = useQaStore.getState().addCard({ paragraphId: 'live-1', paragraphHash: 'hash-1', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo' });
+    useQaStore.getState().addCard({ paragraphId: 'live-1', paragraphHash: 'hash-1', category: 'Style', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Style' });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([
+      { paragraphId: 'live-1', status: 'FOUND', currentHash: 'hash-1' },
+    ]);
+
+    await useQaStore.getState().validateLiveCards(mockBridge);
+
+    expect(mockBridge.getLiveParagraphSnapshots).toHaveBeenCalledWith(['live-1']);
+    expect(useQaStore.getState().cards.find((card) => card.id === first)?.lastValidatedAt).toEqual(expect.any(Number));
+  });
+
+  it('refreshes a changed live paragraph, confirms absence twice, and preserves indeterminate results', async () => {
+    useBridgeStore.setState({ editorConnected: true, editorType: 'InDesign' });
+    const guidelines = {
+      language: 'ko' as const,
+      name: 'Live refresh rules',
+      rules: [{ category: 'Terminology', description: 'Keep product names untranslated.' }],
+      rawContent: '',
+    };
+    useConfigStore.setState({ guidelines, targetLang: 'en', explanationLang: 'ko' });
+    useQaStore.setState({
+      appliedCards: [{
+        id: 'accepted-preference', paragraphId: 'old', paragraphHash: 'old-hash', paragraphText: 'new text',
+        category: 'Spelling', originalSegment: 'new', suggestedSegment: 'fresh', reason: 'Accepted preference',
+        severity: 'LOW', status: 'applied', createdAt: Date.now(),
+      }],
+    });
+    vi.spyOn(useTmStore.getState(), 'search').mockResolvedValueOnce([{
+      source: 'Matching source text', target: 'new text', score: 1, scorePercent: 100, grade: 'EXACT',
+    }]);
+    const changed = useQaStore.getState().addCard({ paragraphId: 'changed', paragraphHash: 'old', paragraphText: 'old text', category: 'Grammar', originalSegment: 'old', suggestedSegment: 'new', reason: 'Changed' });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValueOnce([
+      { paragraphId: 'changed', status: 'FOUND', currentHash: 'new', currentText: 'new text' },
+    ]);
+    const analyzeSpy = vi.spyOn(mockBridge, 'analyzeParagraph').mockResolvedValue({ status: 'PASS', issues: [] });
+    await useQaStore.getState().validateLiveCards(mockBridge);
+    expect(analyzeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ paragraphId: 'changed', text: 'new text', hash: 'new' }),
+      {
+        guidelines,
+        targetLang: 'en',
+        explanationLang: 'ko',
+        userPreferences: [expect.objectContaining({ originalSegment: 'new', suggestedSegment: 'fresh' })],
+        tmReference: { source: 'Matching source text', target: 'new text', score: 1 },
+      },
+    );
+
+    useQaStore.getState().reset();
+    const missing = useQaStore.getState().addCard({ paragraphId: 'missing', paragraphHash: 'hash', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Missing' });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([{ paragraphId: 'missing', status: 'NOT_FOUND' }]);
+    await useQaStore.getState().validateLiveCards(mockBridge);
+    expect(useQaStore.getState().cards.map((card) => card.id)).toContain(missing);
+    await new Promise((resolve) => setTimeout(resolve, 2_050));
+    expect(useQaStore.getState().cards.map((card) => card.id)).not.toContain(missing);
+
+    const uncertain = useQaStore.getState().addCard({ paragraphId: 'uncertain', paragraphHash: 'hash', category: 'Grammar', originalSegment: 'a', suggestedSegment: 'b', reason: 'Busy' });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([{ paragraphId: 'uncertain', status: 'BUSY' }]);
+    await useQaStore.getState().validateLiveCards(mockBridge);
+    expect(useQaStore.getState().cards.map((card) => card.id)).toContain(uncertain);
   });
 
   it('retains a report TM reference on every created issue card', () => {

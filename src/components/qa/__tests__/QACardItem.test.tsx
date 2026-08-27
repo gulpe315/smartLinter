@@ -6,6 +6,7 @@ import { type QACardData } from '../../../types/qa.ts';
 import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
 import { useQaStore } from '../../../stores/qaStore.ts';
 import { useConfigStore } from '../../../stores/configStore.ts';
+import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 
 describe('QACardItem Component', () => {
   const sampleCard: QACardData = {
@@ -24,6 +25,8 @@ describe('QACardItem Component', () => {
 
   beforeEach(() => {
     useQaStore.getState().reset();
+    useBridgeStore.getState().reset();
+    useBridgeStore.setState({ editorConnected: true, editorType: 'InDesign' });
     useConfigStore.getState().reset();
     localStorage.clear();
   });
@@ -58,6 +61,14 @@ describe('QACardItem Component', () => {
     expect(screen.getByTestId('qa-card-reason')).toHaveTextContent(
       '클라우드 표준 번역 지침에 따라 "복제본 수"로 표준화합니다.'
     );
+  });
+
+  it('disables Apply and Locate while the editor is disconnected', () => {
+    useBridgeStore.setState({ editorConnected: false });
+    render(<QACardItem card={sampleCard} />);
+
+    expect(screen.getByTestId('qa-accept-action-btn')).toBeDisabled();
+    expect(screen.getByTestId('qa-locate-paragraph-btn')).toBeDisabled();
   });
 
   it('shows a history badge for replayed corrections', () => {

@@ -49,6 +49,8 @@ export interface QACardData {
   isStale?: boolean;
   isRefreshing?: boolean;
   staleMessage?: string;
+  /** Epoch milliseconds of the latest successful live snapshot validation. */
+  lastValidatedAt?: number;
   rollbackStatus?: 'FAILED' | 'ROLLBACK_ABORTED' | 'ROLLED_BACK';
   rollbackMessage?: string;
   /** Whether the source editor frame/layer is locked. */

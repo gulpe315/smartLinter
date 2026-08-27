@@ -15,6 +15,7 @@ describe('QACardList Component', () => {
   beforeEach(() => {
     useQaStore.getState().reset();
     useBridgeStore.getState().reset();
+    useBridgeStore.setState({ editorConnected: true, editorType: 'InDesign' });
     mockBridge = new MockBridgeService();
     setBridgeService(mockBridge);
     scrollSpy = vi.fn();
@@ -26,6 +27,7 @@ describe('QACardList Component', () => {
   });
 
   it('renders clean empty state when no cards exist and editor is waiting', () => {
+    useBridgeStore.setState({ editorConnected: false });
     render(<QACardList />);
 
     expect(screen.getByTestId('qa-card-list-container')).toBeInTheDocument();

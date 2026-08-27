@@ -18,8 +18,10 @@ import {
 import { computeParagraphHash } from '../../shared/engine/hash_util.ts';
 import {
   type AcceptedCorrectionPromptItem,
+  type AnalysisOptions,
   type IBridgeService,
   type QaReportPayload,
+  type TmReferencePromptItem,
   getBridgeService,
 } from '../services/tauriBridge.ts';
 import {
@@ -34,10 +36,14 @@ import { getStaleConflictResolver } from '../services/stale_conflict_resolver.ts
 import { getRollbackGuard } from '../services/rollback_guard.ts';
 import { useTmStore } from './tmStore.ts';
 import { useConfigStore } from './configStore.ts';
+import { useBridgeStore } from './bridgeStore.ts';
 import { normalizeText, TsFuzzyMatcher } from '../utils/tmMatcher.ts';
 
 const USER_PREFERENCE_LIMIT = 2;
 const USER_PREFERENCE_MIN_SIMILARITY = 0.9;
+const LIVE_NOT_FOUND_RECHECK_MS = 2_000;
+const liveNotFoundCounts = new Map<string, number>();
+const liveNotFoundTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export interface AcceptCardOptions {
   autoResolveStale?: boolean;
@@ -120,6 +126,34 @@ export function getRelevantAcceptedCorrectionPreferences(
   return selected;
 }
 
+/** Builds the optional QA context used by both debounced and live-card analyses. */
+async function buildAnalysisContext(
+  appliedCards: QACardData[],
+  text: string,
+): Promise<{ options: AnalysisOptions; tmReference?: TmReferencePromptItem }> {
+  const tmStore = useTmStore.getState();
+  const tmMatches = await tmStore.search(text);
+  const tmMatch = tmMatches[0]?.score >= tmStore.minScore ? tmMatches[0] : undefined;
+  const tmReference = tmMatch ? {
+    source: tmMatch.source,
+    target: tmMatch.target,
+    score: tmMatch.score,
+  } : undefined;
+  const { guidelines, targetLang, explanationLang } = useConfigStore.getState();
+  const userPreferences = getRelevantAcceptedCorrectionPreferences(appliedCards, text);
+
+  return {
+    tmReference,
+    options: {
+      targetLang,
+      explanationLang,
+      ...(guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 ? { guidelines } : {}),
+      ...(userPreferences.length > 0 ? { userPreferences } : {}),
+      ...(tmReference ? { tmReference } : {}),
+    },
+  };
+}
+
 export function buildDismissedIssueKeySet(dismissedCards: QACardData[]): Set<string> {
   const keys = new Set<string>();
   for (const card of dismissedCards) {
@@ -142,6 +176,7 @@ export interface QAState {
   activeCardId: string | null;
   isAnalyzing: boolean;
   analysisError: string | null;
+  lastEditorDisconnectAt: number | null;
 
   // --- Actions ---
   addCard: (card: Partial<QACardData> & { category: string; originalSegment: string; suggestedSegment: string; reason: string }) => string;
@@ -163,6 +198,7 @@ export interface QAState {
   setActiveCardId: (id: string | null) => void;
   setIsAnalyzing: (analyzing: boolean) => void;
   setAnalysisError: (message: string | null) => void;
+  validateLiveCards: (service?: IBridgeService) => Promise<void>;
   initEventListener: (service?: IBridgeService) => () => void;
   reset: () => void;
 
@@ -186,6 +222,7 @@ const initialState = {
   activeCardId: null as string | null,
   isAnalyzing: false,
   analysisError: null as string | null,
+  lastEditorDisconnectAt: null as number | null,
 };
 
 export const useQaStore = create<QAState>((set, get) => ({
@@ -208,6 +245,10 @@ export const useQaStore = create<QAState>((set, get) => ({
       status: cardInput.status || 'pending',
       createdAt: cardInput.createdAt || Date.now(),
       errorMessage: cardInput.errorMessage,
+      isStale: cardInput.isStale,
+      isRefreshing: cardInput.isRefreshing,
+      staleMessage: cardInput.staleMessage,
+      lastValidatedAt: cardInput.lastValidatedAt,
       isLocked: cardInput.isLocked,
       historyReplay: cardInput.historyReplay,
     };
@@ -287,13 +328,17 @@ export const useQaStore = create<QAState>((set, get) => ({
           .map((card) =>
             card.paragraphId === payload.paragraphId &&
             card.status === 'pending' &&
-            card.historyReplay &&
-            payload.paragraphText.includes(card.originalSegment)
+            payload.paragraphText.includes(card.originalSegment) && (
+              card.historyReplay || issueKeys.has(`${card.category}\u0000${card.originalSegment}\u0000${card.suggestedSegment}`)
+            )
               ? {
                   ...card,
                   paragraphText: payload.paragraphText,
                   paragraphHash: payload.paragraphHash,
                   isLocked: payload.isLocked,
+                  isStale: false,
+                  isRefreshing: false,
+                  staleMessage: undefined,
                 }
               : card
           ),
@@ -592,12 +637,120 @@ export const useQaStore = create<QAState>((set, get) => ({
 
   setAnalysisError: (analysisError) => set({ analysisError }),
 
+  validateLiveCards: async (service) => {
+    if (!useBridgeStore.getState().editorConnected) return;
+
+    const bridgeService = service || getBridgeService();
+    const cards = get().cards.filter((card) => card.paragraphId && card.status !== 'applying');
+    const paragraphIds = [...new Set(cards.map((card) => card.paragraphId))];
+    if (paragraphIds.length === 0) return;
+
+    let snapshots;
+    try {
+      snapshots = await bridgeService.getLiveParagraphSnapshots(paragraphIds);
+    } catch (error) {
+      console.warn('QA live paragraph batch snapshot failed:', error);
+      return;
+    }
+
+    const snapshotByParagraphId = new Map(snapshots.map((snapshot) => [snapshot.paragraphId, snapshot]));
+    const reanalyze = new Map<string, { paragraphId: string; text: string; hash: string; isLocked?: boolean }>();
+
+    for (const card of cards) {
+      const snapshot = snapshotByParagraphId.get(card.paragraphId);
+      if (!snapshot) continue;
+
+      if (snapshot.status === 'FOUND' && snapshot.currentHash === card.paragraphHash) {
+        liveNotFoundCounts.delete(card.id);
+        const timer = liveNotFoundTimers.get(card.id);
+        if (timer) clearTimeout(timer);
+        liveNotFoundTimers.delete(card.id);
+        set((state) => ({ cards: state.cards.map((candidate) => candidate.id === card.id
+          ? { ...candidate, isStale: false, isRefreshing: false, staleMessage: undefined, lastValidatedAt: Date.now() }
+          : candidate) }));
+        continue;
+      }
+
+      if (snapshot.status === 'FOUND') {
+        liveNotFoundCounts.delete(card.id);
+        set((state) => ({ cards: state.cards.map((candidate) => candidate.id === card.id
+          ? { ...candidate, isStale: true, isRefreshing: true, staleMessage: 'Document changed; refreshing this suggestion.' }
+          : candidate) }));
+        reanalyze.set(card.paragraphId, {
+          paragraphId: card.paragraphId,
+          text: snapshot.currentText || card.paragraphText,
+          hash: snapshot.currentHash || card.paragraphHash,
+          isLocked: card.isLocked,
+        });
+        continue;
+      }
+
+      if (snapshot.status === 'NOT_FOUND') {
+        const misses = (liveNotFoundCounts.get(card.id) || 0) + 1;
+        liveNotFoundCounts.set(card.id, misses);
+        if (misses >= 2) {
+          liveNotFoundCounts.delete(card.id);
+          get().markCardObsolete(card.id);
+        } else if (!liveNotFoundTimers.has(card.id)) {
+          set((state) => ({ cards: state.cards.map((candidate) => candidate.id === card.id
+            ? { ...candidate, isStale: true, isRefreshing: true, staleMessage: 'Paragraph not found; confirming before removing this suggestion.' }
+            : candidate) }));
+          const timer = setTimeout(() => {
+            liveNotFoundTimers.delete(card.id);
+            void get().validateLiveCards(bridgeService);
+          }, LIVE_NOT_FOUND_RECHECK_MS);
+          liveNotFoundTimers.set(card.id, timer);
+        }
+      }
+      // AMBIGUOUS, BUSY, and ERROR deliberately leave the card untouched.
+    }
+
+    await Promise.all([...reanalyze.values()].map(async (paragraph) => {
+      try {
+        const { options, tmReference } = await buildAnalysisContext(get().appliedCards, paragraph.text);
+        const report = await bridgeService.analyzeParagraph({
+          paragraphId: paragraph.paragraphId,
+          text: paragraph.text,
+          hash: paragraph.hash,
+          source: '',
+          timestamp: Date.now(),
+          editorType: useBridgeStore.getState().editorType || 'InDesign',
+          isLocked: paragraph.isLocked,
+        }, options);
+        get().addReport({
+          paragraphId: paragraph.paragraphId,
+          paragraphText: paragraph.text,
+          paragraphHash: paragraph.hash,
+          isLocked: paragraph.isLocked,
+          report,
+          tmReference,
+        });
+      } catch (error) {
+        console.warn('QA live paragraph reanalysis failed:', error);
+      }
+    }));
+  },
+
   initEventListener: (service) => {
     const bridgeService = service || getBridgeService();
     const unlisteners: Array<() => void> = [];
     const analysisRequestVersions = new Map<string, number>();
     const pendingAnalysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
     let nextAnalysisRequestVersion = 0;
+
+    const validateLiveCards = () => void get().validateLiveCards(bridgeService);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', validateLiveCards);
+      unlisteners.push(() => window.removeEventListener('focus', validateLiveCards));
+    }
+    const unsubscribeBridge = useBridgeStore.subscribe((state, previousState) => {
+      if (previousState.editorConnected && !state.editorConnected) {
+        set({ lastEditorDisconnectAt: Date.now() });
+      } else if (!previousState.editorConnected && state.editorConnected) {
+        validateLiveCards();
+      }
+    });
+    unlisteners.push(unsubscribeBridge);
 
     // Subscribe to incoming QA reports
     unlisteners.push(
@@ -662,9 +815,6 @@ export const useQaStore = create<QAState>((set, get) => ({
         const timer = setTimeout(() => void (async () => {
           pendingAnalysisTimers.delete(payload.paragraphId);
           try {
-            const tmMatches = await useTmStore.getState().search(payload.text);
-            const { minScore } = useTmStore.getState();
-            const tmReference = tmMatches[0]?.score >= minScore ? tmMatches[0] : undefined;
             // Editor telemetry currently supplies only a document/context identifier,
             // not an aligned source-language segment. Do not let either it or a TM
             // fuzzy match be treated as confirmed bilingual source text.
@@ -672,21 +822,7 @@ export const useQaStore = create<QAState>((set, get) => ({
               ...payload,
               source: '',
             };
-            const { guidelines, targetLang, explanationLang } = useConfigStore.getState();
-            const userPreferences = getRelevantAcceptedCorrectionPreferences(get().appliedCards, payload.text);
-            const options = {
-                targetLang,
-                explanationLang,
-                ...(guidelines.rules.length > 0 || guidelines.rawContent.trim().length > 0 ? { guidelines } : {}),
-                ...(userPreferences.length > 0 ? { userPreferences } : {}),
-                ...(tmReference ? {
-                  tmReference: {
-                    source: tmReference.source,
-                    target: tmReference.target,
-                    score: tmReference.score,
-                  },
-                } : {}),
-              };
+            const { options, tmReference } = await buildAnalysisContext(get().appliedCards, payload.text);
             const report = await bridgeService.analyzeParagraph(analysisPayload, options);
 
             if (analysisRequestVersions.get(payload.paragraphId) !== requestVersion) {
@@ -711,11 +847,7 @@ export const useQaStore = create<QAState>((set, get) => ({
               paragraphHash: payload.hash,
               isLocked: payload.isLocked,
               report,
-              tmReference: tmReference ? {
-                source: tmReference.source,
-                target: tmReference.target,
-                score: tmReference.score,
-              } : undefined,
+              tmReference,
             });
           } catch (error) {
             if (analysisRequestVersions.get(payload.paragraphId) === requestVersion) {
@@ -751,6 +883,9 @@ export const useQaStore = create<QAState>((set, get) => ({
     return () => {
       pendingAnalysisTimers.forEach((timer) => clearTimeout(timer));
       pendingAnalysisTimers.clear();
+      liveNotFoundTimers.forEach((timer) => clearTimeout(timer));
+      liveNotFoundTimers.clear();
+      liveNotFoundCounts.clear();
       analysisRequestVersions.clear();
       get().setIsAnalyzing(false);
       unlisteners.forEach((u) => u());
