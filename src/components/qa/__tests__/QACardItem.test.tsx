@@ -121,6 +121,62 @@ describe('QACardItem Component', () => {
     expect(screen.queryByTestId('qa-suggestion-editor')).not.toBeInTheDocument();
   });
 
+  it('preserves the existing UI for cards with zero or one suggestion', () => {
+    const { rerender } = render(<QACardItem card={{ ...sampleCard, suggestions: [] }} />);
+    expect(screen.queryByTestId('qa-suggestion-pill')).not.toBeInTheDocument();
+    expect(screen.getByTestId('qa-accept-action-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('qa-edit-suggestion-btn')).toBeInTheDocument();
+
+    rerender(<QACardItem card={{ ...sampleCard, suggestions: [{ suggestedSegment: 'Only option' }] }} />);
+    expect(screen.queryByTestId('qa-suggestion-pill')).not.toBeInTheDocument();
+    expect(screen.getByTestId('qa-accept-action-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('qa-edit-suggestion-btn')).toBeInTheDocument();
+  });
+
+  it('requires selection from multiple suggestion pills before applying', () => {
+    const multiSuggestionCard: QACardData = {
+      ...sampleCard,
+      id: 'card-multiple-suggestions',
+      suggestions: [
+        { suggestedSegment: 'First replacement', label: 'First option' },
+        { suggestedSegment: 'Second replacement', label: 'Second option', reason: 'Option rationale' },
+      ],
+    };
+    useQaStore.getState().addCard(multiSuggestionCard);
+    const StoredCard = () => {
+      const storedCard = useQaStore((state) => state.cards[0]);
+      return <QACardItem card={storedCard} />;
+    };
+    render(<StoredCard />);
+
+    const pills = screen.getAllByTestId('qa-suggestion-pill');
+    expect(pills).toHaveLength(2);
+    expect(screen.getByTestId('qa-accept-action-btn')).toBeDisabled();
+
+    fireEvent.click(pills[1]);
+    expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({
+      suggestedSegment: 'Second replacement', selectedSuggestionSegment: 'Second replacement',
+    }));
+    expect(screen.getByTestId('qa-accept-action-btn')).not.toBeDisabled();
+    expect(pills[1]).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByText('Option rationale')).toBeInTheDocument();
+
+    fireEvent.click(pills[0]);
+    expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({
+      suggestedSegment: 'First replacement', selectedSuggestionSegment: 'First replacement',
+    }));
+  });
+
+  it('shows but disables suggestion pills for read-only cards', () => {
+    render(<QACardItem card={{
+      ...sampleCard,
+      suggestions: [{ suggestedSegment: 'First replacement' }, { suggestedSegment: 'Second replacement' }],
+    }} readOnly />);
+
+    expect(screen.getAllByTestId('qa-suggestion-pill')).toHaveLength(2);
+    screen.getAllByTestId('qa-suggestion-pill').forEach((pill) => expect(pill).toBeDisabled());
+  });
+
   it('cancels suggestion editing without calling the QA store', () => {
     useQaStore.getState().addCard(sampleCard);
     render(<QACardItem card={useQaStore.getState().cards[0]} />);

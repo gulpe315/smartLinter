@@ -522,6 +522,53 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     });
   });
 
+  it('preserves a selected suggestion when free-text editing overrides its text', () => {
+    const cardId = useQaStore.getState().addCard({
+      category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+      suggestions: [
+        { suggestedSegment: 'the', label: 'First' },
+        { suggestedSegment: 'te', label: 'Second' },
+      ],
+    });
+
+    useQaStore.getState().selectSuggestion(cardId, 'te');
+    useQaStore.getState().updateSuggestedSegment(cardId, 'custom replacement');
+
+    expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({
+      suggestedSegment: 'custom replacement',
+      selectedSuggestionSegment: 'te',
+      suggestions: [
+        { suggestedSegment: 'the', label: 'First' },
+        { suggestedSegment: 'te', label: 'Second' },
+      ],
+    }));
+  });
+
+  it('selects an alternative only for editable cards', () => {
+    const cardId = useQaStore.getState().addCard({
+      category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+      suggestions: [{ suggestedSegment: 'the' }, { suggestedSegment: 'te' }],
+    });
+
+    useQaStore.getState().selectSuggestion(cardId, 'te');
+    expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({
+      suggestedSegment: 'te', selectedSuggestionSegment: 'te',
+    }));
+
+    for (const status of ['applying', 'stale_obsolete', 'stale_refreshing'] as const) {
+      useQaStore.getState().reset();
+      const lockedCardId = useQaStore.getState().addCard({
+        category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', status,
+        suggestions: [{ suggestedSegment: 'the' }, { suggestedSegment: 'te' }],
+      });
+      useQaStore.getState().selectSuggestion(lockedCardId, 'te');
+      expect(useQaStore.getState().cards[0]).toEqual(expect.objectContaining({
+        suggestedSegment: 'the',
+      }));
+      expect(useQaStore.getState().cards[0]).not.toHaveProperty('selectedSuggestionSegment');
+    }
+  });
+
   it.each(['applying', 'stale_obsolete', 'stale_refreshing'] as const)(
     'does not update a %s card suggested segment',
     (status) => {

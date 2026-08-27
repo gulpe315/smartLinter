@@ -62,10 +62,14 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const [editedSuggestion, setEditedSuggestion] = useState(card.suggestedSegment);
   const pointerDownPosition = useRef<{ clientX: number; clientY: number } | null>(null);
   const updateSuggestedSegment = useQaStore((state) => state.updateSuggestedSegment);
+  const selectSuggestion = useQaStore((state) => state.selectSuggestion);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isObsolete = card.status === 'stale_obsolete';
   const isApplying = propIsApplying || card.status === 'applying' || isStale;
-  const isAcceptDisabled = isApplying || isObsolete || card.isLocked === true;
+  const requiresSuggestionSelection = !!card.suggestions && card.suggestions.length >= 2;
+  const isAcceptDisabled = isApplying || isObsolete || card.isLocked === true || (
+    requiresSuggestionSelection && !card.selectedSuggestionSegment
+  );
   const isEditUnavailable = readOnly || isApplying || isObsolete;
   const readOnlyStatus = card.status === 'applied'
     ? '적용됨'
@@ -309,6 +313,38 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         </p>
       </div>
 
+      {requiresSuggestionSelection && (
+        <div role="radiogroup" className="mb-3 space-y-1.5">
+          {card.suggestions!.map((suggestion) => {
+            const isSelected = card.selectedSuggestionSegment === suggestion.suggestedSegment;
+            return (
+              <div key={suggestion.suggestedSegment}>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  data-card-click-exempt
+                  data-testid="qa-suggestion-pill"
+                  data-selected={isSelected ? 'true' : undefined}
+                  disabled={readOnly}
+                  onClick={() => selectSuggestion(card.id, suggestion.suggestedSegment)}
+                  className={`w-full rounded-md border px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isSelected
+                      ? 'border-indigo-500/80 bg-indigo-950/60 text-indigo-100'
+                      : 'border-slate-700 bg-slate-950/60 text-slate-300 hover:border-slate-600 hover:bg-slate-800/80'
+                  }`}
+                >
+                  {suggestion.label || suggestion.suggestedSegment}
+                </button>
+                {isSelected && suggestion.reason && (
+                  <p className="mt-1 px-1 text-[11px] leading-relaxed text-slate-400">{suggestion.reason}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Inline Diff Viewer (Core Visualizer) */}
       <div className="mb-3.5">
         <InlineDiffViewer
@@ -448,6 +484,8 @@ export const QACardItem: React.FC<QACardItemProps> = ({
                 />
                 <span>적용 중...</span>
               </>
+            ) : requiresSuggestionSelection && !card.selectedSuggestionSegment ? (
+              <span>제안을 선택해 주세요</span>
             ) : (
               <>
                 <Check className="w-3.5 h-3.5" />
