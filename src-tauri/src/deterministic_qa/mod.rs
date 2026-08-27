@@ -11,6 +11,8 @@ use tracing::debug;
 
 #[allow(dead_code)] // The module is deliberately dormant until Step 4 wiring.
 mod particle_pronoun;
+#[cfg(test)]
+mod particle_pronoun_corpus_spike;
 
 const DICTIONARY_JSON: &str = include_str!("dictionary.json");
 const PARTICLES: &[&str] = &[
