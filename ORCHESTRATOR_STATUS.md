@@ -17,17 +17,37 @@
 `CARGO_TARGET_DIR`을 임시 폴더로 돌려 검증, 완료 후 삭제). **아직 아무도
 `suggestions`를 채우지 않으므로 실제 동작 변화 없음 — 라이브 검증 불필요.**
 
-**다음 세션 최우선: Step 2(Part A — `particle_pronoun` 모듈+보호막) 착수.**
-설계는 `CODEX_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md`의 Part A(A.1~A.4)에
-이미 상세히 확정돼 있음 — 재자문 불필요. `src-tauri/src/deterministic_qa/particle_pronoun.rs`
-신설, 기존 `Dictionary`/`dictionary_issue()`/카테고리 루프/`protected_spans()`는
-건드리지 않고 `deterministic_qa::detect()`에서 로케일이 한국어일 때만 별도로
-호출. 10개 대명사×3개 조사쌍(30개 매핑, A.3 표 그대로), 인용부호/예시줄/제목·라벨
-보호막(A.2), `particle_issue()` 전용 생성자(A.4, `category: "particle.pronoun"`,
-confidence 0.90, provenance `deterministic:particle-whitelist-v1`)까지가 이번
-단계 범위. **Part A.5(코퍼스 3,000+1,000건 검증)는 이번 코드 구현 단계가 아니라
-그 다음 검증 단계 — 지금은 로직만 구현.** `merge()` 변경(Part B.2)과 UI(Part B.3)는
-그 다음 단계.
+**Step 2(Part A — `particle_pronoun` 모듈+보호막) 완료(커밋 `b6a4274`).** 30개
+매핑(A.3 표 그대로)+전용 보호막(A.2, 인용부호/예시줄/제목·라벨/식별자)+
+`particle_issue()` 전용 생성자(A.4) 전부 구현. `deterministic_qa::detect()`에는
+**의도적으로 아직 연결 안 함(dormant)** — "그"가 "그은"(긋다 활용형)과 표면
+문자열이 완전히 같아 지금 설계로는 구분 불가하고, 코퍼스 게이트(A.5) 통과
+전까지는 라이브 노출하지 않기로 결정(dormancy 자체를 테스트로 증명함). 리뷰
+중 `reason` 문구가 받침 유무와 무관하게 항상 같던 결함을 Claude가 직접 수정.
+
+**Step 3(Part B.2 — `merge()` 다중후보 병합) 완료(커밋 `19b7764`).** 다중후보
+결정론적 이슈가 같은 스팬·같은 카테고리 LLM 제안을 후보 목록에 union(중복
+제거, 레거시 미러 불변)하도록 `merge()` 확장. 싱글턴 경로/카테고리 불일치/
+모호 오프셋/부분겹침은 전부 기존 동작 그대로. `particle_pronoun`은 여전히
+`detect()`에 미연결.
+
+**Step 4(Part B.3 — UI pill 선택자) 완료(커밋 `87af7c6`).** `addCard`/
+`addReport`가 `issue.suggestions`를 카드로 전달하도록 배선(이 배선이
+빠져있던 걸 이번에 발견해서 같이 고침), `selectSuggestion` 스토어 액션 신설,
+2개 이상 옵션일 때만 reason bar와 diff viewer 사이에 radiogroup pill 렌더링,
+선택 전엔 Apply 비활성화(설명 문구 표시), 자유 텍스트 편집은 선택 상태를
+안 건드림. 0~1개 옵션 카드는 완전히 기존과 동일. **이걸로 Part A/B 구현
+계획(Step 1~4) 전부 완료 — 남은 건 Part A.5(코퍼스 검증)와 그 게이트를
+통과해야 여는 실제 `detect()` 연결뿐.**
+
+**다음 세션 최우선: Part A.5(코퍼스 검증) 착수 여부/방식 결정.** 스템당
+클린 3,000+홀드아웃 1,000+시드오류 100건(설계 문서 그대로)이 필요한 대규모
+작업 — 실제 문서 코퍼스 소스 확보 방법부터 agy+Codex에 스코핑 요청 필요
+(결정론적 오탈자사전 때의 "corpus 정밀도 스파이크" 선례 참고). "그" 스템은
+이 게이트에서 탈락할 것으로 이미 예상됨(설계 문서 자체가 명시). 코퍼스
+검증 통과 후에만 `particle_pronoun`을 `detect()`에 연결하는 별도 마무리
+단계가 남는다는 것도 다음 세션에 상기시킬 것. Part C(Kiwi 스파이크)는
+별도 병행 트랙, 수치기준 재조율부터.
 
 **신규 백로그 2건(2026-08-27, 사용자가 "현재 계획된 작업 모두 완료 후" 처리
 요청 — 즉 조사 호응 Step 1~4 + 코퍼스 검증까지 끝난 뒤 순서):**
@@ -42,6 +62,13 @@ confidence 0.90, provenance `deterministic:particle-whitelist-v1`)까지가 이�
    - **TM 로드 시 좌우/상하로 분리되는 창의 비율이 고정돼 있어 자유롭게
      조절이 안 됨.** TM 위주로 보고 싶을 때처럼, 사용자가 분할 비율을
      드래그 등으로 직접 조절할 수 있어야 함(리사이저블 스플릿 패널).
+     **사용자가 대안도 제시함(자유 드래그 리사이징이 구현 복잡도가 높으면,
+     VS Code 에디터 레이아웃 드롭다운처럼 몇 가지 정해진 분할 배치를
+     아이콘 프리셋 버튼으로 제공하는 것도 나쁘지 않다는 의견 — 단, 사용자
+     스스로도 "프리셋에서조차 미세조정을 원할 수 있다"고 인지하고 있음).
+     실제 착수 시 자유 리사이징 vs 프리셋 vs 둘 다(프리셋 기본값 + 드래그
+     미세조정) 중 agy+Codex 의견을 받아 [[feedback_present_candidates_not_forced_consensus]]
+     원칙대로 후보로 제시할 것.**
    착수 전 agy+Codex 스코핑부터 필요할 가능성 높음(TM 스키마/`tmx_parser.rs`/
    `fuzzy_matcher.rs` 영향 범위, 스플릿 패널은 프론트 레이아웃 컴포넌트
    범위로 별도 파악).
