@@ -3,6 +3,32 @@
 마지막 업데이트: 2026-08-27 세션. **`DESIGN_QA_CARD_LIVE_INTEGRITY.md` Step 1~3
 전부 완료·라이브검증**(`0909ec5`/`ccf20a8`/`7ae3d28`). 다음은 Step 4.
 
+**조사 호응(particle agreement) 구현 착수 — Step 1(다중후보 스키마 확장, Part B.1)
+완료(커밋 `d1e7fc2`).** `CODEX_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md` 기반
+`TASK_REQUEST_PARTICLE_STEP1_SCHEMA.md`로 Codex에게 위임 → 순수 additive(Rust
+`QaSuggestion`+`QaIssue.suggestions`+`normalize_suggestions`, TS `QaProvenance`
+확장+`QaSuggestion`+`isQaIssue` 검증 강화+`QACardData` 필드 2개). **Codex가 이번에도
+지시 범위 밖 25개 Rust 파일에 `cargo fmt` 재포맷을 걸어놓은 걸 스스로 보고**(기존에
+알려진 패턴) → Claude가 무관한 파일 전부 `git checkout HEAD --`로 되돌리고, 대상
+파일(`ai/mod.rs`/`deterministic_qa/mod.rs`/`qa_parser.rs`) 안에 섞인 불필요한
+재포맷 hunk도 손으로 원상복구(라인 단위 diff 확인 습관 재적용) → `cargo test`
+127/127, `npm test` 167/167, `npm run test:ui` 261/261, `npm run build` 독립
+재검증(브릿지 서버 `smart-linter.exe`가 실행 중이라 기본 target이 잠겨있어
+`CARGO_TARGET_DIR`을 임시 폴더로 돌려 검증, 완료 후 삭제). **아직 아무도
+`suggestions`를 채우지 않으므로 실제 동작 변화 없음 — 라이브 검증 불필요.**
+
+**다음 세션 최우선: Step 2(Part A — `particle_pronoun` 모듈+보호막) 착수.**
+설계는 `CODEX_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md`의 Part A(A.1~A.4)에
+이미 상세히 확정돼 있음 — 재자문 불필요. `src-tauri/src/deterministic_qa/particle_pronoun.rs`
+신설, 기존 `Dictionary`/`dictionary_issue()`/카테고리 루프/`protected_spans()`는
+건드리지 않고 `deterministic_qa::detect()`에서 로케일이 한국어일 때만 별도로
+호출. 10개 대명사×3개 조사쌍(30개 매핑, A.3 표 그대로), 인용부호/예시줄/제목·라벨
+보호막(A.2), `particle_issue()` 전용 생성자(A.4, `category: "particle.pronoun"`,
+confidence 0.90, provenance `deterministic:particle-whitelist-v1`)까지가 이번
+단계 범위. **Part A.5(코퍼스 3,000+1,000건 검증)는 이번 코드 구현 단계가 아니라
+그 다음 검증 단계 — 지금은 로직만 구현.** `merge()` 변경(Part B.2)과 UI(Part B.3)는
+그 다음 단계.
+
 **별도 트랙 — 로컬 LLM 언어품질 개선, "둘 다 순서대로":**
 
 1. **1단계(사전 확장) 완료·라이브검증 완료**(`301a5c6`+`40e6718`). 외래어 15개+
