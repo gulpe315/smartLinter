@@ -8,6 +8,9 @@ use serde::Deserialize;
 use crate::ai::{QaIssue, QaSeverity};
 use tracing::debug;
 
+#[allow(dead_code)] // The module is deliberately dormant until Step 4 wiring.
+mod particle_pronoun;
+
 const DICTIONARY_JSON: &str = include_str!("dictionary.json");
 const PARTICLES: &[&str] = &[
     "으로", "은", "는", "이", "가", "을", "를", "의", "에", "와", "과", "로", "에서", "에게",
