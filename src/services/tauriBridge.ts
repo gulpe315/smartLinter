@@ -93,6 +93,8 @@ export interface QaReportPayload {
   paragraphText: string;
   paragraphHash: string;
   isLocked?: boolean;
+  /** TM context retained locally after an advisory QA analysis. */
+  tmReference?: { source: string; target: string; score: number };
   report: QaReport;
 }
 

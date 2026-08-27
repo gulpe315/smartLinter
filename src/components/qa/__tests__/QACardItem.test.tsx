@@ -5,6 +5,7 @@ import { QACardItem } from '../QACardItem.tsx';
 import { type QACardData } from '../../../types/qa.ts';
 import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
 import { useQaStore } from '../../../stores/qaStore.ts';
+import { useConfigStore } from '../../../stores/configStore.ts';
 
 describe('QACardItem Component', () => {
   const sampleCard: QACardData = {
@@ -23,6 +24,26 @@ describe('QACardItem Component', () => {
 
   beforeEach(() => {
     useQaStore.getState().reset();
+    useConfigStore.getState().reset();
+    localStorage.clear();
+  });
+
+  it('saves the applied QA suggestion, rather than the TM match target, to the user TM overlay', () => {
+    const addSpy = vi.spyOn(useConfigStore.getState(), 'addUserTmEntry');
+    const tmCard = {
+      ...sampleCard,
+      status: 'applied' as const,
+      suggestedSegment: 'Applied correction',
+      tmReference: { source: 'Matched source', target: 'Stale TM target', score: 0.95 },
+    };
+    render(<QACardItem card={tmCard} />);
+
+    fireEvent.click(screen.getByTestId('qa-save-to-tm-btn'));
+
+    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'Matched source', target: 'Applied correction',
+    }), false);
+    expect(screen.getByTestId('qa-save-to-tm-btn')).toHaveTextContent('TM에 저장됨');
   });
 
   afterEach(() => {

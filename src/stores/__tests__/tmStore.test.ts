@@ -75,6 +75,16 @@ describe('SmartLinter TM Store (tmStore)', () => {
     expect(state.matchDurationMs!).toBeLessThan(100);
   });
 
+  it('searches both loaded TM entries and user overlay entries', async () => {
+    useConfigStore.setState({ userTmOverlayEntries: [{ id: 'overlay', source: 'Overlay source text', target: 'Overlay target text' }] });
+    const store = useTmStore.getState();
+
+    await expect(store.search('Overlay source text')).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ tuId: 'overlay', target: 'Overlay target text' })]),
+    );
+    expect(store.searchKeyword('overlay target').map((result) => result.tuId)).toContain('overlay');
+  });
+
   it('should automatically search when new-paragraph-detected event is received', async () => {
     const cleanup = useTmStore.getState().initEventListener(mockBridge);
 

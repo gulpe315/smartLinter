@@ -142,6 +142,18 @@ describe('useConfigStore', () => {
     expect(useBridgeStore.getState().tmEntriesCount).toBe(0);
   });
 
+  it('adds user TM overlay entries without mutating loaded TM entries', () => {
+    useConfigStore.setState({ tmEntries: [{ id: 'loaded', source: 'Source text', target: 'Loaded target' }] });
+    const store = useConfigStore.getState();
+
+    expect(store.addUserTmEntry({ source: '  source   text ', target: 'Overlay target' })).toBe('conflict');
+    expect(store.addUserTmEntry({ source: 'New source', target: 'New target' })).toBe('added');
+    expect(store.addUserTmEntry({ source: 'New source', target: 'New target' })).toBe('duplicate');
+    expect(useConfigStore.getState().tmEntries).toEqual([{ id: 'loaded', source: 'Source text', target: 'Loaded target' }]);
+    expect(useConfigStore.getState().userTmOverlayEntries).toHaveLength(1);
+    expect(JSON.parse(localStorage.getItem('smartlinter_user_tm_overlay') || '[]')).toHaveLength(1);
+  });
+
   it('should trigger batch scan and handle abort correctly', async () => {
     await useConfigStore.getState().startBatchScan(10);
     expect(useBridgeStore.getState().batchScanning).toBe(true);

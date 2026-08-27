@@ -33,6 +33,27 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(state.activeCardId).toBeNull();
   });
 
+  it('retains a report TM reference on every created issue card', () => {
+    useQaStore.getState().addReport({
+      paragraphId: 'paragraph-tm-reference',
+      paragraphText: 'Checked text',
+      paragraphHash: 'tm-reference-hash',
+      tmReference: { source: 'Aligned source', target: 'Matched target', score: 0.91 },
+      report: {
+        status: 'FAIL',
+        issues: [
+          { category: 'Grammar', originalSegment: 'Checked', suggestedSegment: 'Corrected', reason: 'Fix', severity: 'LOW' },
+          { category: 'Style', originalSegment: 'text', suggestedSegment: 'content', reason: 'Style', severity: 'LOW' },
+        ],
+      },
+    });
+
+    expect(useQaStore.getState().cards).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tmReference: { source: 'Aligned source', target: 'Matched target', score: 0.91 } }),
+    ]));
+    expect(useQaStore.getState().cards).toHaveLength(2);
+  });
+
   it('archives an obsolete card in dismissedCards instead of leaving it active', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'para-obsolete', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',

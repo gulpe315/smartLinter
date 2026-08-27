@@ -33,6 +33,7 @@ import { InlineDiffViewer } from './InlineDiffViewer.tsx';
 import { StaleNotificationBadge } from './StaleNotificationBadge.tsx';
 import { RollbackAlertCard } from './RollbackAlertCard.tsx';
 import { useQaStore } from '../../stores/qaStore.ts';
+import { useConfigStore } from '../../stores/configStore.ts';
 
 export interface QACardItemProps {
   card: QACardData;
@@ -60,6 +61,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const [locateError, setLocateError] = useState<string | null>(null);
   const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
   const [editedSuggestion, setEditedSuggestion] = useState(card.suggestedSegment);
+  const [isTmSaved, setIsTmSaved] = useState(false);
   const pointerDownPosition = useRef<{ clientX: number; clientY: number } | null>(null);
   const updateSuggestedSegment = useQaStore((state) => state.updateSuggestedSegment);
   const selectSuggestion = useQaStore((state) => state.selectSuggestion);
@@ -158,6 +160,22 @@ export const QACardItem: React.FC<QACardItemProps> = ({
 
     updateSuggestedSegment(card.id, editedSuggestion);
     setIsEditingSuggestion(false);
+  };
+
+  const saveToTm = () => {
+    if (!card.tmReference) return;
+    const config = useConfigStore.getState();
+    const conflict = config.findUserTmConflict(card.tmReference.source);
+    const sameTarget = conflict?.target === card.suggestedSegment;
+    if (conflict && !sameTarget && !window.confirm('같은 원문에 대해 TM에 이미 다른 번역이 있습니다. 그래도 새 항목으로 추가하시겠습니까?')) {
+      return;
+    }
+    const result = config.addUserTmEntry({
+      source: card.tmReference.source,
+      target: card.suggestedSegment,
+      targetLang: config.targetLang,
+    }, Boolean(conflict && !sameTarget));
+    if (result === 'added' || result === 'duplicate') setIsTmSaved(true);
   };
 
   const renderSeverityIcon = () => {
@@ -420,12 +438,32 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         </div>
 
         {readOnly ? (
-          <span data-testid="qa-card-readonly-status" className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-emerald-300 bg-emerald-950/40 border border-emerald-800/60">
-            <Check className="w-3 h-3" />
-            {readOnlyStatus}
-          </span>
+          <div className="flex items-center gap-2 flex-none">
+            {card.tmReference && card.status === 'applied' && (
+              <button type="button" data-testid="qa-save-to-tm-btn" disabled className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 bg-slate-800 border border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                <Check className="w-3.5 h-3.5" />
+                TM에 저장
+              </button>
+            )}
+            <span data-testid="qa-card-readonly-status" className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-emerald-300 bg-emerald-950/40 border border-emerald-800/60">
+              <Check className="w-3 h-3" />
+              {readOnlyStatus}
+            </span>
+          </div>
         ) : (
         <div className="flex items-center gap-2 flex-none">
+          {card.tmReference && card.status === 'applied' && (
+            <button
+              type="button"
+              data-testid="qa-save-to-tm-btn"
+              disabled={isTmSaved}
+              onClick={saveToTm}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-emerald-300 hover:text-emerald-100 bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/70 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Check className="w-3.5 h-3.5" />
+              {isTmSaved ? 'TM에 저장됨' : 'TM에 저장'}
+            </button>
+          )}
           <button
             type="button"
             data-testid="qa-locate-paragraph-btn"

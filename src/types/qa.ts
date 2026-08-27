@@ -36,6 +36,8 @@ export interface QACardData {
   suggestedSegment: string;
   /** Selectable alternatives carried over from the QaIssue, if any. */
   suggestions?: QaSuggestion[];
+  /** The TM fuzzy match that informed this card's analysis, when available. */
+  tmReference?: { source: string; target: string; score: number };
   /** The suggestion the user has explicitly chosen, when suggestions.length >= 2.
    * Undefined means "not yet chosen" — do not default this to the mirror. */
   selectedSuggestionSegment?: string;

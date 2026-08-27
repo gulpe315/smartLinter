@@ -26,6 +26,7 @@ const STORAGE_KEYS = {
   CUSTOM_GUIDELINE_NAME: 'smartlinter_custom_guideline_name',
   TARGET_LANG: 'smartlinter_target_lang',
   EXPLANATION_LANG: 'smartlinter_explanation_lang',
+  USER_TM_OVERLAY: 'smartlinter_user_tm_overlay',
 };
 
 let llmHealthRequestVersion = 0;
@@ -49,6 +50,7 @@ export interface ConfigState {
   // --- Translation Memory State ---
   tmEntries: TmEntry[];
   tmFileName: string | null;
+  userTmOverlayEntries: TmEntry[];
 
   // --- Modal Open States ---
   isSettingsModalOpen: boolean;
@@ -82,6 +84,11 @@ export interface ConfigState {
   loadTmFile: (fileOrData: File | { name: string; content: string }) => Promise<void>;
   loadTmText: (content: string, filename?: string) => Promise<void>;
   clearTm: () => void;
+  addUserTmEntry: (
+    entry: { source: string; target: string; sourceLang?: string; targetLang?: string },
+    force?: boolean,
+  ) => 'added' | 'duplicate' | 'conflict';
+  findUserTmConflict: (source: string) => TmEntry | undefined;
 
   // --- Actions: Batch Scan ---
   startBatchScan: (totalParagraphs?: number) => Promise<void>;
@@ -112,6 +119,22 @@ const getInitialLanguage = (key: string): LanguageTag => {
   return saved === 'ko' || saved === 'en' || saved === 'ja' || saved === 'zh' ? saved : 'ko';
 };
 
+const getInitialUserTmOverlayEntries = (): TmEntry[] => {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const saved = localStorage.getItem(STORAGE_KEYS.USER_TM_OVERLAY);
+    const entries: unknown = saved ? JSON.parse(saved) : [];
+    return Array.isArray(entries)
+      ? entries.filter((entry): entry is TmEntry =>
+          typeof entry?.source === 'string' && typeof entry?.target === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+const normalizeTmSource = (source: string) => source.trim().toLowerCase().replace(/\s+/g, ' ');
+
 export const useConfigStore = create<ConfigState>((set, get) => ({
   targetLang: getInitialLanguage(STORAGE_KEYS.TARGET_LANG),
   explanationLang: getInitialLanguage(STORAGE_KEYS.EXPLANATION_LANG),
@@ -139,6 +162,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
   tmEntries: [],
   tmFileName: null,
+  userTmOverlayEntries: getInitialUserTmOverlayEntries(),
 
   isSettingsModalOpen: false,
   isGuidelineViewerOpen: false,
@@ -348,6 +372,39 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     });
   },
 
+  findUserTmConflict: (source) => {
+    const normalizedSource = normalizeTmSource(source);
+    if (!normalizedSource) return undefined;
+    return [...get().tmEntries, ...get().userTmOverlayEntries]
+      .find((entry) => normalizeTmSource(entry.source) === normalizedSource);
+  },
+
+  addUserTmEntry: (entry, force = false) => {
+    const source = entry.source.trim();
+    const target = entry.target.trim();
+    const normalizedSource = normalizeTmSource(source);
+    if (!normalizedSource || !target) return 'conflict';
+
+    const existing = [...get().tmEntries, ...get().userTmOverlayEntries]
+      .filter((candidate) => normalizeTmSource(candidate.source) === normalizedSource);
+    if (existing.some((candidate) => candidate.target === target)) return 'duplicate';
+    if (existing.length > 0 && !force) return 'conflict';
+
+    const newEntry: TmEntry = {
+      id: `user-tm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      source,
+      target,
+      ...(entry.sourceLang ? { sourceLang: entry.sourceLang } : {}),
+      ...(entry.targetLang ? { targetLang: entry.targetLang } : {}),
+    };
+    const userTmOverlayEntries = [...get().userTmOverlayEntries, newEntry];
+    set({ userTmOverlayEntries });
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(STORAGE_KEYS.USER_TM_OVERLAY, JSON.stringify(userTmOverlayEntries));
+    }
+    return 'added';
+  },
+
   startBatchScan: async (totalParagraphs = 25) => {
     useBridgeStore.getState().setBatchScanProgress({
       active: true,
@@ -401,6 +458,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       isCustomGuideline: false,
       tmEntries: [],
       tmFileName: null,
+      userTmOverlayEntries: [],
       isSettingsModalOpen: false,
       isGuidelineViewerOpen: false,
     });

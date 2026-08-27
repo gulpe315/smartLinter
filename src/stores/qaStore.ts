@@ -202,6 +202,7 @@ export const useQaStore = create<QAState>((set, get) => ({
       originalSegment: cardInput.originalSegment,
       suggestedSegment: cardInput.suggestedSegment,
       suggestions: cardInput.suggestions,
+      tmReference: cardInput.tmReference,
       reason: cardInput.reason,
       severity: cardInput.severity || 'MEDIUM',
       status: cardInput.status || 'pending',
@@ -312,6 +313,7 @@ export const useQaStore = create<QAState>((set, get) => ({
         originalSegment: issue.originalSegment,
         suggestedSegment: issue.suggestedSegment,
         suggestions: issue.suggestions,
+        tmReference: payload.tmReference,
         reason: issue.reason,
         severity: issue.severity,
         status: 'pending',
@@ -709,6 +711,11 @@ export const useQaStore = create<QAState>((set, get) => ({
               paragraphHash: payload.hash,
               isLocked: payload.isLocked,
               report,
+              tmReference: tmReference ? {
+                source: tmReference.source,
+                target: tmReference.target,
+                score: tmReference.score,
+              } : undefined,
             });
           } catch (error) {
             if (analysisRequestVersions.get(payload.paragraphId) === requestVersion) {

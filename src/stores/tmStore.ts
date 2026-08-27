@@ -104,13 +104,13 @@ export const useTmStore = create<TMState>((set, get) => ({
     const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
 
     try {
-      const tmEntries = useConfigStore.getState().tmEntries;
+      const { tmEntries, userTmOverlayEntries } = useConfigStore.getState();
+      const entries = [...tmEntries, ...userTmOverlayEntries];
       const matcher = getGlobalTmMatcher();
 
-      // Ensure matcher is in sync with configStore entries
-      if (matcher.count !== tmEntries.length) {
-        matcher.loadEntries(tmEntries);
-      }
+      // Ensure matcher reflects both the loaded TM and the user overlay, even
+      // when their combined count happens to stay the same.
+      matcher.loadEntries(entries);
 
       const { minScore, topN } = get();
       const results = matcher.search(textToSearch, topN, minScore);
@@ -149,7 +149,8 @@ export const useTmStore = create<TMState>((set, get) => ({
     const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const needle = trimmed.toLowerCase();
     const { keywordScope } = get();
-    const entries = useConfigStore.getState().tmEntries;
+    const { tmEntries, userTmOverlayEntries } = useConfigStore.getState();
+    const entries = [...tmEntries, ...userTmOverlayEntries];
     const results: TmMatchCandidate[] = [];
 
     for (const entry of entries) {
@@ -320,7 +321,8 @@ export const useTmStore = create<TMState>((set, get) => ({
           get().clearCandidates();
         } else {
           // Re-index from configStore
-          const entries = useConfigStore.getState().tmEntries;
+          const { tmEntries, userTmOverlayEntries } = useConfigStore.getState();
+          const entries = [...tmEntries, ...userTmOverlayEntries];
           getGlobalTmMatcher().loadEntries(entries);
           const currentText = get().currentParagraph?.text;
           if (currentText) {
