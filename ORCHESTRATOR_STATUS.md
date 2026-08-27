@@ -110,6 +110,46 @@
    `fuzzy_matcher.rs` 영향 범위, 스플릿 패널은 프론트 레이아웃 컴포넌트
    범위로 별도 파악).
 
+**위 백로그 2건 + Kiwi 스파이크 착수여부, Round 1 자문 완료 — 완전 수렴
+(`QUESTION_BACKLOG_REVIEW_ROUND1.md`/`CODEX_ANSWER_BACKLOG_REVIEW_ROUND1.md`/
+`AGY_ANSWER_BACKLOG_REVIEW_ROUND1.md`):**
+1. **Part A(AI 커맨드 채팅 검토) — Claude가 코드를 직접 읽다가 실제 결함
+   발견.** `tauriBridge.ts`의 `TauriBridgeService.executeAiCommand`가
+   Tauri invoke 실패 이유(Ollama 다운/타임아웃/모델없음 등)를 구분 없이
+   전부 `MockBridgeService`(하드코딩 정규식 치환)로 조용히 대체 — 가짜
+   응답에 실제 모델명+그럴듯한 소요시간까지 붙어 나가 사용자가 구분 불가.
+   이 정확한 파일이 `[[feedback_agy_consult_when_stuck]]`에 "가볍다고
+   혼자 판단하지 말라"고 명시된 곳이라 agy+Codex 양쪽에 자문 요청.
+   **두 모델이 완전히 수렴**: Tauri 확인된 상태의 invoke 실패는 절대
+   Mock으로 안 가리고 명시적 실패로 노출해야 함(Mock은 `!isTauriAvailable()`
+   전용으로 한정). `tauriBridge.ts` 전체 재검토 결과 같은 패턴이 훨씬
+   광범위: **`sendReplacementCommand`가 IPC 실패 시 가짜 `SUCCESS` 반환**
+   (실제 문서 미변경인데 성공 표시 — 최우선), `executeAiCommand`,
+   `analyzeParagraph`(P0/즉시), `fetchOllamaModels`/`setOllamaModel`/
+   `fetchBridgeHealth`/`startBatchScan`/`abortBatchScan`/`setAlwaysOnTop`/
+   `connectIndesign`/`checkIndesignStatus`(P1). `locateParagraph`/
+   `getLiveParagraphSnapshot(s)`/`checkOllamaHealth`는 이미 올바른 패턴
+   (구조화된 ERROR 반환)으로 확인. **P0 3건 수정 착수 완료**
+   (`TASK_REQUEST_MOCK_FALLBACK_MASKING_P0.md`로 Codex에게 위임, 결과
+   검토 중 — 다음 세션에 이어서 확인). P1 8건은 P0 커밋 후 별도 단계로.
+2. **Part B(TM 사용성) — 순서까지 수렴.** 단어검색(기존 TM 패널에 검색모드
+   추가, 별도 인덱스/뷰 불필요, 퍼지매치와 분리) → 스플릿 패널 프리셋
+   (자유드래그 대신 먼저 프리셋 버튼, `package.json`에 리사이즈
+   라이브러리 없음 확인됨, 필요시 나중에 검증된 라이브러리 추가) → AI/QA
+   수정본 TM 저장(치환 SUCCESS+이중언어 확인된 경우만, 수동 확인 버튼,
+   기존 TM 파일 직접 덮어쓰지 않고 별도 overlay에 append — `historyReplay`의
+   "정확일치만, 퍼지매칭 금지" 원칙 계승). 아직 착수 전, Part A(P0) 이후
+   진행.
+3. **Part C(Kiwi 스파이크) — 우선순위 P0→P1/P2로 하향, 착수 보류.** 9개
+   스템 화이트리스트가 라이브로 나가서 실사용 오류 대다수 해결됐고, 사용자
+   불만도 접수된 적 없음 → 두 모델 다 "지금 급하지 않다"고 판단, Part
+   A/B를 먼저 처리하는 게 합리적이라고 합의. 수치기준(RSS 등) 차이는
+   agy=경량목표치/Codex=보수적상한선 차이일 뿐 스파이크 실측 시 자연
+   수렴될 것으로 판단, 재조율 불필요. **착수 안 함, 백로그 우선순위만
+   하향 조정.** 다음에 실제 착수할 때 첫 단계는 문법 규칙이 아니라
+   오프라인 패키징 실현가능성 검증(kiwi-rs 버전 고정→네트워크 차단
+   Windows VM에서 20회 콜드 기동).
+
 **별도 트랙 — 로컬 LLM 언어품질 개선, "둘 다 순서대로":**
 
 1. **1단계(사전 확장) 완료·라이브검증 완료**(`301a5c6`+`40e6718`). 외래어 15개+
