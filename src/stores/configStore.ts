@@ -362,6 +362,13 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       await bridge.startBatchScan(totalParagraphs);
     } catch (err) {
       console.warn('Bridge startBatchScan failed:', err);
+      useBridgeStore.getState().setBatchScanProgress({
+        active: false,
+        current: 0,
+        total: 0,
+        percent: 0,
+        isAborted: false,
+      });
     }
   },
 

@@ -152,6 +152,20 @@ describe('useConfigStore', () => {
     expect(useBridgeStore.getState().batchAborted).toBe(true);
   });
 
+  it('resets batch scan progress when starting the bridge scan fails', async () => {
+    mockBridge.startBatchScan = vi.fn().mockRejectedValue(new Error('Tauri backend unavailable'));
+
+    await useConfigStore.getState().startBatchScan(10);
+
+    expect(useBridgeStore.getState()).toMatchObject({
+      batchScanning: false,
+      batchCurrent: 0,
+      batchTotal: 0,
+      batchPercent: 0,
+      batchAborted: false,
+    });
+  });
+
   it('should open and close modals', () => {
     useConfigStore.getState().openSettingsModal();
     expect(useConfigStore.getState().isSettingsModalOpen).toBe(true);

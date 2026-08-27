@@ -177,6 +177,38 @@ describe('TauriBridgeService & IPC Integration', () => {
     service.destroy();
   });
 
+  it('does not mask Tauri IPC failures with MockBridgeService responses', async () => {
+    const error = new Error('Tauri backend unavailable');
+    const invokeMock = vi.fn().mockRejectedValue(error);
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
+    const service = new TauriBridgeService();
+    const fallback = (service as any).fallbackService as MockBridgeService;
+
+    const fallbackSpies = {
+      fetchBridgeHealth: vi.spyOn(fallback, 'fetchBridgeHealth'),
+      fetchOllamaModels: vi.spyOn(fallback, 'fetchOllamaModels'),
+      setOllamaModel: vi.spyOn(fallback, 'setOllamaModel'),
+      startBatchScan: vi.spyOn(fallback, 'startBatchScan'),
+      abortBatchScan: vi.spyOn(fallback, 'abortBatchScan'),
+      setAlwaysOnTop: vi.spyOn(fallback, 'setAlwaysOnTop'),
+      checkIndesignStatus: vi.spyOn(fallback, 'checkIndesignStatus'),
+      connectIndesign: vi.spyOn(fallback, 'connectIndesign'),
+    };
+
+    await expect(service.fetchBridgeHealth()).rejects.toThrow(error);
+    await expect(service.fetchOllamaModels()).rejects.toThrow(error);
+    await expect(service.setOllamaModel('qwen2.5:7b')).rejects.toThrow(error);
+    await expect(service.startBatchScan(5)).rejects.toThrow(error);
+    await expect(service.abortBatchScan()).rejects.toThrow(error);
+    await expect(service.setAlwaysOnTop(true)).rejects.toThrow(error);
+    await expect(service.checkIndesignStatus()).resolves.toBe(false);
+    await expect(service.connectIndesign()).rejects.toThrow(error);
+
+    Object.values(fallbackSpies).forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    service.destroy();
+  });
+
   it('listens to Tauri events and transforms BridgeStatusEvent from Rust session', async () => {
     let capturedHandler: ((evt: { payload: any }) => void) | null = null;
     const unlistenFn = vi.fn();

@@ -787,9 +787,8 @@ export class TauriBridgeService implements IBridgeService {
       return await invoke('get_bridge_status');
     } catch (e) {
       console.warn('Tauri invoke get_bridge_status failed:', e);
+      throw e;
     }
-
-    return this.fallbackService.fetchBridgeHealth();
   }
 
   async analyzeParagraph(paragraph: ParagraphPayload, options?: AnalysisOptions): Promise<QaReport> {
@@ -847,10 +846,9 @@ export class TauriBridgeService implements IBridgeService {
     try {
       return await invoke('list_ollama_models', { host });
     } catch (e) {
-      console.warn('Tauri invoke list_ollama_models failed, using fallback:', e);
+      console.warn('Tauri invoke list_ollama_models failed:', e);
+      throw e;
     }
-
-    return this.fallbackService.fetchOllamaModels(host);
   }
 
   async checkOllamaHealth(host: string | undefined, modelName: string): Promise<LlmStatusPayload> {
@@ -895,10 +893,9 @@ export class TauriBridgeService implements IBridgeService {
     try {
       return await invoke('set_ollama_model', { modelName });
     } catch (e) {
-      console.warn('Tauri invoke set_ollama_model failed, using fallback:', e);
+      console.warn('Tauri invoke set_ollama_model failed:', e);
+      throw e;
     }
-
-    return this.fallbackService.setOllamaModel(modelName);
   }
 
   async loadGuidelineContent(content: string, filename?: string): Promise<GuidelineSet> {
@@ -936,12 +933,10 @@ export class TauriBridgeService implements IBridgeService {
 
     try {
       await invoke('start_batch_scan', { total });
-      return;
     } catch (e) {
-      console.warn('Tauri invoke start_batch_scan failed, using fallback:', e);
+      console.warn('Tauri invoke start_batch_scan failed:', e);
+      throw e;
     }
-
-    return this.fallbackService.startBatchScan(total);
   }
 
   async abortBatchScan(): Promise<boolean> {
@@ -953,9 +948,8 @@ export class TauriBridgeService implements IBridgeService {
       return await invoke('abort_batch_scan');
     } catch (e) {
       console.warn('Tauri invoke abort_batch_scan failed:', e);
+      throw e;
     }
-
-    return this.fallbackService.abortBatchScan();
   }
 
   async setAlwaysOnTop(pinned: boolean): Promise<boolean> {
@@ -966,10 +960,9 @@ export class TauriBridgeService implements IBridgeService {
     try {
       return await invoke('set_always_on_top', { pinned });
     } catch (e) {
-      console.warn('Tauri invoke set_always_on_top failed, using fallback:', e);
+      console.warn('Tauri invoke set_always_on_top failed:', e);
+      throw e;
     }
-
-    return this.fallbackService.setAlwaysOnTop(pinned);
   }
 
   async checkIndesignStatus(): Promise<boolean> {
@@ -980,8 +973,8 @@ export class TauriBridgeService implements IBridgeService {
     try {
       return await invoke('check_indesign_status');
     } catch (e) {
-      console.warn('Tauri invoke check_indesign_status failed, using fallback:', e);
-      return this.fallbackService.checkIndesignStatus();
+      console.warn('Tauri invoke check_indesign_status failed:', e);
+      return false;
     }
   }
 
@@ -993,8 +986,8 @@ export class TauriBridgeService implements IBridgeService {
     try {
       await invoke('connect_indesign');
     } catch (e) {
-      console.warn('Tauri invoke connect_indesign failed, using fallback:', e);
-      await this.fallbackService.connectIndesign();
+      console.warn('Tauri invoke connect_indesign failed:', e);
+      throw e;
     }
   }
 
