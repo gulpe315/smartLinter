@@ -5,7 +5,8 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
-use crate::ai::{QaIssue, QaSeverity};
+use crate::ai::{QaIssue, QaSeverity, QaSuggestion};
+use crate::ai::qa_parser::normalize_suggestions;
 use tracing::debug;
 
 #[allow(dead_code)] // The module is deliberately dormant until Step 4 wiring.
@@ -115,6 +116,17 @@ pub fn merge(
             if (d_start, d_end) != (l_start, l_end) {
                 continue;
             }
+            if deterministic_issue.suggestions.is_some() {
+                // Multi-option issues represent one underlying source span. They
+                // only absorb LLM alternatives from the same category; a
+                // differently categorized issue remains a separate card.
+                if deterministic_issue.category != llm_issue.category {
+                    continue;
+                }
+                merge_llm_suggestion(deterministic_issue, llm_issue);
+                suppressed_llm[llm_index] = true;
+                continue;
+            }
             if deterministic_issue.suggested_segment == llm_issue.suggested_segment {
                 deterministic_issue.provenance = Some("deterministic+llm".into());
                 suppressed_llm[llm_index] = true;
@@ -170,6 +182,46 @@ pub fn merge(
         }
     }
     result
+}
+
+/// category + UTF-16 source span + sorted unique replacement-text set.
+///
+/// `suggested_segment` (the legacy mirror) is excluded from this identity. It
+/// is only used to distinguish same-underlying multi-option issue candidates
+/// during union, not to compare against a singleton issue's replacement.
+fn multi_suggestion_key(issue: &QaIssue) -> Option<(String, usize, usize, Vec<String>)> {
+    let (start, end) = offsets(issue)?;
+    let suggestions = issue.suggestions.as_ref()?;
+    let mut replacements: Vec<String> = suggestions
+        .iter()
+        .map(|suggestion| suggestion.suggested_segment.clone())
+        .collect();
+    replacements.sort();
+    replacements.dedup();
+    Some((issue.category.clone(), start, end, replacements))
+}
+
+fn merge_llm_suggestion(deterministic_issue: &mut QaIssue, llm_issue: &QaIssue) {
+    let existing_replacements = multi_suggestion_key(deterministic_issue)
+        .expect("multi-option deterministic issue has offsets and suggestions")
+        .3;
+    let replacement = llm_issue.suggested_segment.trim();
+    if existing_replacements
+        .binary_search_by(|existing| existing.as_str().cmp(replacement))
+        .is_ok()
+    {
+        return;
+    }
+
+    let mut suggestions = deterministic_issue.suggestions.clone().unwrap_or_default();
+    suggestions.push(QaSuggestion {
+        suggested_segment: replacement.into(),
+        label: None,
+        reason: None,
+        confidence: None,
+        provenance: None,
+    });
+    deterministic_issue.suggestions = normalize_suggestions(suggestions);
 }
 
 fn populate_unambiguous_offset(issue: &mut QaIssue, paragraph_text: &str) {
@@ -429,6 +481,22 @@ mod tests {
         issue
     }
 
+    fn suggestion(segment: &str) -> QaSuggestion {
+        QaSuggestion {
+            suggested_segment: segment.into(),
+            label: None,
+            reason: None,
+            confidence: None,
+            provenance: None,
+        }
+    }
+
+    fn multi_option_issue(text: &str, original: &str, first: &str, second: &str) -> QaIssue {
+        let mut issue = deterministic_issue(text, original, first);
+        issue.suggestions = Some(vec![suggestion(first), suggestion(second)]);
+        issue
+    }
+
     #[test]
     fn merge_keeps_non_overlapping_deterministic_and_llm_issues() {
         let text = "회의는 일오일에 열립니다.";
@@ -474,6 +542,92 @@ mod tests {
         let llm_issue = merged.iter().find(|issue| issue.original_segment == "확인").unwrap();
         assert_eq!(llm_issue.start_offset, None);
         assert_eq!(llm_issue.end_offset, None);
+    }
+
+    #[test]
+    fn merge_unions_a_same_span_llm_correction_into_multi_option_issue() {
+        let text = "bad input";
+        let deterministic = multi_option_issue(text, "bad", "good", "better");
+        let merged = merge(vec![deterministic], vec![test_issue("bad", "best")], text);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].suggested_segment, "good");
+        let replacements: Vec<&str> = merged[0]
+            .suggestions
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|suggestion| suggestion.suggested_segment.as_str())
+            .collect();
+        assert_eq!(replacements, ["good", "better", "best"]);
+    }
+
+    #[test]
+    fn merge_deduplicates_an_llm_correction_already_in_multi_option_issue() {
+        let text = "bad input";
+        let deterministic = multi_option_issue(text, "bad", "good", "better");
+        let merged = merge(vec![deterministic], vec![test_issue("bad", "better")], text);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].suggestions.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn merge_treats_an_llm_correction_matching_the_legacy_mirror_as_duplicate() {
+        let text = "bad input";
+        let deterministic = multi_option_issue(text, "bad", "good", "better");
+        let merged = merge(vec![deterministic], vec![test_issue("bad", "good")], text);
+
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].suggested_segment, "good");
+        assert_eq!(merged[0].suggestions.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn multi_suggestion_key_ignores_option_order_and_metadata() {
+        let text = "bad input";
+        let left = multi_option_issue(text, "bad", "good", "better");
+        let mut right = multi_option_issue(text, "bad", "better", "good");
+        right.suggestions.as_mut().unwrap()[0].label = Some("different label".into());
+        right.suggestions.as_mut().unwrap()[1].reason = Some("different reason".into());
+        right.suggestions.as_mut().unwrap()[1].provenance = Some("other source".into());
+
+        assert_eq!(multi_suggestion_key(&left), multi_suggestion_key(&right));
+    }
+
+    #[test]
+    fn merge_keeps_same_span_multi_option_issue_and_different_category_llm_separate() {
+        let text = "bad input";
+        let deterministic = multi_option_issue(text, "bad", "good", "better");
+        let mut llm = test_issue("bad", "best");
+        llm.category = "other".into();
+        let merged = merge(vec![deterministic], vec![llm], text);
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].suggestions.as_ref().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn merge_keeps_ambiguous_llm_issue_separate_from_multi_option_issue() {
+        let text = "bad and bad";
+        let deterministic = multi_option_issue(text, "bad", "good", "better");
+        let merged = merge(vec![deterministic], vec![test_issue("bad", "best")], text);
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].suggestions.as_ref().unwrap().len(), 2);
+        assert_eq!(merged[1].start_offset, None);
+    }
+
+    #[test]
+    fn merge_groups_partial_overlap_without_merging_multi_option_issue() {
+        let text = "bad input";
+        let deterministic = multi_option_issue(text, "bad", "good", "better");
+        let merged = merge(vec![deterministic], vec![test_issue("bad input", "good input")], text);
+
+        assert_eq!(merged.len(), 2);
+        assert!(merged.iter().all(|issue| issue.conflict_group_id.is_some()));
+        assert_eq!(merged[0].conflict_group_id, merged[1].conflict_group_id);
+        assert_eq!(merged[0].suggestions.as_ref().unwrap().len(), 2);
     }
 
     fn tokens(text: &str) -> Vec<String> {
