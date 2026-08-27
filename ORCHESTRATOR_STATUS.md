@@ -3,6 +3,19 @@
 마지막 업데이트: 2026-08-27 세션. **`DESIGN_QA_CARD_LIVE_INTEGRITY.md` Step 1~3
 전부 완료·라이브검증**(`0909ec5`/`ccf20a8`/`7ae3d28`). 다음은 Step 4.
 
+**Part A(Mock 폴백 마스킹 제거) 완료 — P0(`5088282`)+P1(`f7e02f0`).**
+`sendReplacementCommand`(가짜 SUCCESS)/`executeAiCommand`/`analyzeParagraph`
++ 나머지 8개 메서드(`fetchOllamaModels`/`setOllamaModel`/`fetchBridgeHealth`/
+`startBatchScan`/`abortBatchScan`/`setAlwaysOnTop`/`connectIndesign`/
+`checkIndesignStatus`) 전부 Tauri invoke 실패 시 더 이상 Mock으로 안 가려짐.
+`configStore.startBatchScan`도 실패 시 진행률 리셋하도록 같이 수정(안 하면
+진행률 바가 멈춘 것처럼 보이는 회귀 발생 — 미리 호출부 확인해서 발견).
+`npm test` 167/167, `npm run test:ui` 270/270, `npm run build` 매 단계
+독립검증. **다음은 Part B(TM 사용성), 합의된 순서: 검색모드 → 레이아웃
+프리셋 → TM 수동저장(가장 복잡, 데이터 거버넌스 필요) — 상세는
+`AGY_ANSWER_BACKLOG_REVIEW_ROUND1.md`/`CODEX_ANSWER_BACKLOG_REVIEW_ROUND1.md`
+Part B 참고.**
+
 **조사 호응(particle agreement) 구현 착수 — Step 1(다중후보 스키마 확장, Part B.1)
 완료(커밋 `d1e7fc2`).** `CODEX_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md` 기반
 `TASK_REQUEST_PARTICLE_STEP1_SCHEMA.md`로 Codex에게 위임 → 순수 additive(Rust
