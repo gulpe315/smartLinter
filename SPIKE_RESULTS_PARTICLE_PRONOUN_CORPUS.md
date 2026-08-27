@@ -1,5 +1,9 @@
 # Particle/pronoun corpus spike results
 
+agy independently reviewed this spike and the underlying corpus; see
+`AGY_REVIEW_PARTICLE_PRONOUN_CORPUS_SPIKE.md` for the full review. Its
+findings are folded into "Other unexpected behavior" and "Decision" below.
+
 ## Scope and method
 
 This is a measurement-only spike for the dormant
@@ -85,20 +89,38 @@ to hide or alter these results.
 
 ## Other unexpected behavior
 
-The protected case `<span title=누구을>` emitted `누구을 → 누구를`.
-This is a protection-coverage defect in the tested detector: an unquoted tag
-attribute is not treated as a protected context.  The other 24 protected cases
-were suppressed as expected, including the glossary literal case.  This is
-recorded as a discovered bug only; it was not fixed.
+The protected case `<span title=누구을>` emitted `누구을 → 누구를` when
+`detect_particle_pronoun` was called in isolation with an empty
+`inherited_protected` slice (as this spike does throughout, per the task
+request). **agy's independent review flagged that this is a spike-harness
+artifact, not a production defect**: `deterministic_qa::protected_spans()`
+(the parent function that `detect()` already computes and would pass in as
+`inherited_protected` once this module is wired up) treats any `<...>` run as
+one protected span, which fully covers this case. Claude verified this
+empirically with a new permanent test,
+`verify_agy_claim_parent_protected_spans_covers_the_tag_case`: the isolated
+call reproduces the false positive (1 issue), and the same call with
+`super::protected_spans(text)` supplied as `inherited_protected` returns zero
+issues. **Non-blocking, confirmed by both an independent model review and a
+direct test run** — no code change needed for this specific case, though the
+module's own `identifier_spans()` could still be hardened later as defense in
+depth (it doesn't itself recognize unquoted `key=value` tag attributes).
 
 ## Decision
 
-**NO-GO for the current full whitelist pilot.**  The corpus is a reduced spike,
-not the 3,000/1,000 acceptance corpus in the design document, so it cannot
-establish release precision by itself.  More importantly, it already contains
-clean-text false positives in the explicitly high-risk `그은` and `그을`
-surfaces and one protection failure.  Per the stated gate, those results are
-not averaged away.
+**NO-GO for the current 10-stem pilot as specified; GO for a 9-stem pilot
+(excluding `그`).** The corpus is a reduced spike, not the 3,000/1,000
+acceptance corpus in the design document, so it cannot establish release
+precision by itself for the surviving stems either. But `그`'s failure is
+decisive on its own terms (clean-text false positives on the explicitly
+flagged high-risk surfaces, per the design's stop rule) and both Codex and
+agy independently agree it must be dropped. The other 9 stems (27 mappings)
+scored 3/3 exact on every mapping with zero false positives across all
+protected/clean/paragraph cases in this corpus, and agy's structural argument
+(all 9 remaining stems are 2+ syllables, so a wrong-particle-attached surface
+form cannot collide with an unrelated real word or verb inflection the way
+the single-syllable `그` does) is a reasonable basis for proceeding without
+requiring the full acceptance-scale corpus for the low-risk stems first.
 
 ## Verification status
 

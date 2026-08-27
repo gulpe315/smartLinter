@@ -201,6 +201,19 @@ fn all_cases() -> Vec<CorpusCase> {
 }
 
 #[test]
+fn verify_agy_claim_parent_protected_spans_covers_the_tag_case() {
+    let text = "<span title=누구을>";
+    let empty = HashSet::new();
+    let options = ParticlePronounOptions { protected_literals: &empty };
+    let isolated = detect_particle_pronoun(text, &[], &options);
+    assert_eq!(isolated.len(), 1, "isolated call should reproduce the spike's reported false positive");
+
+    let inherited = super::protected_spans(text);
+    let wired = detect_particle_pronoun(text, &inherited, &options);
+    assert!(wired.is_empty(), "parent protected_spans() should suppress it once real inherited_protected is passed, per agy's claim; got {wired:?}");
+}
+
+#[test]
 fn measures_particle_pronoun_corpus_without_gating_on_mismatches() {
     let cases = all_cases();
     let mut expected = 0usize;
