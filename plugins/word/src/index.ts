@@ -95,8 +95,3 @@ if (typeof (globalThis as any) !== 'undefined') {
     (globalThis as any).btnToggleHide = btnToggleHide;
     (globalThis as any).initializeWordAddin = initializeWordAddin;
 }
-
-// If in browser/Office runtime with Office object present, automatically initialize
-if (typeof window !== 'undefined' && typeof (window as any).Office !== 'undefined') {
-    initializeWordAddin().catch(() => {});
-}

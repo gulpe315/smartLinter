@@ -56,7 +56,7 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
             const content = fs.readFileSync(manifestPath, 'utf8');
             assert.ok(content.includes('<Permissions>ReadWriteDocument</Permissions>'));
             assert.ok(content.includes('<AppDomain>http://127.0.0.1:49152</AppDomain>'));
-            assert.ok(content.includes('<AppDomain>https://localhost:3000</AppDomain>'));
+            assert.ok(content.includes('<AppDomain>https://localhost:5173</AppDomain>'));
         });
 
         it('should define ribbon controls for toggle and show task pane', () => {

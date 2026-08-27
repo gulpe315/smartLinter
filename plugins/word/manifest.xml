@@ -11,12 +11,12 @@
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="SmartLinter Bridge" />
   <Description DefaultValue="SmartLinter Background Bridge for MS Word (Shared Runtime)" />
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-32.png" />
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png" />
+  <IconUrl DefaultValue="https://localhost:5173/assets/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://localhost:5173/assets/icon-80.png" />
   <SupportUrl DefaultValue="https://smartlinter.dev/support" />
   
   <AppDomains>
-    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>https://localhost:5173</AppDomain>
     <AppDomain>http://127.0.0.1:49152</AppDomain>
   </AppDomains>
 
@@ -25,7 +25,7 @@
   </Hosts>
 
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/word_taskpane.html" />
+    <SourceLocation DefaultValue="https://localhost:5173/word_taskpane.html" />
   </DefaultSettings>
 
   <Permissions>ReadWriteDocument</Permissions>
@@ -100,12 +100,12 @@
     
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        <bt:Image id="Icon.16" DefaultValue="https://localhost:5173/assets/icon-16.png"/>
+        <bt:Image id="Icon.32" DefaultValue="https://localhost:5173/assets/icon-32.png"/>
+        <bt:Image id="Icon.80" DefaultValue="https://localhost:5173/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/word_taskpane.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:5173/word_taskpane.html"/>
         <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://smartlinter.dev"/>
       </bt:Urls>
       <bt:ShortStrings>
