@@ -1,8 +1,9 @@
 # SmartLinter — 오케스트레이터 현황판
 
 **마지막 업데이트: 2026-08-27 후속 세션. Kiwi 스파이크 Step 1 완료·커밋,
-Step 2는 환경 준비 이슈로 보류. `DESIGN_QA_CARD_LIVE_INTEGRITY.md` Step 4도
-완료·커밋(이전 세션들에서 다른 트랙에 밀려 누락돼있던 걸 발견해 재개함).
+Step 2는 환경 준비 이슈로 보류. `DESIGN_QA_CARD_LIVE_INTEGRITY.md`
+Step 1~5 전부 완료(Step 4/5는 이전 세션들에서 다른 트랙에 밀려
+누락돼있던 걸 이번 세션에 발견해 재개·완주함). 계획된 작업 전부 소진 —
 다음 세션 시작 시 아래 "다음 세션 우선순위"부터 읽을 것.**
 
 ## QA 카드 생명주기 정합성 (`DESIGN_QA_CARD_LIVE_INTEGRITY.md`) 진행 상황
@@ -18,9 +19,17 @@ Step 3(`7ae3d28`)는 이전 세션에 라이브검증까지 완료. **Step 4(Lay
 뻔함 → `buildAnalysisContext()` 공유 헬퍼로 리팩터링해 두 경로가 동일한
 컨텍스트를 쓰도록 수정 후 커밋.
 
-**남은 건 Step 5(F5 차단 + Zustand persist + 복원 시 재검증, Part 5)뿐.**
-설계 문서에 "1~4와 대체로 독립적, 병행 가능"이라 명시돼 있음 — 착수 시
-재설계/재자문 불필요, 문서 그대로 구현.
+**Step 5(F5 차단 + Zustand persist + 복원 시 재검증, 커밋 `d54c44d`)도 완료
+— `DESIGN_QA_CARD_LIVE_INTEGRITY.md` Step 1~5 전부 끝남.** 프로덕션에서만
+F5/Ctrl+R/Cmd+R+우클릭 메뉴 차단(dev는 그대로 허용 — 영속화 경로 자체를
+수동 검증하는 용도로 유용), `useQaStore`에 `persist` 미들웨어로
+cards/dismissedCards/appliedCards+문서/세션식별자+스키마버전 저장. 하이드레이션된
+카드는 `validationState: 'restoring'`으로 시작해 `getFilteredCards()`에서
+숨겨지고, Step 4의 `validateLiveCards` 게이트를 통과해야만 다시 보임.
+문서가 다르면 복원 자체를 안 함. 헤더에 "상태 초기화" 버튼 추가. Claude가
+`cargo test`/`npm test`/`npm run test:ui`/`npm run build` 독립 재검증 후
+커밋(사용자 지시로 InDesign 라이브 검증은 생략 — 앞으로 이 항목은 실사용
+중 발견으로 대체됨, [[feedback_skip_live_review_when_tests_pass]] 참고).
 
 ## Kiwi 스파이크 진행 상황 (Part C)
 
