@@ -333,6 +333,34 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(ambiguous.status, 'AMBIGUOUS');
         });
 
+        it('gets batch live snapshots independently without selecting or activating', () => {
+            const foundParagraph = env.createParagraph('Batch current paragraph.', 'batch-live');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'batch-live'
+                    ? { paragraphs: [foundParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            app.select = () => { throw new Error('select must not be called'); };
+            (env.activeDocument as any).windows = [{ activate: () => { throw new Error('activate must not be called'); } }];
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.getLiveParagraphSnapshots({
+                commandId: 'batch-live-001',
+                paragraphIds: [
+                    'indesign-para-batch-live-0',
+                    'indesign-para-batch-live-1',
+                    'indesign-para-missing-story-0'
+                ]
+            });
+
+            assert.equal(result.commandId, 'batch-live-001');
+            assert.deepEqual(Array.from(result.results, (entry: any) => entry.status), ['FOUND', 'NOT_FOUND', 'ERROR']);
+            assert.equal(result.results[0].currentText, 'Batch current paragraph.');
+            assert.equal(result.results[0].currentHash, computeParagraphHash('Batch current paragraph.'));
+        });
+
         it('rejects replacement before opening a transaction when the text frame is locked', () => {
             const text = 'This approved copy must remain unchanged.';
             const paragraph = env.getSelectedParagraph()!;

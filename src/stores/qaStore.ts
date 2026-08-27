@@ -589,6 +589,30 @@ export const useQaStore = create<QAState>((set, get) => ({
     // result, so only the newest text may update the UI.
     unlisteners.push(
       bridgeService.listen('new-paragraph-detected', (payload) => {
+        set((state) => {
+          const obsoleteCardIds = new Set(state.cards
+            .filter((card) =>
+              card.status === 'pending' &&
+              card.paragraphId === payload.paragraphId &&
+              !payload.text.includes(card.originalSegment)
+            )
+            .map((card) => card.id));
+          if (obsoleteCardIds.size === 0) {
+            return state;
+          }
+
+          const newlyObsolete = state.cards
+            .filter((card) => obsoleteCardIds.has(card.id))
+            .map((card) => ({ ...card, status: 'stale_obsolete' as QACardStatus }));
+          return {
+            cards: state.cards.filter((card) => !obsoleteCardIds.has(card.id)),
+            dismissedCards: [...newlyObsolete, ...state.dismissedCards],
+            activeCardId: state.activeCardId && obsoleteCardIds.has(state.activeCardId)
+              ? null
+              : state.activeCardId,
+          };
+        });
+
         const acceptedCorrection = findAcceptedCorrectionForText(get().appliedCards, payload.text);
         if (acceptedCorrection) {
           get().addCard({

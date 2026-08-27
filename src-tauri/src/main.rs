@@ -80,6 +80,7 @@ fn main() {
             commands::send_replacement_command,
             commands::locate_paragraph_in_editor,
             commands::get_live_paragraph_snapshot,
+            commands::get_live_paragraph_snapshots,
             commands::list_ollama_models,
             commands::check_ollama_health,
             commands::set_ollama_model,

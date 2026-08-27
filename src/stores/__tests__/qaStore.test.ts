@@ -48,6 +48,51 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().activeCardId).toBeNull();
   });
 
+  it('passively archives pending cards whose original segment disappears before analysis runs', () => {
+    vi.useFakeTimers();
+    const cardId = useQaStore.getState().addCard({
+      paragraphId: 'para-passive-obsolete', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+    });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-passive-obsolete', text: 'This paragraph was edited.', hash: 'edited-hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+
+    expect(useQaStore.getState().cards).toEqual([]);
+    expect(useQaStore.getState().dismissedCards).toEqual([
+      expect.objectContaining({ id: cardId, status: 'stale_obsolete' }),
+    ]);
+    unlisten();
+    vi.useRealTimers();
+  });
+
+  it('passively archives only missing pending segments in the detected paragraph', () => {
+    vi.useFakeTimers();
+    const missingCardId = useQaStore.getState().addCard({
+      paragraphId: 'para-passive-multiple', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',
+    });
+    const retainedCardId = useQaStore.getState().addCard({
+      paragraphId: 'para-passive-multiple', category: 'Grammar', originalSegment: 'colour', suggestedSegment: 'color', reason: 'Style',
+    });
+    const unrelatedCardId = useQaStore.getState().addCard({
+      paragraphId: 'para-passive-unrelated', category: 'Grammar', originalSegment: 'wierd', suggestedSegment: 'weird', reason: 'Typo',
+    });
+    const unlisten = useQaStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', {
+      paragraphId: 'para-passive-multiple', text: 'The colour is correct.', hash: 'mixed-hash', source: 'Catalog.indd', timestamp: Date.now(), editorType: 'InDesign',
+    });
+
+    expect(useQaStore.getState().cards.map((card) => card.id)).toEqual(expect.arrayContaining([retainedCardId, unrelatedCardId]));
+    expect(useQaStore.getState().cards.map((card) => card.id)).not.toContain(missingCardId);
+    expect(useQaStore.getState().dismissedCards).toEqual([
+      expect.objectContaining({ id: missingCardId, status: 'stale_obsolete' }),
+    ]);
+    unlisten();
+    vi.useRealTimers();
+  });
+
   it('adds individual QA cards and computes unique IDs', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'para-001',

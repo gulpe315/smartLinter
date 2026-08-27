@@ -132,6 +132,14 @@ export interface LiveParagraphSnapshotResult {
   message?: string;
 }
 
+export interface LiveParagraphSnapshotEntry {
+  paragraphId: string;
+  status: LiveParagraphSnapshotStatus;
+  currentText?: string;
+  currentHash?: string;
+  message?: string;
+}
+
 /**
  * Abstract interface for event subscription & backend communication
  */
@@ -150,6 +158,9 @@ export interface IBridgeService {
 
   /** Returns current paragraph contents without changing editor selection or focus. */
   getLiveParagraphSnapshot(paragraphId: string, baseHash?: string): Promise<LiveParagraphSnapshotResult>;
+
+  /** Returns current contents for multiple paragraphs without changing editor selection or focus. */
+  getLiveParagraphSnapshots(paragraphIds: string[]): Promise<LiveParagraphSnapshotEntry[]>;
 
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
@@ -481,6 +492,15 @@ export class MockBridgeService implements IBridgeService {
     };
   }
 
+  async getLiveParagraphSnapshots(paragraphIds: string[]): Promise<LiveParagraphSnapshotEntry[]> {
+    return paragraphIds.map((paragraphId) => ({
+      paragraphId,
+      status: 'FOUND',
+      currentText: '',
+      currentHash: '',
+    }));
+  }
+
   async fetchBridgeHealth(): Promise<BridgeStatusPayload> {
     return {
       connected: false,
@@ -737,6 +757,19 @@ export class TauriBridgeService implements IBridgeService {
         status: 'ERROR',
         message: e instanceof Error ? e.message : String(e),
       };
+    }
+  }
+
+  async getLiveParagraphSnapshots(paragraphIds: string[]): Promise<LiveParagraphSnapshotEntry[]> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.getLiveParagraphSnapshots(paragraphIds);
+    }
+
+    try {
+      return await invoke('get_live_paragraph_snapshots', { paragraphIds });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return paragraphIds.map((paragraphId) => ({ paragraphId, status: 'ERROR', message }));
     }
   }
 

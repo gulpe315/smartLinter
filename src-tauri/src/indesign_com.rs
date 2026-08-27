@@ -31,9 +31,23 @@ pub struct LiveParagraphSnapshotResult {
     pub message: Option<String>,
 }
 
+/// One entry returned by InDesign's non-invasive batch live paragraph snapshot.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveParagraphSnapshotEntry {
+    pub paragraph_id: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
 #[cfg(windows)]
 mod platform {
-    use super::{LiveParagraphSnapshotResult, LocateParagraphResult};
+    use super::{LiveParagraphSnapshotEntry, LiveParagraphSnapshotResult, LocateParagraphResult};
     use std::ffi::c_void;
     use std::path::Path;
     use std::thread;
@@ -507,10 +521,56 @@ mod platform {
 
         unreachable!("the retry loop always returns")
     }
+
+    pub fn get_live_paragraph_snapshots(
+        paragraph_ids: Vec<String>,
+    ) -> Result<Vec<LiveParagraphSnapshotEntry>, String> {
+        if !is_indesign_process_running()? {
+            return Err("InDesign is not running".to_string());
+        }
+        let command_id = "live-snapshots-batch";
+        let command_json = serde_json::json!({
+            "commandId": command_id,
+            "paragraphIds": paragraph_ids,
+        });
+        let script = format!(
+            "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{\n    var res = $.global.SmartLinterDaemonInstance.getLiveParagraphSnapshots({command_json});\n    return JSON.stringify(res.results);\n  }}\n  return JSON.stringify([]);\n}})();"
+        );
+        let _com = ComApartment::initialize()?;
+        let dispatch = active_indesign()?;
+        let start = Instant::now();
+        for (attempt, delay) in [100_u64, 300, 900].into_iter().enumerate() {
+            thread::sleep(Duration::from_millis(delay));
+            match do_script_with_result(&dispatch, &script) {
+                Ok(output) => {
+                    tracing::debug!(elapsed_ms = start.elapsed().as_millis() as u64, attempt = attempt + 1, "InDesign batch live paragraph snapshot completed");
+                    return serde_json::from_str(&output)
+                        .map_err(|error| format!("Cannot decode InDesign batch live paragraph snapshot result: {error}"));
+                }
+                Err(error) if is_transient_busy(&error) && attempt < 2 => continue,
+                Err(error) if is_transient_busy(&error) => {
+                    tracing::debug!(elapsed_ms = start.elapsed().as_millis() as u64, attempts = attempt + 1, "InDesign batch live paragraph snapshot remained busy");
+                    return Ok(paragraph_ids.into_iter().map(|paragraph_id| LiveParagraphSnapshotEntry {
+                        paragraph_id,
+                        status: "BUSY".to_string(),
+                        current_text: None,
+                        current_hash: None,
+                        message: Some(format!("InDesign remained busy after 3 DoScript attempts: {error}")),
+                    }).collect());
+                }
+                Err(error) => {
+                    tracing::debug!(elapsed_ms = start.elapsed().as_millis() as u64, attempt = attempt + 1, "InDesign batch live paragraph snapshot failed");
+                    return Err(format!("InDesign DoScript failed: {error}"));
+                }
+            }
+        }
+
+        unreachable!("the retry loop always returns")
+    }
 }
 
 #[cfg(windows)]
-pub use platform::{detect_running_indesign, execute_replacement, get_live_paragraph_snapshot, inject_daemon_script, locate_paragraph};
+pub use platform::{detect_running_indesign, execute_replacement, get_live_paragraph_snapshot, get_live_paragraph_snapshots, inject_daemon_script, locate_paragraph};
 
 #[cfg(not(windows))]
 pub fn detect_running_indesign() -> Result<bool, String> {
@@ -534,5 +594,10 @@ pub fn locate_paragraph(_paragraph_id: String, _base_hash: Option<String>) -> Re
 
 #[cfg(not(windows))]
 pub fn get_live_paragraph_snapshot(_paragraph_id: String, _base_hash: Option<String>) -> Result<LiveParagraphSnapshotResult, String> {
+    Err("InDesign COM automation is only supported on Windows".to_string())
+}
+
+#[cfg(not(windows))]
+pub fn get_live_paragraph_snapshots(_paragraph_ids: Vec<String>) -> Result<Vec<LiveParagraphSnapshotEntry>, String> {
     Err("InDesign COM automation is only supported on Windows".to_string())
 }

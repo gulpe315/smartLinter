@@ -308,6 +308,56 @@
     };
 
     /**
+     * Returns current contents for multiple QA paragraphs without changing selection or focus.
+     * @param {{commandId: string, paragraphIds: string[]}} command
+     * @returns {{commandId: string, results: Array}}
+     */
+    SmartLinterAtomicReplacer.prototype.getLiveParagraphSnapshots = function(command) {
+        var commandId = command && command.commandId ? command.commandId : 'unknown';
+        if (!command || !command.paragraphIds || typeof command.paragraphIds.length !== 'number') {
+            return { commandId: commandId, results: [] };
+        }
+
+        var results = [];
+        for (var i = 0; i < command.paragraphIds.length; i++) {
+            var paragraphId = command.paragraphIds[i];
+            try {
+                var inApp = this.appInstance || (typeof app !== 'undefined' ? app : null);
+                var doc = inApp ? inApp.activeDocument : null;
+                var resolved = resolveStoryForParagraphId(doc, paragraphId);
+                if (!resolved) {
+                    results.push({ paragraphId: paragraphId, status: 'ERROR', message: 'Unable to resolve the paragraph story.' });
+                    continue;
+                }
+
+                var story = resolved.story;
+                if (resolved.paragraphIndex < 0 || resolved.paragraphIndex >= story.paragraphs.length) {
+                    results.push({ paragraphId: paragraphId, status: 'NOT_FOUND', message: 'The paragraph index is outside the story.' });
+                    continue;
+                }
+
+                var paragraph = story.paragraphs[resolved.paragraphIndex];
+                if (!paragraph || paragraph.isValid === false) {
+                    results.push({ paragraphId: paragraphId, status: 'NOT_FOUND', message: 'The paragraph is no longer available.' });
+                    continue;
+                }
+
+                var currentText = this.normalizeContents(paragraph.contents);
+                results.push({
+                    paragraphId: paragraphId,
+                    status: 'FOUND',
+                    currentText: currentText,
+                    currentHash: getHashUtil().computeParagraphHash(currentText, true)
+                });
+            } catch (e) {
+                results.push({ paragraphId: paragraphId, status: 'ERROR', message: e.message });
+            }
+        }
+
+        return { commandId: commandId, results: results };
+    };
+
+    /**
      * Locates and selects a QA paragraph without changing document contents.
      * @param {{commandId: string, paragraphId: string, baseHash?: string}} command
      * @param {Object} [options]
