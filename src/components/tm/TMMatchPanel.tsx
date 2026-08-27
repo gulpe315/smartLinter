@@ -6,7 +6,7 @@
  * and seamless fallback handling when no TM is loaded.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Database,
   Search,
@@ -40,17 +40,29 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
     matchDurationMs,
     minScore,
     searchQuery,
+    searchMode,
+    keywordScope,
     setMinScore,
+    setSearchMode,
+    setKeywordScope,
     search,
+    searchKeyword,
     applyMatch,
   } = useTmStore();
 
   const [customSearchInput, setCustomSearchInput] = useState('');
+  const [keywordInput, setKeywordInput] = useState('');
   const [showSearchInput, setShowSearchInput] = useState(false);
 
   const currentParagraphText = activeParagraph?.text || '';
   const effectiveTmCount = tmEntriesCount || tmEntries.length;
   const isTmActuallyLoaded = tmLoaded || effectiveTmCount > 0;
+
+  useEffect(() => {
+    if (searchMode !== 'keyword') return;
+    const timer = window.setTimeout(() => searchKeyword(keywordInput), 200);
+    return () => window.clearTimeout(timer);
+  }, [keywordInput, keywordScope, searchKeyword, searchMode]);
 
   const handleScoreFilterChange = (score: number) => {
     setMinScore(score);
@@ -71,6 +83,16 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
     if (currentParagraphText) {
       search(currentParagraphText);
     }
+  };
+
+  const handleSearchModeChange = (mode: 'fuzzy' | 'keyword') => {
+    setSearchMode(mode);
+    if (mode === 'fuzzy') {
+      const fuzzyQuery = customSearchInput.trim() || currentParagraphText;
+      if (fuzzyQuery) search(fuzzyQuery);
+      return;
+    }
+    searchKeyword(keywordInput);
   };
 
   const handleApply = async (candidate: TmMatchCandidate) => {
@@ -113,8 +135,17 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             </span>
           )}
 
+          <div data-testid="tm-search-mode-toggle" className="flex items-center rounded-md bg-slate-800/80 p-0.5 border border-slate-700/80 text-[11px] text-slate-400">
+            <button type="button" data-testid="tm-search-mode-fuzzy" onClick={() => handleSearchModeChange('fuzzy')} className={`px-2 py-0.5 rounded transition-colors ${searchMode === 'fuzzy' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'hover:text-slate-200'}`}>
+              문단 유사도
+            </button>
+            <button type="button" data-testid="tm-search-mode-keyword" onClick={() => handleSearchModeChange('keyword')} className={`px-2 py-0.5 rounded transition-colors ${searchMode === 'keyword' ? 'bg-cyan-600 text-white font-semibold shadow-sm' : 'hover:text-slate-200'}`}>
+              TM 검색
+            </button>
+          </div>
+
           {/* Similarity Filter Buttons (All, 85%+, 100%) */}
-          <div
+          {searchMode === 'fuzzy' && <div
             data-testid="tm-score-filters"
             className="flex items-center rounded-md bg-slate-800/80 p-0.5 border border-slate-700/80 text-[11px] text-slate-400"
           >
@@ -154,10 +185,10 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             >
               Exact
             </button>
-          </div>
+          </div>}
 
           {/* Search Toggle */}
-          <button
+          {searchMode === 'fuzzy' && <button
             type="button"
             data-testid="tm-search-toggle-btn"
             onClick={() => setShowSearchInput(!showSearchInput)}
@@ -169,14 +200,14 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             }`}
           >
             <Search className="w-3.5 h-3.5" />
-          </button>
+          </button>}
         </div>
       </div>
 
       {/* Optional Manual Search Bar */}
-      {showSearchInput && (
+      {(searchMode === 'keyword' || showSearchInput) && (
         <form
-          onSubmit={handleCustomSearchSubmit}
+          onSubmit={searchMode === 'keyword' ? (e) => e.preventDefault() : handleCustomSearchSubmit}
           data-testid="tm-custom-search-form"
           className="flex-none px-4 py-2 bg-slate-950/80 border-b border-slate-800 flex items-center gap-2"
         >
@@ -185,27 +216,33 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             <input
               type="text"
               data-testid="tm-custom-search-input"
-              value={customSearchInput}
-              onChange={(e) => setCustomSearchInput(e.target.value)}
+              value={searchMode === 'keyword' ? keywordInput : customSearchInput}
+              onChange={(e) => searchMode === 'keyword' ? setKeywordInput(e.target.value) : setCustomSearchInput(e.target.value)}
               placeholder="TM 직접 검색할 문장 또는 키워드 입력..."
               className="w-full pl-8 pr-7 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-sans"
             />
-            {customSearchInput && (
+            {(searchMode === 'keyword' ? keywordInput : customSearchInput) && (
               <button
                 type="button"
-                onClick={handleClearCustomSearch}
+                onClick={searchMode === 'keyword' ? () => setKeywordInput('') : handleClearCustomSearch}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-          <button
+          {searchMode === 'keyword' ? (
+            <div data-testid="tm-keyword-scope-filters" className="flex items-center rounded-md bg-slate-800/80 p-0.5 border border-slate-700/80 text-[11px] text-slate-400">
+              <button type="button" data-testid="keyword-scope-source" onClick={() => setKeywordScope('source')} className={`px-2 py-0.5 rounded ${keywordScope === 'source' ? 'bg-cyan-600 text-white font-semibold' : 'hover:text-slate-200'}`}>원문</button>
+              <button type="button" data-testid="keyword-scope-target" onClick={() => setKeywordScope('target')} className={`px-2 py-0.5 rounded ${keywordScope === 'target' ? 'bg-cyan-600 text-white font-semibold' : 'hover:text-slate-200'}`}>번역문</button>
+              <button type="button" data-testid="keyword-scope-both" onClick={() => setKeywordScope('both')} className={`px-2 py-0.5 rounded ${keywordScope === 'both' ? 'bg-cyan-600 text-white font-semibold' : 'hover:text-slate-200'}`}>전체</button>
+            </div>
+          ) : <button
             type="submit"
             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 border border-cyan-500 transition-colors"
           >
             검색
-          </button>
+          </button>}
         </form>
       )}
 

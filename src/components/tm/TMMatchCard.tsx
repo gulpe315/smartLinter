@@ -18,6 +18,7 @@ import {
   Languages,
   Sparkles,
   Zap,
+  Search,
 } from 'lucide-react';
 import {
   type TmMatchCandidate,
@@ -32,6 +33,14 @@ export interface TMMatchCardProps {
   isApplying?: boolean;
   className?: string;
 }
+
+const renderHighlightedText = (text: string, keyword?: string) => {
+  if (!keyword) return text;
+  const start = text.toLowerCase().indexOf(keyword.toLowerCase());
+  if (start < 0) return text;
+  const end = start + keyword.length;
+  return <>{text.slice(0, start)}<mark className="rounded bg-amber-300/25 px-0.5 text-inherit">{text.slice(start, end)}</mark>{text.slice(end)}</>;
+};
 
 export const TMMatchCard: React.FC<TMMatchCardProps> = ({
   candidate,
@@ -74,13 +83,17 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
       <div className="flex items-center justify-between gap-2 mb-3">
         {/* Left: Score Badge with Color Coding */}
         <div className="flex items-center gap-2">
-          <span
+          {candidate.matchMode === 'keyword' ? (
+            <span data-testid="tm-keyword-badge" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border bg-slate-800 text-slate-300 border-slate-600">
+              <Search className="w-3 h-3" /> 키워드 일치
+            </span>
+          ) : <span
             data-testid="tm-score-badge"
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${badgeStyle.bg} ${badgeStyle.text} ${badgeStyle.border}`}
           >
             <span className={`w-2 h-2 rounded-full ${badgeStyle.dotColor}`} />
             <span>{badgeStyle.label}</span>
-          </span>
+          </span>}
 
           {/* Translation Unit ID */}
           {candidate.tuId && (
@@ -132,12 +145,14 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
             data-testid="tm-card-source"
             className="text-xs text-slate-300 font-mono leading-relaxed break-words select-text"
           >
-            {candidate.source}
+            {candidate.matchMode === 'keyword'
+              ? renderHighlightedText(candidate.source, candidate.matchedKeyword)
+              : candidate.source}
           </p>
         </div>
 
         {/* Source Diff vs Current Paragraph (if not 100% exact and current text exists) */}
-        {currentText &&
+        {candidate.matchMode !== 'keyword' && currentText &&
           currentText.trim() !== '' &&
           candidate.scorePercent < 99.9 &&
           currentText !== candidate.source && (
@@ -176,7 +191,9 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
             data-testid="tm-card-target"
             className="text-xs font-medium text-slate-100 leading-relaxed break-words select-text"
           >
-            {candidate.target}
+            {candidate.matchMode === 'keyword'
+              ? renderHighlightedText(candidate.target, candidate.matchedKeyword)
+              : candidate.target}
           </p>
         </div>
       </div>
@@ -195,7 +212,9 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
       {/* Bottom Footer: [TM 적용] Action Button */}
       <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
         <div className="text-[11px] font-mono text-slate-500 truncate max-w-[200px]">
-          {candidate.scorePercent >= 99.9 ? (
+          {candidate.matchMode === 'keyword' ? (
+            <span className="text-slate-400">키워드 검색 결과 — 현재 문단에 적용</span>
+          ) : candidate.scorePercent >= 99.9 ? (
             <span className="text-emerald-400 flex items-center gap-1 font-medium">
               <Check className="w-3 h-3" /> 완벽 일치 (100% Exact)
             </span>

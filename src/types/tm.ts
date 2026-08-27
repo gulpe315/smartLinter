@@ -37,6 +37,10 @@ export interface TmMatchCandidate {
   status?: 'idle' | 'applying' | 'applied' | 'failed';
   /** Error message if replacement failed */
   errorMessage?: string;
+  /** Match mode; omitted candidates are legacy fuzzy matches. */
+  matchMode?: 'fuzzy' | 'keyword';
+  /** Original-cased substring that matched during a keyword search. */
+  matchedKeyword?: string;
 }
 
 /**

@@ -165,4 +165,23 @@ describe('TMMatchPanel Component', () => {
 
     expect(useTmStore.getState().searchQuery).toBe('Save changes');
   });
+
+  it('switches between fuzzy controls and keyword scope controls', () => {
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 2 });
+    useConfigStore.setState({ tmEntries: mockEntries });
+    render(<TMMatchPanel />);
+
+    expect(screen.getByTestId('tm-score-filters')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tm-search-mode-keyword'));
+
+    expect(useTmStore.getState().searchMode).toBe('keyword');
+    expect(screen.queryByTestId('tm-score-filters')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tm-custom-search-input')).toBeInTheDocument();
+    expect(screen.getByTestId('tm-keyword-scope-filters')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('keyword-scope-source'));
+    expect(useTmStore.getState().keywordScope).toBe('source');
+    fireEvent.click(screen.getByTestId('tm-search-mode-fuzzy'));
+    expect(screen.getByTestId('tm-score-filters')).toBeInTheDocument();
+  });
 });

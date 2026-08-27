@@ -191,4 +191,30 @@ describe('SmartLinter TM Store (tmStore)', () => {
 
     cleanup();
   });
+
+  it('searches keywords synchronously by scope and preserves the matched casing', () => {
+    useConfigStore.setState({
+      tmEntries: [
+        { id: 'source-hit', source: 'Configure the Bridge', target: '연결 설정' },
+        { id: 'target-hit', source: 'Save document', target: 'Bridge Translation' },
+      ],
+    });
+    const store = useTmStore.getState();
+
+    store.setKeywordScope('source');
+    const sourceResults = store.searchKeyword('BRIDGE');
+    expect(sourceResults).toHaveLength(1);
+    expect(sourceResults[0]).toMatchObject({
+      tuId: 'source-hit', matchMode: 'keyword', matchedKeyword: 'Bridge', scorePercent: 100,
+    });
+    expect(sourceResults).not.toBeInstanceOf(Promise);
+
+    store.setKeywordScope('target');
+    expect(store.searchKeyword('bridge').map((result) => result.tuId)).toEqual(['target-hit']);
+
+    store.setKeywordScope('both');
+    expect(store.searchKeyword('bridge').map((result) => result.tuId)).toEqual(['source-hit', 'target-hit']);
+    expect(store.searchKeyword('   ')).toEqual([]);
+    expect(useTmStore.getState().candidates).toEqual([]);
+  });
 });

@@ -135,4 +135,24 @@ describe('TMMatchCard Component', () => {
 
     expect(writeTextMock).toHaveBeenCalledWith(exactCandidate.target);
   });
+
+  it('renders keyword matches with a neutral badge, highlighting, and no fuzzy diff', () => {
+    render(
+      <TMMatchCard
+        candidate={{
+          ...highFuzzyCandidate,
+          source: 'Configure the Bridge connection.',
+          target: 'Bridge translation.',
+          matchMode: 'keyword',
+          matchedKeyword: 'Bridge',
+        }}
+        currentText="An unrelated paragraph"
+      />
+    );
+
+    expect(screen.getByTestId('tm-keyword-badge')).toHaveTextContent('키워드 일치');
+    expect(screen.getAllByText('Bridge', { selector: 'mark' })).toHaveLength(2);
+    expect(screen.queryByText(/current.*difference/i)).not.toBeInTheDocument();
+    expect(screen.getByText('키워드 검색 결과 — 현재 문단에 적용')).toBeInTheDocument();
+  });
 });

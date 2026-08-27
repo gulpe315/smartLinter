@@ -45,6 +45,8 @@ export interface TMState {
   topN: number;
   isSearching: boolean;
   matchDurationMs: number | null;
+  searchMode: 'fuzzy' | 'keyword';
+  keywordScope: 'source' | 'target' | 'both';
 
   // --- Active Applying State ---
   applyingCandidateKey: string | null;
@@ -53,6 +55,7 @@ export interface TMState {
   // --- Actions ---
   search: (queryText?: string) => Promise<TmMatchCandidate[]>;
   searchWithCustomQuery: (query: string) => Promise<TmMatchCandidate[]>;
+  searchKeyword: (query: string) => TmMatchCandidate[];
   applyMatch: (
     candidate: TmMatchCandidate,
     paragraphOverride?: ParagraphPayload,
@@ -61,6 +64,8 @@ export interface TMState {
   setMinScore: (minScore: number) => void;
   setTopN: (topN: number) => void;
   setSearchQuery: (searchQuery: string) => void;
+  setSearchMode: (mode: 'fuzzy' | 'keyword') => void;
+  setKeywordScope: (scope: 'source' | 'target' | 'both') => void;
   setCandidates: (candidates: TmMatchCandidate[]) => void;
   clearCandidates: () => void;
   initEventListener: (service?: IBridgeService) => () => void;
@@ -75,6 +80,8 @@ const initialState = {
   topN: DEFAULT_TM_TOP_N,         // 5 candidates
   isSearching: false,
   matchDurationMs: null as number | null,
+  searchMode: 'fuzzy' as const,
+  keywordScope: 'both' as const,
   applyingCandidateKey: null as string | null,
   lastAppliedResult: null as ReplacementResult | null,
 };
@@ -129,6 +136,51 @@ export const useTmStore = create<TMState>((set, get) => ({
   searchWithCustomQuery: async (query) => {
     set({ searchQuery: query });
     return get().search(query);
+  },
+
+  searchKeyword: (query) => {
+    const trimmed = query.trim();
+    set({ searchQuery: query });
+    if (!trimmed) {
+      set({ candidates: [], matchDurationMs: 0 });
+      return [];
+    }
+
+    const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const needle = trimmed.toLowerCase();
+    const { keywordScope } = get();
+    const entries = useConfigStore.getState().tmEntries;
+    const results: TmMatchCandidate[] = [];
+
+    for (const entry of entries) {
+      const sourceHit = (keywordScope === 'source' || keywordScope === 'both')
+        && entry.source.toLowerCase().includes(needle);
+      const targetHit = (keywordScope === 'target' || keywordScope === 'both')
+        && entry.target.toLowerCase().includes(needle);
+      if (!sourceHit && !targetHit) continue;
+
+      const haystack = sourceHit ? entry.source : entry.target;
+      const matchStart = haystack.toLowerCase().indexOf(needle);
+      results.push({
+        tuId: entry.id,
+        source: entry.source,
+        target: entry.target,
+        score: 1,
+        scorePercent: 100,
+        grade: 'EXACT',
+        sourceLang: entry.sourceLang,
+        targetLang: entry.targetLang,
+        matchMode: 'keyword',
+        matchedKeyword: haystack.slice(matchStart, matchStart + trimmed.length),
+      });
+    }
+
+    const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    set({
+      candidates: results,
+      matchDurationMs: Math.round((end - start) * 100) / 100,
+    });
+    return results;
   },
 
   applyMatch: async (candidate, paragraphOverride, service) => {
@@ -238,6 +290,10 @@ export const useTmStore = create<TMState>((set, get) => ({
   },
 
   setSearchQuery: (searchQuery) => set({ searchQuery }),
+
+  setSearchMode: (searchMode) => set({ searchMode }),
+
+  setKeywordScope: (keywordScope) => set({ keywordScope }),
 
   setCandidates: (candidates) => set({ candidates }),
 
