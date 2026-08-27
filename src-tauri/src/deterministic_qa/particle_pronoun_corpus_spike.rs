@@ -42,9 +42,6 @@ const MAPPINGS: &[Mapping] = &[
     Mapping { stem: "당신", wrong: "는", correct: "은" },
     Mapping { stem: "당신", wrong: "가", correct: "이" },
     Mapping { stem: "당신", wrong: "를", correct: "을" },
-    Mapping { stem: "그", wrong: "은", correct: "는" },
-    Mapping { stem: "그", wrong: "이", correct: "가" },
-    Mapping { stem: "그", wrong: "을", correct: "를" },
     Mapping { stem: "그녀", wrong: "은", correct: "는" },
     Mapping { stem: "그녀", wrong: "이", correct: "가" },
     Mapping { stem: "그녀", wrong: "을", correct: "를" },
@@ -151,19 +148,8 @@ fn trap_cases() -> Vec<CorpusCase> {
         ("seeded-geueul-pronoun", "그", "을", "그을 최종 승인자로 지정했습니다."),
     ]
     .into_iter()
-    .map(|(id, stem, pair, text)| {
-        let seeded = id.starts_with("seeded-");
-        CorpusCase {
-            id: id.into(), stem, pair,
-            kind: if seeded { Kind::SeededError } else { Kind::Trap },
-            text: text.into(),
-            expected: if seeded {
-                vec![(
-                    match pair { "은" => "그은", "이" => "그이", "을" => "그을", _ => unreachable!() },
-                    match pair { "은" => "그는", "이" => "그가", "을" => "그를", _ => unreachable!() },
-                )]
-            } else { vec![] },
-        }
+    .map(|(id, stem, pair, text)| CorpusCase {
+        id: id.into(), stem, pair, kind: Kind::Trap, text: text.into(), expected: vec![],
     })
     .collect()
 }
@@ -228,7 +214,8 @@ fn measures_particle_pronoun_corpus_without_gating_on_mismatches() {
             HashSet::new()
         };
         let options = ParticlePronounOptions { protected_literals: &protected_literals };
-        let issues = detect_particle_pronoun(&case.text, &[], &options);
+        let inherited_protected = super::protected_spans(&case.text);
+        let issues = detect_particle_pronoun(&case.text, &inherited_protected, &options);
         expected += case.expected.len();
         actual += issues.len();
         let row = by_stem.entry((case.stem, case.pair)).or_default();

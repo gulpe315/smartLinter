@@ -1,5 +1,4 @@
-//! Bounded pronoun-particle agreement rules.  This module is intentionally
-//! dormant until the integration layer can provide live paragraph snapshots.
+//! Bounded pronoun-particle agreement rules.
 
 use std::collections::HashSet;
 
@@ -29,9 +28,6 @@ const MAPPINGS: &[Mapping] = &[
     Mapping { stem: "당신", wrong_particle: "는", correct_particle: "은" },
     Mapping { stem: "당신", wrong_particle: "가", correct_particle: "이" },
     Mapping { stem: "당신", wrong_particle: "를", correct_particle: "을" },
-    Mapping { stem: "그", wrong_particle: "은", correct_particle: "는" },
-    Mapping { stem: "그", wrong_particle: "이", correct_particle: "가" },
-    Mapping { stem: "그", wrong_particle: "을", correct_particle: "를" },
     Mapping { stem: "그녀", wrong_particle: "은", correct_particle: "는" },
     Mapping { stem: "그녀", wrong_particle: "이", correct_particle: "가" },
     Mapping { stem: "그녀", wrong_particle: "을", correct_particle: "를" },
@@ -307,16 +303,15 @@ mod tests {
     }
 
     #[test]
-    fn respects_inherited_protected_spans_and_remains_dormant() {
+    fn respects_inherited_protected_spans() {
         let protected = HashSet::new();
         let text = "그들는 오류입니다.";
         assert!(detect_particle_pronoun(text, &[(0, "그들는".len())], &options(&protected)).is_empty());
-        assert!(super::super::detect(text, "ko").is_empty());
     }
 
     #[test]
-    fn preserves_known_geu_eun_false_positive_for_later_corpus_gate() {
+    fn excludes_known_geu_eun_false_positive_after_dropping_geu_mappings() {
         let protected = HashSet::new();
-        assert_eq!(detect_particle_pronoun("그은 줄을 따라 걸었습니다.", &[], &options(&protected)).len(), 1);
+        assert!(detect_particle_pronoun("그은 줄을 따라 걸었습니다.", &[], &options(&protected)).is_empty());
     }
 }

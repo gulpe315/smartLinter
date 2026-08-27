@@ -9,7 +9,6 @@ use crate::ai::{QaIssue, QaSeverity, QaSuggestion};
 use crate::ai::qa_parser::normalize_suggestions;
 use tracing::debug;
 
-#[allow(dead_code)] // The module is deliberately dormant until Step 4 wiring.
 mod particle_pronoun;
 #[cfg(test)]
 mod particle_pronoun_corpus_spike;
@@ -87,6 +86,16 @@ pub fn detect(text: &str, target_locale: &str) -> Vec<QaIssue> {
         }
     }
     issues.extend(marker_issues(text, &data.list_markers));
+    if language == "ko" {
+        let no_protected_literals = std::collections::HashSet::new();
+        issues.extend(particle_pronoun::detect_particle_pronoun(
+            text,
+            &protected,
+            &particle_pronoun::ParticlePronounOptions {
+                protected_literals: &no_protected_literals,
+            },
+        ));
+    }
     issues
 }
 
@@ -497,6 +506,24 @@ mod tests {
         let mut issue = deterministic_issue(text, original, first);
         issue.suggestions = Some(vec![suggestion(first), suggestion(second)]);
         issue
+    }
+
+    #[test]
+    fn detect_wires_particle_pronoun_for_korean_regional_locale() {
+        let issues = detect("회의에 그들는 참석 대상입니다.", "ko-KR");
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].category, "particle.pronoun");
+        assert_eq!(issues[0].suggested_segment, "그들은");
+    }
+
+    #[test]
+    fn detect_excludes_dropped_geu_mapping() {
+        assert!(detect("그은 검토 결과를 확인했습니다.", "ko").is_empty());
+    }
+
+    #[test]
+    fn detect_does_not_wire_particle_pronoun_for_non_korean() {
+        assert!(detect("They are 그들는 available.", "en").is_empty());
     }
 
     #[test]

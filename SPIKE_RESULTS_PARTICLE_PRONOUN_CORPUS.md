@@ -127,3 +127,17 @@ requiring the full acceptance-scale corpus for the low-risk stems first.
 The focused corpus command above completed successfully.  The subsequent full
 `cargo test` run also passed: 85 Rust unit tests plus all integration-test
 suites completed successfully (no test failures).
+
+## Re-run after dropping `그` (27-mapping table)
+
+The corpus now uses the 27-mapping table and passes the parent
+`protected_spans()` result as `inherited_protected`, matching the live
+`detect()` integration. The three former `그` pronoun controls are retained as
+clean traps with no expected issue.
+
+```text
+cargo test measures_particle_pronoun_corpus_without_gating_on_mismatches -- --nocapture
+```
+
+Result: `cases=157`, `expected_issues=81`, `actual_issues=81`,
+`mismatches=0`.
