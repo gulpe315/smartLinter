@@ -89,6 +89,22 @@ describe('useChatStore (Zustand) & Action-First AI Chat State', () => {
     expect(card?.suggestedText).toContain('업데이트됩니다');
   });
 
+  it('marks the card failed when AI command execution rejects', async () => {
+    const mockPara: ParagraphPayload = {
+      paragraphId: 'para-ai-error', text: 'Original text', hash: 'hash-ai-error', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word',
+    };
+    const error = new Error('Ollama unavailable');
+    vi.spyOn(mockBridge, 'executeAiCommand').mockRejectedValueOnce(error);
+
+    const cardId = await useChatStore.getState().submitCommand('Rewrite this', mockPara, mockBridge);
+
+    expect(cardId).toBeNull();
+    expect(useChatStore.getState().cards).toEqual([
+      expect.objectContaining({ status: 'failed', errorMessage: error.message }),
+    ]);
+    expect(useChatStore.getState().isGenerating).toBe(false);
+  });
+
   it('handles active-voice rewriting prompt correctly', async () => {
     const mockPara: ParagraphPayload = {
       paragraphId: 'para-103',

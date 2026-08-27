@@ -1080,6 +1080,10 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
     await vi.advanceTimersByTimeAsync(1000);
     await vi.waitFor(() => expect(useQaStore.getState().isAnalyzing).toBe(false));
+    expect(useQaStore.getState().analysisError).toBe(
+      'AI 분석에 실패했습니다. Ollama 연결 상태를 확인한 뒤 다시 시도해 주세요.'
+    );
+    expect(useQaStore.getState().cards).toEqual([]);
     expect(warnSpy).toHaveBeenCalledWith(
       'QA analysis failed for detected paragraph:',
       expect.any(Error)

@@ -716,6 +716,8 @@ export const useQaStore = create<QAState>((set, get) => ({
               const message = error instanceof Error ? error.message : String(error);
               if (message.includes('not yet validated')) {
                 get().setAnalysisError('선택한 언어 조합은 아직 검증되지 않아 분석할 수 없습니다. 설정에서 언어를 변경해 주세요.');
+              } else {
+                get().setAnalysisError('AI 분석에 실패했습니다. Ollama 연결 상태를 확인한 뒤 다시 시도해 주세요.');
               }
             }
           } finally {

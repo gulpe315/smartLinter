@@ -124,26 +124,30 @@ describe('TauriBridgeService & IPC Integration', () => {
     service.destroy();
   });
 
-  it('normalizes and rethrows an unvalidated language error without using the fallback QA report', async () => {
-    const error = "QA profile for language 'en' is not yet validated";
+  it('returns FAILED replacement result when Tauri replacement IPC fails without using fallback', async () => {
+    const error = new Error('Editor connection lost');
     const invokeMock = vi.fn().mockRejectedValue(error);
     (window as any).isTauri = true;
     (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
     const service = new TauriBridgeService();
-    const fallbackSpy = vi.spyOn((service as any).fallbackService, 'analyzeParagraph');
-    const paragraph: ParagraphPayload = {
-      paragraphId: 'para-unvalidated', text: 'Text', hash: 'hash', source: '', timestamp: 1, editorType: 'InDesign',
+    const fallbackSpy = vi.spyOn((service as any).fallbackService, 'sendReplacementCommand');
+    const command: ReplacementCommand = {
+      commandId: 'cmd-failed', paragraphId: 'para-failed', baseHash: 'base-hash', expectedHash: 'expected-hash', hunks: [],
     };
 
-    const rejected = await service.analyzeParagraph(paragraph).catch((reason) => reason);
-    expect(rejected).toBeInstanceOf(Error);
-    expect(rejected.message).toBe(error);
+    await expect(service.sendReplacementCommand(command)).resolves.toEqual({
+      commandId: command.commandId,
+      status: 'FAILED',
+      currentHash: command.baseHash,
+      message: error.message,
+    });
     expect(fallbackSpy).not.toHaveBeenCalled();
     service.destroy();
   });
 
-  it('uses the fallback QA report for other Tauri analysis errors', async () => {
-    const invokeMock = vi.fn().mockRejectedValue(new Error('Ollama unavailable'));
+  it('rejects Tauri analysis IPC failures without using fallback', async () => {
+    const error = new Error('Ollama unavailable');
+    const invokeMock = vi.fn().mockRejectedValue(error);
     (window as any).isTauri = true;
     (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
     const service = new TauriBridgeService();
@@ -152,8 +156,24 @@ describe('TauriBridgeService & IPC Integration', () => {
       paragraphId: 'para-fallback', text: 'Text', hash: 'hash', source: '', timestamp: 1, editorType: 'InDesign',
     };
 
-    await service.analyzeParagraph(paragraph);
-    expect(fallbackSpy).toHaveBeenCalledWith(paragraph, undefined);
+    await expect(service.analyzeParagraph(paragraph)).rejects.toThrow(error);
+    expect(fallbackSpy).not.toHaveBeenCalled();
+    service.destroy();
+  });
+
+  it('rejects Tauri AI command IPC failures without using fallback', async () => {
+    const error = new Error('Ollama unavailable');
+    const invokeMock = vi.fn().mockRejectedValue(error);
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
+    const service = new TauriBridgeService();
+    const fallbackSpy = vi.spyOn((service as any).fallbackService, 'executeAiCommand');
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'para-ai-failure', text: 'Text', hash: 'hash', source: '', timestamp: 1, editorType: 'InDesign',
+    };
+
+    await expect(service.executeAiCommand('Rewrite this', paragraph)).rejects.toThrow(error);
+    expect(fallbackSpy).not.toHaveBeenCalled();
     service.destroy();
   });
 

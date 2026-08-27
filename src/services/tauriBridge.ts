@@ -722,10 +722,15 @@ export class TauriBridgeService implements IBridgeService {
     try {
       return await invoke('send_replacement_command', { command });
     } catch (e) {
-      console.warn('Tauri invoke send_replacement_command failed, using fallback:', e);
+      const message = e instanceof Error ? e.message : String(e);
+      console.warn('Tauri invoke send_replacement_command failed:', e);
+      return {
+        commandId: command.commandId,
+        status: 'FAILED',
+        currentHash: command.baseHash,
+        message,
+      };
     }
-
-    return this.fallbackService.sendReplacementCommand(command);
   }
 
   async locateParagraph(paragraphId: string, baseHash?: string): Promise<LocateParagraphResult> {
@@ -792,17 +797,7 @@ export class TauriBridgeService implements IBridgeService {
       return this.fallbackService.analyzeParagraph(paragraph, options);
     }
 
-    try {
-      return await invoke('analyze_paragraph', options ? { paragraph, options } : { paragraph });
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      if (message.includes('not yet validated')) {
-        throw (e instanceof Error ? e : new Error(message));
-      }
-      console.warn('Tauri invoke analyze_paragraph failed, using fallback:', e);
-    }
-
-    return this.fallbackService.analyzeParagraph(paragraph, options);
+    return await invoke('analyze_paragraph', options ? { paragraph, options } : { paragraph });
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {
@@ -810,13 +805,7 @@ export class TauriBridgeService implements IBridgeService {
       return this.fallbackService.executeAiCommand(instruction, paragraph);
     }
 
-    try {
-      return await invoke('execute_ai_command', { instruction, paragraph });
-    } catch (e) {
-      console.warn('Tauri invoke execute_ai_command failed, using fallback:', e);
-    }
-
-    return this.fallbackService.executeAiCommand(instruction, paragraph);
+    return await invoke('execute_ai_command', { instruction, paragraph });
   }
 
 
