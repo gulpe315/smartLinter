@@ -21,6 +21,7 @@ import {
 } from '../services/tauriBridge.ts';
 
 export type SplitLayoutMode = 'horizontal' | 'vertical';
+export type LayoutPreset = 'qa-focus' | 'balanced' | 'tm-focus';
 
 export interface BridgeState {
   // --- Editor Connection ---
@@ -57,6 +58,7 @@ export interface BridgeState {
 
   // --- Layout Configuration & Window State ---
   splitMode: SplitLayoutMode;
+  layoutPreset: LayoutPreset;
   pinned: boolean;
 
   // --- Telemetry & Active Paragraph ---
@@ -76,6 +78,7 @@ export interface BridgeState {
   setBatchScanProgress: (progress: Partial<BatchScanProgressPayload>) => void;
   setSplitMode: (mode: SplitLayoutMode) => void;
   toggleSplitMode: () => void;
+  setLayoutPreset: (preset: LayoutPreset) => void;
   setPinned: (pinned: boolean) => void;
   togglePin: () => void;
   connectIndesign: () => Promise<void>;
@@ -119,6 +122,7 @@ const initialState = {
   batchAborted: false,
 
   splitMode: 'horizontal' as SplitLayoutMode,
+  layoutPreset: 'balanced' as LayoutPreset,
   pinned: false,
 
   activeParagraph: null as ParagraphPayload | null,
@@ -195,6 +199,8 @@ export const useBridgeStore = create<BridgeState>((set, get) => ({
     set((state) => ({
       splitMode: state.splitMode === 'horizontal' ? 'vertical' : 'horizontal',
     })),
+
+  setLayoutPreset: (preset) => set({ layoutPreset: preset }),
 
   setPinned: (pinned) => {
     set({ pinned });

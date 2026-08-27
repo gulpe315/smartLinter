@@ -131,6 +131,19 @@ describe('Header Component', () => {
     expect(useBridgeStore.getState().splitMode).toBe('horizontal');
   });
 
+  it('sets the layout preset from the segmented control', () => {
+    render(<Header />);
+
+    const balancedButton = screen.getByTestId('layout-preset-balanced');
+    expect(balancedButton).toHaveClass('bg-indigo-600');
+
+    fireEvent.click(screen.getByTestId('layout-preset-qa-focus'));
+    expect(useBridgeStore.getState().layoutPreset).toBe('qa-focus');
+
+    fireEvent.click(screen.getByTestId('layout-preset-tm-focus'));
+    expect(useBridgeStore.getState().layoutPreset).toBe('tm-focus');
+  });
+
   it('displays batch scan progress bar when batchScanning is true', () => {
     useBridgeStore.getState().setBatchScanProgress({
       active: true,

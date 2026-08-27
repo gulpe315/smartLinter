@@ -40,6 +40,8 @@ export const Header: React.FC = () => {
     guidelinesCount,
     splitMode,
     toggleSplitMode,
+    layoutPreset,
+    setLayoutPreset,
   } = useBridgeStore();
 
   const { openSettingsModal, openGuidelineViewer } = useConfigStore();
@@ -187,6 +189,36 @@ export const Header: React.FC = () => {
         <div className="flex items-center gap-2">
           {/* Always-on-top Pin Mode Toggle Button */}
           <PinToggleButton />
+
+          <div
+            aria-label="레이아웃 비율 프리셋"
+            className="flex items-center rounded-md bg-slate-800/80 p-0.5 border border-slate-700/80 text-[11px] text-slate-400"
+          >
+            <button
+              type="button"
+              data-testid="layout-preset-qa-focus"
+              onClick={() => setLayoutPreset('qa-focus')}
+              className={layoutPreset === 'qa-focus' ? 'px-2 py-0.5 rounded transition-colors bg-indigo-600 text-white font-semibold shadow-sm' : 'px-2 py-0.5 rounded transition-colors hover:text-slate-200'}
+            >
+              QA 중심
+            </button>
+            <button
+              type="button"
+              data-testid="layout-preset-balanced"
+              onClick={() => setLayoutPreset('balanced')}
+              className={layoutPreset === 'balanced' ? 'px-2 py-0.5 rounded transition-colors bg-indigo-600 text-white font-semibold shadow-sm' : 'px-2 py-0.5 rounded transition-colors hover:text-slate-200'}
+            >
+              균등
+            </button>
+            <button
+              type="button"
+              data-testid="layout-preset-tm-focus"
+              onClick={() => setLayoutPreset('tm-focus')}
+              className={layoutPreset === 'tm-focus' ? 'px-2 py-0.5 rounded transition-colors bg-indigo-600 text-white font-semibold shadow-sm' : 'px-2 py-0.5 rounded transition-colors hover:text-slate-200'}
+            >
+              TM 중심
+            </button>
+          </div>
 
           {/* Layout Split Mode Switcher (Horizontal vs Vertical) */}
           <button

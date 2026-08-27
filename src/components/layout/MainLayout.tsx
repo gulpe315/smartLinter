@@ -21,7 +21,31 @@ import {
   Clock,
   FileText,
 } from 'lucide-react';
-import { useBridgeStore, type SplitLayoutMode } from '../../stores/bridgeStore.ts';
+import { useBridgeStore, type LayoutPreset } from '../../stores/bridgeStore.ts';
+
+const HORIZONTAL_QA_WIDTH: Record<LayoutPreset, string> = {
+  'qa-focus': 'w-full md:w-[65%] h-full overflow-hidden flex flex-col',
+  balanced: 'w-full md:w-1/2 h-full overflow-hidden flex flex-col',
+  'tm-focus': 'w-full md:w-[35%] h-full overflow-hidden flex flex-col',
+};
+
+const HORIZONTAL_TM_WIDTH: Record<LayoutPreset, string> = {
+  'qa-focus': 'w-full md:w-[35%] h-full overflow-hidden flex flex-col bg-slate-900/30',
+  balanced: 'w-full md:w-1/2 h-full overflow-hidden flex flex-col bg-slate-900/30',
+  'tm-focus': 'w-full md:w-[65%] h-full overflow-hidden flex flex-col bg-slate-900/30',
+};
+
+const VERTICAL_QA_HEIGHT: Record<LayoutPreset, string> = {
+  'qa-focus': 'w-full h-[65%] overflow-hidden flex flex-col',
+  balanced: 'w-full h-1/2 overflow-hidden flex flex-col',
+  'tm-focus': 'w-full h-[35%] overflow-hidden flex flex-col',
+};
+
+const VERTICAL_TM_HEIGHT: Record<LayoutPreset, string> = {
+  'qa-focus': 'w-full h-[35%] overflow-hidden flex flex-col bg-slate-900/30',
+  balanced: 'w-full h-1/2 overflow-hidden flex flex-col bg-slate-900/30',
+  'tm-focus': 'w-full h-[65%] overflow-hidden flex flex-col bg-slate-900/30',
+};
 
 interface MainLayoutProps {
   qaSlot?: React.ReactNode;
@@ -29,7 +53,7 @@ interface MainLayoutProps {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ qaSlot, tmSlot }) => {
-  const { tmLoaded, splitMode, activeParagraph, paragraphs, editorConnected, editorType } =
+  const { tmLoaded, splitMode, layoutPreset } =
     useBridgeStore();
 
   return (
@@ -59,9 +83,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ qaSlot, tmSlot }) => {
           {/* QA Panel Area */}
           <div
             data-testid="qa-panel-container"
-            className={`${
-              splitMode === 'horizontal' ? 'w-full md:w-3/5 h-full' : 'w-full h-1/2'
-            } overflow-hidden flex flex-col`}
+            className={
+              splitMode === 'horizontal'
+                ? HORIZONTAL_QA_WIDTH[layoutPreset]
+                : VERTICAL_QA_HEIGHT[layoutPreset]
+            }
           >
             {qaSlot || <DefaultQAPanelPlaceholder fullWidth={false} />}
           </div>
@@ -69,9 +95,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ qaSlot, tmSlot }) => {
           {/* TM & TQA Panel Area */}
           <div
             data-testid="tm-panel-container"
-            className={`${
-              splitMode === 'horizontal' ? 'w-full md:w-2/5 h-full' : 'w-full h-1/2'
-            } overflow-hidden flex flex-col bg-slate-900/30`}
+            className={
+              splitMode === 'horizontal'
+                ? HORIZONTAL_TM_WIDTH[layoutPreset]
+                : VERTICAL_TM_HEIGHT[layoutPreset]
+            }
           >
             {tmSlot || <DefaultTMPanelPlaceholder />}
           </div>

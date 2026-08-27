@@ -24,6 +24,7 @@ describe('SmartLinter Bridge Zustand Store', () => {
     expect(state.tmLoaded).toBe(false);
     expect(state.tmEntriesCount).toBe(0);
     expect(state.splitMode).toBe('horizontal');
+    expect(state.layoutPreset).toBe('balanced');
     expect(state.pinned).toBe(false);
     expect(state.paragraphs).toEqual([]);
     expect(state.activeParagraph).toBeNull();
@@ -87,6 +88,17 @@ describe('SmartLinter Bridge Zustand Store', () => {
 
     useBridgeStore.getState().setSplitMode('vertical');
     expect(useBridgeStore.getState().splitMode).toBe('vertical');
+  });
+
+  it('should set layout presets independently from split mode', () => {
+    expect(useBridgeStore.getState().layoutPreset).toBe('balanced');
+
+    useBridgeStore.getState().setLayoutPreset('qa-focus');
+    expect(useBridgeStore.getState().layoutPreset).toBe('qa-focus');
+    expect(useBridgeStore.getState().splitMode).toBe('horizontal');
+
+    useBridgeStore.getState().setLayoutPreset('tm-focus');
+    expect(useBridgeStore.getState().layoutPreset).toBe('tm-focus');
   });
 
   it('should toggle and set pin mode (always-on-top) and call bridgeService', async () => {

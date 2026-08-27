@@ -71,6 +71,24 @@ describe('MainLayout Component & Responsive Dynamic Split', () => {
     expect(tmContainer).toHaveClass('h-1/2');
   });
 
+  it.each([
+    ['horizontal', 'qa-focus', 'md:w-[65%]', 'md:w-[35%]'],
+    ['horizontal', 'balanced', 'md:w-1/2', 'md:w-1/2'],
+    ['horizontal', 'tm-focus', 'md:w-[35%]', 'md:w-[65%]'],
+    ['vertical', 'qa-focus', 'h-[65%]', 'h-[35%]'],
+    ['vertical', 'balanced', 'h-1/2', 'h-1/2'],
+    ['vertical', 'tm-focus', 'h-[35%]', 'h-[65%]'],
+  ] as const)('applies the %s %s preset panel proportions', (splitMode, layoutPreset, qaClass, tmClass) => {
+    useBridgeStore.getState().setTmStatus({ tmLoaded: true, entriesCount: 100 });
+    useBridgeStore.getState().setSplitMode(splitMode);
+    useBridgeStore.getState().setLayoutPreset(layoutPreset);
+
+    render(<MainLayout />);
+
+    expect(screen.getByTestId('qa-panel-container')).toHaveClass(qaClass);
+    expect(screen.getByTestId('tm-panel-container')).toHaveClass(tmClass);
+  });
+
   it('renders active paragraph live card in QA panel when telemetry arrives', () => {
     const mockParagraph: ParagraphPayload = {
       paragraphId: 'para-abc-123',
