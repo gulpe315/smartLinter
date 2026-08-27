@@ -1,12 +1,49 @@
 # SmartLinter — 오케스트레이터 현황판
 
 마지막 업데이트: 2026-08-27 세션 — `DESIGN_QA_CARD_LIVE_INTEGRITY.md`의 Suggested
-implementation order 1~2번(실시간 스냅샷 primitive + 새 카드 게이팅) 구현·검증·커밋
-완료(`0909ec5`, `ccf20a8`), **실제 InDesign 라이브 검증으로 원래 유령카드 버그
-재현 안 됨 확인(사용자 "정상 작동함")**. 다음은 Step 3(배치 폼+Part 3 Layer 1).
-아래 "⭐⭐⭐⭐⭐" 절 참고.
+implementation order 1~3번(실시간 스냅샷 단일/배치 폼 + 새 카드 게이팅 + Layer 1
+수동적 무효화) 구현·검증·커밋·**라이브검증까지 전부 완료**(`0909ec5`, `ccf20a8`,
+`7ae3d28`, 사용자 재검증 확인). 다음은 Step 4(Layer 2 JIT+오프라인/재연결).
+**별도로, 사용자가 로컬 LLM의 언어 품질(조사 호응 등) 개선 방법을 Codex+agy에게
+서베이만 시켜보라고 요청** — `QUESTION_LOCAL_MODEL_LINGUISTIC_QUALITY.md` 참고,
+아직 답변 수집/종합 전. 아래 "⭐⭐⭐⭐⭐" 절 참고.
 
-## ⭐⭐⭐⭐⭐ 2026-08-27 세션 후반 — Step 2(새 카드 게이팅) 완료+라이브검증, 다음은 Step 3
+## ⭐⭐⭐⭐⭐⭐ 2026-08-27 세션 후반 — Step 3 완료+라이브검증, 별도로 언어품질 서베이 진행 중
+
+1. **`git log --oneline -1`로 최신 커밋이 `7ae3d28`(Add batch live-snapshot primitive and passively invalidate stale cards)인지 확인.**
+2. **Step 3 한 일:** (a) `getLiveParagraphSnapshots` 배치 폼 — ExtendScript/Rust/TS
+   전 레이어 배선 완료, baseHash 없이 인덱스 기반으로만 판정(슬로우패스 생략,
+   단일 폼과의 의도된 차이), 아직 아무 데서도 호출 안 함(Step 4에서 씀). (b) Layer
+   1 — `qaStore.ts`의 `new-paragraph-detected` 리스너 맨 앞에서, 디바운스/LLM
+   응답을 기다리지 않고 즉시 로컬 메모리로 `pending` 카드의 `originalSegment`가
+   `payload.text`에서 사라졌는지 체크해서 사라졌으면 바로 `stale_obsolete`로
+   아카이브(새 IPC 없음). `addReport`의 기존 `directEditCandidates` 로직은
+   안 건드림(중복 안전망으로 그대로 유지). Claude 독립검증(`cargo test`/`npm
+   test` 165/165/`npm run test:ui` 261/261/`npm run build`) 후 커밋.
+3. **실제 InDesign 라이브 검증 완료(사용자 재확인 "문제 없어").** Claude가 서버
+   재기동 후 번호 매긴 절차로 요청 → 카드가 뜨자마자(LLM 응답 전에) InDesign에서
+   직접 고치면 즉시 사라지는지 확인 → 정상 확인. **`DESIGN_QA_CARD_LIVE_INTEGRITY.md`
+   Step 1~3 전부 구현+라이브검증 완료.**
+4. **다음 세션 최우선:** Step 4(Layer 2 JIT 뷰포트/포커스 검증 — Step 3에서 만든
+   배치 폼을 실제로 호출, 대시보드 포커스/스크롤 이벤트에 디바운스 걸어서 사용
+   + 오프라인/재연결 처리) → Step 5(F5 차단+Zustand persist+복원 시 재검증).
+   재자문 불필요, 설계문서 그대로 순서대로.
+5. **별도 트랙(Step 4/5와 무관, 사용자가 병행 요청) — 로컬 LLM 언어품질 서베이:**
+   사용자가 "그들은"→"그들는" 조사 오타를 현재 파이프라인이 못 잡는 걸 계기로
+   ①조사 호응(받침 기반 은/는/이/가/을/를)을 결정론적 사전에 새 카테고리로
+   추가할 만한지 + ②그 외 로컬 모델의 언어 품질을 올릴 방법 전반(다른/더 큰
+   로컬 모델, 파인튜닝, 오프라인 문법검사 라이브러리 병행, self-consistency
+   이중패스 등)을 **검토만**(구현 금지) Codex+agy 양쪽에 서베이 요청함
+   (`QUESTION_LOCAL_MODEL_LINGUISTIC_QUALITY.md`, 각각
+   `CODEX_ANSWER_LOCAL_MODEL_LINGUISTIC_QUALITY.md`/
+   `AGY_ANSWER_LOCAL_MODEL_LINGUISTIC_QUALITY.md`에 답변 예정). **다음 세션
+   재개 시 이 두 답변 파일이 있으면 먼저 종합해서 사용자에게 보고할 것** — 아직
+   구현 결정 난 거 없음, 이 프로젝트의 기존 실패사례(few-shot FPR 폭증
+   `83d80af`, 80% 재현율 절대기준)를 반드시 감안해서 판단.
+
+---
+
+## ⭐⭐⭐⭐⭐ 2026-08-27 세션 후반 (지나간 상태) — Step 2(새 카드 게이팅) 완료+라이브검증, 다음은 Step 3
 
 1. **`git log --oneline -1`로 최신 커밋이 `ccf20a8`(Gate new QA cards on a live paragraph snapshot before showing them)인지 확인.**
 2. **한 일:** `qaStore.ts`의 `new-paragraph-detected` 핸들러에서, 기존 저렴한
