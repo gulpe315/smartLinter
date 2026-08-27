@@ -11,10 +11,43 @@
 `configStore.startBatchScan`도 실패 시 진행률 리셋하도록 같이 수정(안 하면
 진행률 바가 멈춘 것처럼 보이는 회귀 발생 — 미리 호출부 확인해서 발견).
 `npm test` 167/167, `npm run test:ui` 270/270, `npm run build` 매 단계
-독립검증. **다음은 Part B(TM 사용성), 합의된 순서: 검색모드 → 레이아웃
-프리셋 → TM 수동저장(가장 복잡, 데이터 거버넌스 필요) — 상세는
-`AGY_ANSWER_BACKLOG_REVIEW_ROUND1.md`/`CODEX_ANSWER_BACKLOG_REVIEW_ROUND1.md`
-Part B 참고.**
+독립검증.
+
+**Part B(TM 사용성) 전체 완료 — 검색모드(`6100382`) → 레이아웃 프리셋
+(`f6f6cc2`) → TM 수동저장(`7a44a05`).**
+1. **검색모드**: 기존 3-gram 문단 퍼지매치와 완전히 분리된 부분일치
+   키워드 검색을 같은 TM 패널에 모드 전환으로 추가(`searchMode: 'fuzzy'|
+   'keyword'`, 원문/번역문/전체 스코프). 결과는 `TmMatchCandidate`에
+   `matchMode`/`matchedKeyword` optional 필드로 additive 확장, 카드에
+   하이라이트 표시. 검토 중 Codex가 남긴 영어 배지 문구("Keyword match" 등)
+   2곳을 Claude가 직접 한글로 수정(과거 Task U 때와 동일 패턴 재발 — diff
+   검토 시 반드시 걸러야 할 항목으로 재확인).
+2. **레이아웃 프리셋**: `bridgeStore`에 `layoutPreset`('qa-focus'/
+   'balanced'/'tm-focus') 신설, 기존 `splitMode`(좌우/상하)와 독립된 축.
+   Tailwind 동적 클래스 조합 함정(빌드 시 정적 스캔이라 템플릿 리터럴로
+   만들면 CSS에서 빠짐) 피하려고 프리셋별 완전 리터럴 클래스 lookup 사용
+   — 빌드 CSS에 실제 포함됐는지 `grep`으로 직접 확인함. `balanced`가
+   기존 하드코딩 60:40(`w-3/5`/`w-2/5`)에서 50:50으로 바뀐 건 두 모델이
+   명시적으로 권한 의도된 변경(회귀 아님, 그걸 검증하는 기존 테스트도 없었음).
+3. **TM 수동저장 — 답변과 실제 코드 사이 간극을 발견해 범위를 좁혀 진행.**
+   Codex/agy 둘 다 "AI/QA 수정본이 이중언어 원문을 갖는다"고 전제하고
+   답변했지만, 실제로는 `ParagraphPayload.source`가 번역원문이 아니라
+   문서파일명이고 AI 채팅 카드(`CommandCardData`)는 원문/번역문 개념
+   자체가 없음 — 유일한 실제 원문/번역문 쌍은 `qaStore`의 `tmReference`
+   (TM 퍼지매치 결과, 지금까지 LLM 호출에만 쓰고 버려지던 값)뿐. 재자문
+   없이 두 모델이 이미 명시한 제약("단일언어 교정은 TM 저장 대상 아님")을
+   문자 그대로 적용해 **QA 카드(tmReference 있는 경우만)로 범위를 좁히고,
+   AI 커맨드 채팅 카드는 이번 단계에서 완전히 제외**. `tmReference`를
+   `QaReportPayload`→`addReport`→`QACardData`까지 배선(신규 필드), TM에
+   저장 시 `tmReference.target`이 아니라 최종 적용된 `card.suggestedSegment`
+   저장(핵심 포인트). `configStore.userTmOverlayEntries`(localStorage
+   영속화)에 append만 하고 로드된 원본 TM 파일은 절대 안 건드림, 같은
+   원문+다른 번역 충돌 시 `window.confirm`으로 확인 후 진행.
+
+`npm test`/`npm run test:ui`(273→281→285)/`npm run build` 매 단계
+독립검증. **Part A/B 둘 다 완료 — 다음 세션 최우선 항목은 없음(모든
+계획된 백로그 소진), Kiwi 스파이크(Part C)는 우선순위 하향된 채 보류
+중이니 사용자 지시 시 착수.**
 
 **조사 호응(particle agreement) 구현 착수 — Step 1(다중후보 스키마 확장, Part B.1)
 완료(커밋 `d1e7fc2`).** `CODEX_DESIGN_PARTICLE_WHITELIST_AND_KIWI_SPIKE.md` 기반
