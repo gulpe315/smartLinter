@@ -35,6 +35,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     dismissCard,
     markCardObsolete,
     acceptCard,
+    acceptMatchingCards,
     dismissAll,
     getFilteredCards,
     getCardCountBySeverity,
@@ -263,6 +264,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
                   card={card}
                   isFocused={focusedCardIds.has(card.id)}
                   onAccept={(id) => acceptCard(id, undefined, { autoResolveStale: true })}
+                  onAcceptMatching={(id) => acceptMatchingCards(id)}
                   onDismiss={(id) => dismissCard(id)}
                   onMarkObsolete={(id) => markCardObsolete(id)}
                 />

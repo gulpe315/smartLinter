@@ -32,13 +32,14 @@ import {
 import { InlineDiffViewer } from './InlineDiffViewer.tsx';
 import { StaleNotificationBadge } from './StaleNotificationBadge.tsx';
 import { RollbackAlertCard } from './RollbackAlertCard.tsx';
-import { useQaStore } from '../../stores/qaStore.ts';
+import { getNormalizedIssueKey, useQaStore } from '../../stores/qaStore.ts';
 import { useConfigStore } from '../../stores/configStore.ts';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
 
 export interface QACardItemProps {
   card: QACardData;
   onAccept?: (cardId: string) => void;
+  onAcceptMatching?: (cardId: string) => Promise<{ succeeded: string[]; failed: Array<{ cardId: string; reason: string }> }>;
   onDismiss?: (cardId: string) => void;
   onMarkObsolete?: (cardId: string) => void;
   isApplying?: boolean;
@@ -50,6 +51,7 @@ export interface QACardItemProps {
 export const QACardItem: React.FC<QACardItemProps> = ({
   card,
   onAccept,
+  onAcceptMatching,
   onDismiss,
   onMarkObsolete,
   isApplying: propIsApplying,
@@ -63,13 +65,16 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
   const [editedSuggestion, setEditedSuggestion] = useState(card.suggestedSegment);
   const [isTmSaved, setIsTmSaved] = useState(false);
+  const [isBatchApplying, setIsBatchApplying] = useState(false);
+  const [batchSummary, setBatchSummary] = useState<string | null>(null);
   const pointerDownPosition = useRef<{ clientX: number; clientY: number } | null>(null);
   const updateSuggestedSegment = useQaStore((state) => state.updateSuggestedSegment);
   const selectSuggestion = useQaStore((state) => state.selectSuggestion);
+  const activeCards = useQaStore((state) => state.cards);
   const editorConnected = useBridgeStore((state) => state.editorConnected);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isObsolete = card.status === 'stale_obsolete';
-  const isApplying = propIsApplying || card.status === 'applying' || isStale;
+  const isApplying = propIsApplying || isBatchApplying || card.status === 'applying' || isStale;
   const requiresSuggestionSelection = !!card.suggestions && card.suggestions.length >= 2;
   const isAcceptDisabled = !editorConnected || isApplying || isObsolete || card.isLocked === true || (
     requiresSuggestionSelection && !card.selectedSuggestionSegment
@@ -86,6 +91,37 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const categoryStyle = getCategoryBadgeClasses(card.category);
   const severityStyle = getSeverityBadgeClasses(card.severity);
   const normSeverity = normalizeSeverity(card.severity);
+  const issueKey = getNormalizedIssueKey(
+    card.category,
+    card.originalSegment,
+    card.selectedSuggestionSegment ?? card.suggestedSegment,
+  );
+  const matchingCardCount = activeCards.filter((candidate) =>
+    candidate.status === 'pending'
+      && candidate.validationState !== 'restoring'
+      && candidate.isStale !== true
+      && candidate.isLocked !== true
+      && getNormalizedIssueKey(
+        candidate.category,
+        candidate.originalSegment,
+        candidate.selectedSuggestionSegment ?? candidate.suggestedSegment,
+      ) === issueKey
+  ).length;
+  const canAcceptMatching = matchingCardCount >= 2 && !!onAcceptMatching;
+
+  const handleAcceptMatching = async () => {
+    if (!onAcceptMatching || isBatchApplying) return;
+    setIsBatchApplying(true);
+    setBatchSummary(null);
+    try {
+      const result = await onAcceptMatching(card.id);
+      setBatchSummary(result.failed.length > 0
+        ? `${matchingCardCount}건 중 ${result.succeeded.length}건 적용, 나머지는 확인이 필요합니다.`
+        : `${result.succeeded.length}건을 적용했습니다.`);
+    } finally {
+      setIsBatchApplying(false);
+    }
+  };
 
   const handleLocate = async () => {
     if (!editorConnected) return;
@@ -491,6 +527,19 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           </button>
 
           {/* Accept (적용) Action Button with Loading Spinner */}
+          {canAcceptMatching && (
+            <button
+              type="button"
+              data-testid="qa-accept-matching-action-btn"
+              disabled={isAcceptDisabled}
+              onClick={() => void handleAcceptMatching()}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-violet-300 hover:text-violet-100 bg-violet-950/40 hover:bg-violet-900/50 border border-violet-800/70 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+            >
+              {isBatchApplying ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              <span>{isBatchApplying ? '일괄 적용 중...' : `동일 이슈 ${matchingCardCount}건 일괄 적용`}</span>
+            </button>
+          )}
+
           <button
             type="button"
             data-testid="qa-accept-action-btn"
@@ -537,6 +586,11 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         </div>
         )}
       </div>
+      {batchSummary && (
+        <p data-testid="qa-accept-matching-summary" className="mt-2 text-[11px] text-violet-300">
+          {batchSummary}
+        </p>
+      )}
     </article>
   );
 };

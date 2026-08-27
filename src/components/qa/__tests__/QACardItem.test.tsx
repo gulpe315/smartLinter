@@ -71,6 +71,22 @@ describe('QACardItem Component', () => {
     expect(screen.getByTestId('qa-locate-paragraph-btn')).toBeDisabled();
   });
 
+  it('shows the matching-issue action only for groups of two or more and invokes its callback', async () => {
+    const onAcceptMatching = vi.fn().mockResolvedValue({ succeeded: ['card-101', 'card-102'], failed: [] });
+    useQaStore.setState({ cards: [sampleCard] });
+    const { rerender } = render(<QACardItem card={sampleCard} onAcceptMatching={onAcceptMatching} />);
+
+    expect(screen.queryByTestId('qa-accept-matching-action-btn')).not.toBeInTheDocument();
+
+    const matchingCard = { ...sampleCard, id: 'card-102', paragraphId: 'para-word-2' };
+    useQaStore.setState({ cards: [sampleCard, matchingCard] });
+    rerender(<QACardItem card={sampleCard} onAcceptMatching={onAcceptMatching} />);
+
+    fireEvent.click(screen.getByTestId('qa-accept-matching-action-btn'));
+    await waitFor(() => expect(onAcceptMatching).toHaveBeenCalledWith('card-101'));
+    expect(screen.getByTestId('qa-accept-matching-summary')).toHaveTextContent('2건을 적용했습니다.');
+  });
+
   it('shows a history badge for replayed corrections', () => {
     render(<QACardItem card={{ ...sampleCard, historyReplay: true }} />);
 

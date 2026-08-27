@@ -65,7 +65,7 @@ interface QaRestoreContext {
   schemaVersion: number;
 }
 
-function getNormalizedIssueKey(category: string, originalSegment: string, suggestedSegment: string): string {
+export function getNormalizedIssueKey(category: string, originalSegment: string, suggestedSegment: string): string {
   return `${category}\u0000${normalizeText(originalSegment)}\u0000${normalizeText(suggestedSegment)}`;
 }
 
@@ -198,6 +198,10 @@ export interface QAState {
   updateSuggestedSegment: (cardId: string, newText: string) => void;
   selectSuggestion: (cardId: string, suggestedSegment: string) => void;
   acceptCard: (cardId: string, service?: IBridgeService, options?: AcceptCardOptions) => Promise<ReplacementResult | null>;
+  acceptMatchingCards: (cardId: string, service?: IBridgeService) => Promise<{
+    succeeded: string[];
+    failed: Array<{ cardId: string; reason: string }>;
+  }>;
   processReplacementResult: (result: ReplacementResult, service?: IBridgeService, options?: AcceptCardOptions) => Promise<boolean>;
   retryCard: (cardId: string) => void;
   removeCard: (cardId: string) => void;
@@ -290,6 +294,9 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
       validationState: cardInput.validationState || 'valid',
       isLocked: cardInput.isLocked,
       historyReplay: cardInput.historyReplay,
+      ...(cardInput.selectedSuggestionSegment !== undefined
+        ? { selectedSuggestionSegment: cardInput.selectedSuggestionSegment }
+        : {}),
     };
 
     set((state) => {
@@ -571,6 +578,71 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
       }));
       return null;
     }
+  },
+
+  acceptMatchingCards: async (cardId, service) => {
+    const sourceCard = get().cards.find((card) => card.id === cardId);
+    if (!sourceCard) return { succeeded: [], failed: [] };
+
+    const issueKey = getNormalizedIssueKey(
+      sourceCard.category,
+      sourceCard.originalSegment,
+      sourceCard.selectedSuggestionSegment ?? sourceCard.suggestedSegment,
+    );
+    const matchingCards = get().cards.filter((card) =>
+      card.status === 'pending'
+        && card.validationState !== 'restoring'
+        && card.isStale !== true
+        && card.isLocked !== true
+        && getNormalizedIssueKey(
+          card.category,
+          card.originalSegment,
+          card.selectedSuggestionSegment ?? card.suggestedSegment,
+        ) === issueKey
+    );
+    const bridgeService = service || getBridgeService();
+    const failed: Array<{ cardId: string; reason: string }> = [];
+
+    let snapshots;
+    try {
+      snapshots = await bridgeService.getLiveParagraphSnapshots(
+        [...new Set(matchingCards.map((card) => card.paragraphId))],
+      );
+    } catch (error: any) {
+      const reason = error?.message || 'Unable to verify live paragraph state.';
+      return { succeeded: [], failed: matchingCards.map((card) => ({ cardId: card.id, reason })) };
+    }
+
+    const snapshotsByParagraphId = new Map(snapshots.map((snapshot) => [snapshot.paragraphId, snapshot]));
+    const executableCards = matchingCards.filter((card) => {
+      const snapshot = snapshotsByParagraphId.get(card.paragraphId);
+      if (snapshot?.status === 'FOUND' && snapshot.currentHash === card.paragraphHash) return true;
+      failed.push({
+        cardId: card.id,
+        reason: snapshot?.message || (snapshot?.status === 'FOUND'
+          ? 'Live paragraph content has changed.'
+          : `Live paragraph is unavailable (${snapshot?.status || 'ERROR'}).`),
+      });
+      return false;
+    });
+
+    const succeeded: string[] = [];
+    // Editor hosts are effectively single-threaded, so preserve the existing
+    // single-card acceptance path and wait before starting the next card.
+    for (const card of executableCards) {
+      const result = await get().acceptCard(card.id, bridgeService, { autoResolveStale: false });
+      if (result?.status === 'SUCCESS') {
+        succeeded.push(card.id);
+      } else {
+        const updatedCard = get().cards.find((candidate) => candidate.id === card.id);
+        failed.push({
+          cardId: card.id,
+          reason: updatedCard?.errorMessage || result?.message || result?.status || 'Replacement failed.',
+        });
+      }
+    }
+
+    return { succeeded, failed };
   },
 
   processReplacementResult: async (result, service, options) => {

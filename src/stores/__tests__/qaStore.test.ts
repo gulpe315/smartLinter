@@ -769,6 +769,72 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(state.appliedCards[0].status).toBe('applied');
   });
 
+  it('accepts matching live cards sequentially and preserves a partial failure', async () => {
+    const addMatchingCard = (paragraphId: string) => useQaStore.getState().addCard({
+      paragraphId,
+      paragraphHash: `hash-${paragraphId}`,
+      paragraphText: 'teh',
+      category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', severity: 'MEDIUM',
+    });
+    const first = addMatchingCard('one');
+    const second = addMatchingCard('two');
+    const third = addMatchingCard('three');
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([
+      { paragraphId: 'one', status: 'FOUND', currentHash: 'hash-one' },
+      { paragraphId: 'two', status: 'FOUND', currentHash: 'hash-two' },
+      { paragraphId: 'three', status: 'FOUND', currentHash: 'hash-three' },
+    ]);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand').mockImplementation(async (command) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await Promise.resolve();
+      inFlight -= 1;
+      return {
+        commandId: command.commandId,
+        status: command.paragraphId === 'two' ? 'FAILED' : 'SUCCESS',
+        currentHash: command.expectedHash,
+      };
+    });
+
+    const result = await useQaStore.getState().acceptMatchingCards(first, mockBridge);
+
+    expect(result.succeeded).toEqual([third, first]);
+    expect(result.failed).toEqual([expect.objectContaining({ cardId: second })]);
+    expect(maxInFlight).toBe(1);
+    expect(sendSpy.mock.calls.map(([command]) => command.paragraphId)).toEqual(['three', 'two', 'one']);
+    expect(useQaStore.getState().appliedCards.map((card) => card.id)).toEqual(expect.arrayContaining([first, third]));
+    expect(useQaStore.getState().cards).toEqual([expect.objectContaining({ id: second, status: 'failed' })]);
+  });
+
+  it('does not accept matching cards excluded by preflight and respects selected suggestions when grouping', async () => {
+    const first = useQaStore.getState().addCard({
+      paragraphId: 'found', paragraphHash: 'found-hash', paragraphText: 'teh', category: 'Grammar',
+      originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', severity: 'MEDIUM',
+    });
+    const missing = useQaStore.getState().addCard({
+      paragraphId: 'missing', paragraphHash: 'missing-hash', paragraphText: 'teh', category: 'Grammar',
+      originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo', severity: 'MEDIUM',
+    });
+    const alternate = useQaStore.getState().addCard({
+      paragraphId: 'alternate', paragraphHash: 'alternate-hash', paragraphText: 'teh', category: 'Grammar',
+      originalSegment: 'teh', suggestedSegment: 'the', selectedSuggestionSegment: 'te', reason: 'Typo', severity: 'MEDIUM',
+    });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([
+      { paragraphId: 'found', status: 'FOUND', currentHash: 'found-hash' },
+      { paragraphId: 'missing', status: 'NOT_FOUND' },
+    ]);
+    const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    const result = await useQaStore.getState().acceptMatchingCards(first, mockBridge);
+
+    expect(result.succeeded).toEqual([first]);
+    expect(result.failed).toEqual([expect.objectContaining({ cardId: missing })]);
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+    expect(useQaStore.getState().cards.map((card) => card.id)).toEqual(expect.arrayContaining([missing, alternate]));
+  });
+
   it('handles bridge replacement rejection or error properly', async () => {
     vi.spyOn(mockBridge, 'sendReplacementCommand').mockResolvedValueOnce({
       commandId: 'cmd-stale',
