@@ -4,12 +4,13 @@
 
 import {
   type QaIssue,
+  type QaSuggestion,
   type QaReport,
   type QaSeverity,
   type QaStatus,
 } from '../../shared/protocol/types.ts';
 
-export type { QaIssue, QaReport, QaSeverity, QaStatus };
+export type { QaIssue, QaReport, QaSeverity, QaStatus, QaSuggestion };
 
 /** Execution state of an individual QA card */
 export type QACardStatus =
@@ -33,6 +34,11 @@ export interface QACardData {
   category: string;
   originalSegment: string;
   suggestedSegment: string;
+  /** Selectable alternatives carried over from the QaIssue, if any. */
+  suggestions?: QaSuggestion[];
+  /** The suggestion the user has explicitly chosen, when suggestions.length >= 2.
+   * Undefined means "not yet chosen" — do not default this to the mirror. */
+  selectedSuggestionSegment?: string;
   reason: string;
   severity: QaSeverity | string;
   status: QACardStatus;

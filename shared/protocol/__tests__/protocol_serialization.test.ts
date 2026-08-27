@@ -27,7 +27,8 @@ import {
     isBridgeMessage,
     isEditorType,
     isReplacementStatus,
-    isTextHunk
+    isTextHunk,
+    isQaIssue
 } from '../types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -98,6 +99,33 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
             assert.equal(isTextHunk({ start: -1, end: 5, oldText: 'a', newText: 'b' }), false);
             assert.equal(isTextHunk({ start: 10, end: 5, oldText: 'a', newText: 'b' }), false); // end < start
             assert.equal(isTextHunk({ start: 0, end: 5, oldText: 123, newText: 'b' }), false);
+        });
+    });
+
+    describe('QaIssue suggestion compatibility', () => {
+        const legacyIssue = {
+            category: 'Grammar', originalSegment: 'old', suggestedSegment: 'new',
+            reason: 'Legacy QA fixture', severity: 'MEDIUM',
+        };
+
+        it('accepts legacy issues with no suggestions', () => {
+            assert.equal(isQaIssue(legacyIssue), true);
+        });
+
+        it('validates suggestion arrays and confidence bounds', () => {
+            assert.equal(isQaIssue({
+                ...legacyIssue,
+                suggestions: [
+                    { suggestedSegment: 'first', confidence: 0 },
+                    { suggestedSegment: 'second', confidence: 1 },
+                ],
+            }), true);
+            assert.equal(isQaIssue({ ...legacyIssue, suggestions: {} }), false);
+            assert.equal(isQaIssue({ ...legacyIssue, suggestions: [] }), false);
+            assert.equal(isQaIssue({ ...legacyIssue, suggestions: [{ suggestedSegment: 1 }] }), false);
+            assert.equal(isQaIssue({ ...legacyIssue, suggestions: [{ suggestedSegment: 'new', confidence: -0.1 }] }), false);
+            assert.equal(isQaIssue({ ...legacyIssue, suggestions: [{ suggestedSegment: 'new', confidence: Number.NaN }] }), false);
+            assert.equal(isQaIssue({ ...legacyIssue, suggestions: [{ suggestedSegment: 'new', confidence: 1.1 }] }), false);
         });
     });
 

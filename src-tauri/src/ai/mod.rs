@@ -21,6 +21,6 @@ pub use prompt_builder::{
     COMPRESSED_SYSTEM_INSTRUCTION, QA_COMPRESSED_TEMPLATE,
 };
 pub use provider::{LocalLlmProvider, MockLlmProvider};
-pub use qa_parser::{QaIssue, QaParser, QaReport, QaSeverity, QaStatus};
+pub use qa_parser::{QaIssue, QaParser, QaReport, QaSeverity, QaStatus, QaSuggestion};
 pub use types::*;
 

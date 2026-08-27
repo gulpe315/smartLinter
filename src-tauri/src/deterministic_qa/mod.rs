@@ -240,6 +240,7 @@ fn dictionary_issue(
         confidence: Some(confidence),
         rule_id: Some(format!("{}.{}", category.id, typo)),
         conflict_group_id: None,
+        suggestions: None,
     }
 }
 
@@ -308,6 +309,7 @@ fn marker_issues(text: &str, markers: &ListMarkers) -> Vec<QaIssue> {
                     reason: "Non-monotonic list-marker progression; no automatic correction is proposed.".into(), severity: QaSeverity::Low,
                     start_offset: Some(utf16_offset(text, start)), end_offset: Some(utf16_offset(text, end)), provenance: Some("deterministic".into()),
                     confidence: Some(0.35), rule_id: Some(format!("list.markers.{}", token)), conflict_group_id: None,
+                    suggestions: None,
                 });
             }
         }

@@ -243,6 +243,28 @@ export type QaSeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'INFO';
 /** Status of the QA linting outcome for a paragraph */
 export type QaStatus = 'PASS' | 'FAIL';
 
+export type QaProvenance =
+    | 'deterministic'
+    | 'llm'
+    | 'deterministic+llm'
+    | `deterministic:${string}`
+    | `morphology:${string}`
+    | `llm:${string}`;
+
+/** One selectable replacement for the same QaIssue source span. */
+export interface QaSuggestion {
+    /** Non-empty complete replacement for the issue's originalSegment. */
+    suggestedSegment: string;
+    /** Short selectable-option label. */
+    label?: string;
+    /** Option-specific rationale. */
+    reason?: string;
+    /** Inclusive 0..1 confidence for this option. */
+    confidence?: number;
+    /** Evidence source for this option. */
+    provenance?: QaProvenance;
+}
+
 /** Single structured QA violation issue */
 export interface QaIssue {
     /** Category or rule name (e.g. "Terminology", "Passive Voice", "Spacing", "용어 혼용", "맞춤법") */
@@ -259,10 +281,13 @@ export interface QaIssue {
     startOffset?: number;
     /** End offset in the target paragraph, measured in UTF-16 code units */
     endOffset?: number;
-    provenance?: 'deterministic' | 'llm' | 'deterministic+llm';
+    provenance?: QaProvenance;
     confidence?: number;
     ruleId?: string;
     conflictGroupId?: string;
+    /** Present only for genuine same-span alternatives (at least two distinct options).
+     * suggestedSegment mirrors its first entry for legacy consumers; it is not a default. */
+    suggestions?: QaSuggestion[];
 }
 
 /** Complete QA lint report containing status and list of detected issues */
@@ -288,12 +313,29 @@ export function isQaStatus(val: unknown): val is QaStatus {
 export function isQaIssue(val: unknown): val is QaIssue {
     if (typeof val !== 'object' || val === null) return false;
     const obj = val as Record<string, unknown>;
+    const suggestionsAreValid = obj.suggestions === undefined || (
+        Array.isArray(obj.suggestions) &&
+        obj.suggestions.length >= 2 &&
+        obj.suggestions.every((suggestion) =>
+            typeof suggestion === 'object' &&
+            suggestion !== null &&
+            typeof (suggestion as Record<string, unknown>).suggestedSegment === 'string' &&
+            (
+                (suggestion as Record<string, unknown>).confidence === undefined ||
+                (typeof (suggestion as Record<string, unknown>).confidence === 'number' &&
+                    Number.isFinite((suggestion as Record<string, unknown>).confidence) &&
+                    (suggestion as Record<string, unknown>).confidence >= 0 &&
+                    (suggestion as Record<string, unknown>).confidence <= 1)
+            )
+        )
+    );
     return (
         typeof obj.category === 'string' &&
         typeof obj.originalSegment === 'string' &&
         typeof obj.suggestedSegment === 'string' &&
         typeof obj.reason === 'string' &&
-        typeof obj.severity === 'string'
+        typeof obj.severity === 'string' &&
+        suggestionsAreValid
     );
 }
 

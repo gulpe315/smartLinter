@@ -83,6 +83,47 @@ impl From<&str> for QaStatus {
     }
 }
 
+/// One selectable replacement for the same QaIssue source span.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QaSuggestion {
+    /// Non-empty complete replacement for `QaIssue::original_segment`.
+    pub suggested_segment: String,
+    /// Short option label, such as "particle agreement" or "proper-name reading".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Candidate-specific rationale. It supplements, rather than replaces,
+    /// the issue-level reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    /// Confidence in this option, in the inclusive range 0.0..=1.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub confidence: Option<f32>,
+    /// Evidence source for this option, e.g. a deterministic rule or Kiwi.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<String>,
+}
+
+/// Normalizes a raw suggestion list: trims, drops empty replacements,
+/// deduplicates by exact trimmed text, and collapses zero/one items to `None`.
+pub(crate) fn normalize_suggestions(raw: Vec<QaSuggestion>) -> Option<Vec<QaSuggestion>> {
+    let mut normalized = Vec::new();
+
+    for mut suggestion in raw {
+        suggestion.suggested_segment = suggestion.suggested_segment.trim().to_string();
+        if suggestion.suggested_segment.is_empty()
+            || normalized.iter().any(|existing: &QaSuggestion| {
+                existing.suggested_segment == suggestion.suggested_segment
+            })
+        {
+            continue;
+        }
+        normalized.push(suggestion);
+    }
+
+    (normalized.len() >= 2).then_some(normalized)
+}
+
 /// Single structured QA violation issue mapped for UI cards and diff replacement.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,6 +152,12 @@ pub struct QaIssue {
     pub rule_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflict_group_id: Option<String>,
+    /// Selectable alternatives for this one source span. Omitted for legacy
+    /// and unambiguous issues. When present it has at least two non-empty,
+    /// distinct `suggested_segment` values; `suggested_segment` is a
+    /// compatibility-only mirror of the first item, never an auto-selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggestions: Option<Vec<QaSuggestion>>,
 }
 
 impl QaIssue {
@@ -133,6 +180,7 @@ impl QaIssue {
             confidence: None,
             rule_id: None,
             conflict_group_id: None,
+            suggestions: None,
         }
     }
 }
@@ -309,6 +357,7 @@ impl RawIssuePayload {
             confidence: None,
             rule_id: None,
             conflict_group_id: None,
+            suggestions: None,
         })
     }
 }
@@ -778,5 +827,64 @@ mod tests {
         assert_eq!(garbage_report.status, QaStatus::Pass);
         assert_eq!(garbage_report.issues.len(), 0);
         assert!(garbage_report.parser_error.is_some());
+    }
+
+    #[test]
+    fn qa_suggestion_serialization_round_trip() {
+        let suggestion = QaSuggestion {
+            suggested_segment: "replacement".into(),
+            label: Some("particle agreement".into()),
+            reason: Some("matches the preceding noun".into()),
+            confidence: Some(0.9),
+            provenance: Some("deterministic:particle".into()),
+        };
+
+        let serialized = serde_json::to_string(&suggestion).unwrap();
+        assert!(serialized.contains("suggestedSegment"));
+        assert_eq!(
+            serde_json::from_str::<QaSuggestion>(&serialized).unwrap(),
+            suggestion
+        );
+    }
+
+    #[test]
+    fn normalize_suggestions_trims_deduplicates_and_requires_alternatives() {
+        let suggestion = |segment: &str| QaSuggestion {
+            suggested_segment: segment.into(),
+            label: None,
+            reason: None,
+            confidence: None,
+            provenance: None,
+        };
+
+        assert_eq!(
+            normalize_suggestions(vec![suggestion(" "), suggestion("\t")]),
+            None
+        );
+        assert_eq!(normalize_suggestions(vec![suggestion(" only ")]), None);
+
+        let normalized = normalize_suggestions(vec![
+            suggestion(" first "),
+            suggestion("first"),
+            suggestion(" second "),
+        ])
+        .unwrap();
+        assert_eq!(normalized.len(), 2);
+        assert_eq!(normalized[0].suggested_segment, "first");
+        assert_eq!(normalized[1].suggested_segment, "second");
+    }
+
+    #[test]
+    fn legacy_issue_payload_deserializes_without_suggestions() {
+        let payload = r#"{
+            "category": "Grammar",
+            "originalSegment": "old",
+            "suggestedSegment": "new",
+            "reason": "legacy payload",
+            "severity": "MEDIUM"
+        }"#;
+
+        let issue: QaIssue = serde_json::from_str(payload).unwrap();
+        assert_eq!(issue.suggestions, None);
     }
 }
