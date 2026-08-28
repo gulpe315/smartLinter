@@ -82,16 +82,17 @@ VM 콜드기동 — 은 예외. [[feedback_skip_live_review_when_tests_pass]] �
 매 수정 후 실제 Word에서 직접 재현·확인해줌 — 이 패턴 덕분에 스냅샷
 gate/텔레메트리 근본버그를 실제로 잡아냄, 다음 세션도 이 흐름 유지).
 
-### 1. Word "위치 보기" InDesign 하드코딩 버그 — 착수함, 상태는 git log로 확인
-`TASK_REQUEST_WORD_LOCATE_FIX.md`로 Codex에게 구현 위임(설계는
-`AGY_ANSWER_LOCATE_WORD_AND_SENTENCE_SCOPING.md`/
-`CODEX_ANSWER_LOCATE_WORD_AND_SENTENCE_SCOPING.md`에서 이미 완전
-수렴 — 새 `LOCATE_REQUEST`/`RESPONSE` RPC, snapshot과 동일한
-fail-closed 전수후보수집 규칙). **이 문서가 마지막으로 갱신된 시점에는
-아직 Claude의 diff 검토·독립 재검증·커밋이 끝났는지 불확실** — 다음
-세션 시작 시 `git log --oneline -5`로 관련 커밋이 있는지 먼저 확인할
-것. 없으면 Codex 결과물이 uncommitted 상태로 남아있을 수 있으니
-`git status`도 같이 확인.
+### 1. Word "위치 보기" InDesign 하드코딩 버그 — 완료됨(커밋 `d9baf48`, 2026-08-28)
+Codex 구현(`TASK_REQUEST_WORD_LOCATE_FIX.md`) → Claude가 diff 파일+라인
+단위 검토 중 죽은 코드 1건 발견(`QACardItem.tsx`의 `return
+setLocateError(...)` 뒤에 도달 불가능한 옛 InDesign 문구가 남아있던
+것, 직접 정리) → `cargo test`(92/92)/`npm test`(183/183)/
+`npm run test:ui`(295/295)/`npm run build` 독립 재검증 후 커밋. 새
+`LOCATE_REQUEST`/`RESPONSE` RPC(snapshot과 별개 메시지, locate는
+선택/스크롤 부수효과가 있어서), Word `locate_provider.ts`가 snapshot과
+동일한 전수후보수집 fail-closed 규칙 적용. **다음 세션에서 서버
+재기동 후 실제 Word에서 라이브 확인 필요**(이 문서 갱신 시점엔 아직
+사용자 확인 전 — Rust 변경이 있어 서버 재기동 후 Word 재연결부터).
 
 ### 2. 문장 단위 CAT 정합성 대형 설계 — 착수 전, 다음 세션 시작점
 사용자가 세션 후반에 명확히 재확인한 목표: **"QA 카드 발생 단위 =
