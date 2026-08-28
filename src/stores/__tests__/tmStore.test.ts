@@ -86,6 +86,7 @@ describe('SmartLinter TM Store (tmStore)', () => {
   });
 
   it('should automatically search when new-paragraph-detected event is received', async () => {
+    useTmStore.getState().setSearchMode('keyword');
     const cleanup = useTmStore.getState().initEventListener(mockBridge);
 
     const testParagraph: ParagraphPayload = {
@@ -107,6 +108,7 @@ describe('SmartLinter TM Store (tmStore)', () => {
     expect(state.currentParagraph?.paragraphId).toBe('para-101');
     expect(state.candidates.length).toBeGreaterThan(0);
     expect(state.candidates[0].grade).toBe('EXACT');
+    expect(state.searchMode).toBe('fuzzy');
 
     cleanup();
   });
@@ -143,6 +145,18 @@ describe('SmartLinter TM Store (tmStore)', () => {
     const updatedState = useTmStore.getState();
     const appliedCandidate = updatedState.candidates.find((c) => c.source === targetCandidate.source);
     expect(appliedCandidate?.status).toBe('applied');
+  });
+
+  it('applies an override target while updating the original candidate card status', async () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'para-override', text: mockEntries[0].source, hash: 'base-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const [candidate] = await useTmStore.getState().search(paragraph.text);
+
+    await useTmStore.getState().applyMatch(candidate, paragraph, mockBridge, 'Edited target text.');
+
+    expect(useTmStore.getState().candidates.find((item) => item.target === candidate.target)?.status).toBe('applied');
   });
 
   it('should handle threshold changes and re-filter candidates', async () => {

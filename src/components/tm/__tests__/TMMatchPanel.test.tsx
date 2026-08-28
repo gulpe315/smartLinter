@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { TMMatchPanel } from '../TMMatchPanel.tsx';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { useConfigStore } from '../../../stores/configStore.ts';
@@ -89,6 +89,31 @@ describe('TMMatchPanel Component', () => {
     expect(screen.getByTestId('tm-match-candidates-list')).toBeInTheDocument();
     expect(screen.getByText('100% Exact Match')).toBeInTheDocument();
     expect(screen.getByText('브릿지 환경 설정을 구성하려면 설정 버튼을 클릭하십시오.')).toBeInTheDocument();
+  });
+
+  it('resets a card edit when the current paragraph changes', () => {
+    const firstParagraph: ParagraphPayload = {
+      paragraphId: 'edit-reset-1', text: 'First paragraph.', hash: 'h-1', source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const secondParagraph: ParagraphPayload = {
+      paragraphId: 'edit-reset-2', text: 'Second paragraph.', hash: 'h-2', source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 1, activeParagraph: firstParagraph });
+    useTmStore.setState({
+      currentParagraph: firstParagraph,
+      searchQuery: firstParagraph.text,
+      candidates: [{ tuId: 'edit-reset', source: 'TM source', target: 'Original target', score: 1, scorePercent: 100, grade: 'EXACT', status: 'idle' }],
+    });
+    render(<TMMatchPanel />);
+
+    fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Uncommitted edit' } });
+    act(() => {
+      useTmStore.setState({ currentParagraph: secondParagraph, searchQuery: secondParagraph.text });
+    });
+
+    expect(screen.queryByTestId('tm-edit-target-textarea')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tm-card-target')).toHaveTextContent('Original target');
   });
 
   it('should display calculation latency speed badge', async () => {

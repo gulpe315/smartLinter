@@ -59,7 +59,8 @@ export interface TMState {
   applyMatch: (
     candidate: TmMatchCandidate,
     paragraphOverride?: ParagraphPayload,
-    service?: IBridgeService
+    service?: IBridgeService,
+    overrideTarget?: string,
   ) => Promise<ReplacementResult | null>;
   setMinScore: (minScore: number) => void;
   setTopN: (topN: number) => void;
@@ -184,7 +185,7 @@ export const useTmStore = create<TMState>((set, get) => ({
     return results;
   },
 
-  applyMatch: async (candidate, paragraphOverride, service) => {
+  applyMatch: async (candidate, paragraphOverride, service, overrideTarget) => {
     const candidateKey = `${candidate.source}:::${candidate.target}`;
     set({ applyingCandidateKey: candidateKey });
 
@@ -206,7 +207,10 @@ export const useTmStore = create<TMState>((set, get) => ({
 
     try {
       const originalText = activePara ? activePara.text : candidate.source;
-      const targetReplacement = candidate.target;
+      // Keep candidate identity tied to the original TM entry.  The optional
+      // target changes only the replacement text, so lifecycle updates still
+      // reach the card that initiated this operation.
+      const targetReplacement = overrideTarget ?? candidate.target;
 
       // 1. Calculate diff hunks
       const hunks: TextHunk[] = extractDiffHunks(originalText, targetReplacement);
@@ -307,7 +311,9 @@ export const useTmStore = create<TMState>((set, get) => ({
     // Subscribe to new incoming paragraphs from Word/InDesign editor
     unlisteners.push(
       bridgeService.listen('new-paragraph-detected', (payload) => {
-        set({ currentParagraph: payload, searchQuery: payload.text });
+        // An editor event always starts an automatic paragraph search. It
+        // must not inherit a prior manual keyword-search mode.
+        set({ currentParagraph: payload, searchQuery: payload.text, searchMode: 'fuzzy' });
         // Execute TM matching immediately (< 100ms)
         get().search(payload.text);
       })

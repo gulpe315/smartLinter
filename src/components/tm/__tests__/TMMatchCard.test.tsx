@@ -3,10 +3,13 @@
  */
 
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TMMatchCard } from '../TMMatchCard.tsx';
 import { type TmMatchCandidate } from '../../../types/tm.ts';
+import { useBridgeStore } from '../../../stores/bridgeStore.ts';
+import { useConfigStore } from '../../../stores/configStore.ts';
+import { useTmStore } from '../../../stores/tmStore.ts';
 
 describe('TMMatchCard Component', () => {
   const exactCandidate: TmMatchCandidate = {
@@ -44,6 +47,13 @@ describe('TMMatchCard Component', () => {
     targetLang: 'ko',
     status: 'idle',
   };
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    useBridgeStore.getState().reset();
+    useConfigStore.getState().reset();
+    useTmStore.getState().reset();
+  });
 
   it('should render 100% Exact match with green badge (Condition 2)', () => {
     render(<TMMatchCard candidate={exactCandidate} />);
@@ -154,5 +164,144 @@ describe('TMMatchCard Component', () => {
     expect(screen.getAllByText('Bridge', { selector: 'mark' })).toHaveLength(2);
     expect(screen.queryByText(/current.*difference/i)).not.toBeInTheDocument();
     expect(screen.getByText('키워드 검색 결과 — 현재 문단에 적용')).toBeInTheDocument();
+  });
+
+  it('applies the edited target while retaining the original candidate identity', () => {
+    const onApplyMock = vi.fn();
+    render(<TMMatchCard candidate={exactCandidate} onApply={onApplyMock} />);
+
+    fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Edited translation.' } });
+    fireEvent.click(screen.getByTestId('tm-apply-btn'));
+
+    expect(onApplyMock).toHaveBeenCalledWith(exactCandidate, 'Edited translation.');
+  });
+
+  it('saves the edited target using the current paragraph rather than candidate.source', () => {
+    const currentSource = 'The actual current paragraph.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-1', text: currentSource, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: currentSource });
+    const addSpy = vi.spyOn(useConfigStore.getState(), 'addUserTmEntry');
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<TMMatchCard candidate={exactCandidate} />);
+
+    fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Edited translation.' } });
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+
+    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ source: currentSource, target: 'Edited translation.' }), false);
+    expect(addSpy).not.toHaveBeenCalledWith(expect.objectContaining({ source: exactCandidate.source }), expect.anything());
+  });
+
+  it('disables TM save when there is no current paragraph', () => {
+    render(<TMMatchCard candidate={exactCandidate} />);
+    expect(screen.getByTestId('tm-save-btn')).toBeDisabled();
+  });
+
+  it('disables apply and TM saving when the target is blank', () => {
+    const source = 'Current paragraph.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-empty', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
+    render(<TMMatchCard candidate={{ ...exactCandidate, target: '   ' }} />);
+
+    expect(screen.getByTestId('tm-apply-btn')).toBeDisabled();
+    expect(screen.getByTestId('tm-save-btn')).toBeDisabled();
+  });
+
+  it('shows the edited target and uses it when copying', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<TMMatchCard candidate={exactCandidate} />);
+
+    fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Visible edited translation.' } });
+    expect(screen.getByTestId('tm-edited-suggestion-label')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tm-edit-confirm-btn'));
+
+    expect(screen.getByTestId('tm-card-target')).toHaveTextContent('Visible edited translation.');
+    expect(screen.getByTestId('tm-edited-suggestion-label')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('tm-copy-target-btn'));
+    expect(writeText).toHaveBeenCalledWith('Visible edited translation.');
+  });
+
+  it('disables TM saving for keyword and custom fuzzy searches', () => {
+    const source = 'Current paragraph.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-2', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'keyword', searchQuery: source });
+    const { rerender } = render(<TMMatchCard candidate={{ ...exactCandidate, matchMode: 'keyword' }} />);
+    expect(screen.getByTestId('tm-save-btn')).toBeDisabled();
+
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: 'A manually entered query.' });
+    rerender(<TMMatchCard candidate={exactCandidate} />);
+    expect(screen.getByTestId('tm-save-btn')).toBeDisabled();
+  });
+
+  it('allows multi-sentence source text but warns before saving, including ellipsis boundaries', () => {
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-3', text: 'One sentence. Another sentence.', hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: 'One sentence. Another sentence.' });
+    const { rerender } = render(<TMMatchCard candidate={exactCandidate} />);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    expect(screen.getByTestId('tm-save-btn')).toBeEnabled();
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('여러 문장'));
+
+    const singleSentence = 'Version v2.0 costs 1.5x at docs.google.com';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-4', text: singleSentence, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchQuery: singleSentence });
+    rerender(<TMMatchCard candidate={exactCandidate} />);
+    expect(screen.getByTestId('tm-save-btn')).toBeEnabled();
+
+    const ellipsisParagraph = 'Wait… Another sentence.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-ellipsis', text: ellipsisParagraph, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchQuery: ellipsisParagraph });
+    rerender(<TMMatchCard candidate={exactCandidate} />);
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(confirmSpy).toHaveBeenLastCalledWith(expect.stringContaining('여러 문장'));
+  });
+
+  it('does not warn for a single sentence and stops saving when confirmation is cancelled', () => {
+    const source = 'A single sentence.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-confirm', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: `  ${source}  ` });
+    const addSpy = vi.spyOn(useConfigStore.getState(), 'addUserTmEntry');
+    addSpy.mockClear();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<TMMatchCard candidate={exactCandidate} />);
+
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(confirmSpy).toHaveBeenCalledWith(expect.not.stringContaining('여러 문장'));
+    expect(addSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows the existing translation in a conflicting-save confirmation', () => {
+    const source = 'Conflicting source.';
+    const existingTarget = 'Existing translation.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-conflict', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
+    useConfigStore.setState({ tmEntries: [{ id: 'existing', source, target: existingTarget }] });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<TMMatchCard candidate={exactCandidate} />);
+
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(existingTarget));
+  });
+
+  it('clears the saved indicator after cancelling an edit', () => {
+    const source = 'Current paragraph.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-5', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<TMMatchCard candidate={exactCandidate} />);
+
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(screen.getByTestId('tm-save-btn')).toHaveTextContent('TM 저장됨');
+    fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Changed target.' } });
+    expect(screen.getByTestId('tm-save-btn')).not.toHaveTextContent('TM 저장됨');
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(screen.getByTestId('tm-save-btn')).toHaveTextContent('TM 저장됨');
+    fireEvent.click(screen.getByTestId('tm-edit-cancel-btn'));
+    expect(screen.getByTestId('tm-save-btn')).not.toHaveTextContent('TM 저장됨');
+    expect(screen.queryByTestId('tm-edited-suggestion-label')).not.toBeInTheDocument();
   });
 });

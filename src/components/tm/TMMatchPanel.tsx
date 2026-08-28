@@ -36,6 +36,7 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
   const { tmEntries, openSettingsModal } = useConfigStore();
   const {
     candidates,
+    currentParagraph,
     isSearching,
     matchDurationMs,
     minScore,
@@ -54,7 +55,7 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
   const [keywordInput, setKeywordInput] = useState('');
   const [showSearchInput, setShowSearchInput] = useState(false);
 
-  const currentParagraphText = activeParagraph?.text || '';
+  const currentParagraphText = currentParagraph?.text || activeParagraph?.text || '';
   const effectiveTmCount = tmEntriesCount || tmEntries.length;
   const isTmActuallyLoaded = tmLoaded || effectiveTmCount > 0;
 
@@ -95,8 +96,8 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
     searchKeyword(keywordInput);
   };
 
-  const handleApply = async (candidate: TmMatchCandidate) => {
-    await applyMatch(candidate);
+  const handleApply = async (candidate: TmMatchCandidate, overrideTarget?: string) => {
+    await applyMatch(candidate, undefined, undefined, overrideTarget);
   };
 
   return (
@@ -323,9 +324,9 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             data-testid="tm-match-candidates-list"
             className="space-y-3"
           >
-            {candidates.map((cand, idx) => (
+            {candidates.map((cand) => (
               <TMMatchCard
-                key={`${cand.tuId || idx}-${cand.source}-${cand.scorePercent}`}
+                key={`${currentParagraph?.paragraphId || activeParagraph?.paragraphId || 'no-paragraph'}-${cand.tuId || `${cand.source}-${cand.target}-${cand.scorePercent}`}`}
                 candidate={cand}
                 currentText={currentParagraphText || searchQuery}
                 onApply={handleApply}

@@ -19,17 +19,24 @@ import {
   Sparkles,
   Zap,
   Search,
+  Pencil,
+  Save,
+  X,
+  Database,
 } from 'lucide-react';
 import {
   type TmMatchCandidate,
   getGradeBadgeClasses,
 } from '../../types/tm.ts';
 import { InlineDiffViewer } from '../qa/InlineDiffViewer.tsx';
+import { useBridgeStore } from '../../stores/bridgeStore.ts';
+import { useConfigStore } from '../../stores/configStore.ts';
+import { useTmStore } from '../../stores/tmStore.ts';
 
 export interface TMMatchCardProps {
   candidate: TmMatchCandidate;
   currentText?: string;
-  onApply?: (candidate: TmMatchCandidate) => void;
+  onApply?: (candidate: TmMatchCandidate, overrideTarget?: string) => void;
   isApplying?: boolean;
   className?: string;
 }
@@ -42,6 +49,14 @@ const renderHighlightedText = (text: string, keyword?: string) => {
   return <>{text.slice(0, start)}<mark className="rounded bg-amber-300/25 px-0.5 text-inherit">{text.slice(start, end)}</mark>{text.slice(end)}</>;
 };
 
+// A period only ends a sentence when it is followed by whitespace or the end
+// of the paragraph.  This deliberately leaves decimals, file names, and
+// abbreviations such as U.S.A. intact.
+const sentenceCount = (text: string) => text.trim()
+  .split(/[.!?\u2026](?=\s|$)|\n+/)
+  .filter((segment) => segment.trim().length > 0)
+  .length;
+
 export const TMMatchCard: React.FC<TMMatchCardProps> = ({
   candidate,
   currentText = '',
@@ -51,23 +66,82 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(true);
+  const [editedSuggestion, setEditedSuggestion] = useState<string | null>(null);
+  const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
+  const [isTmSaved, setIsTmSaved] = useState(false);
+  const tmCurrentParagraph = useTmStore((state) => state.currentParagraph);
+  const searchMode = useTmStore((state) => state.searchMode);
+  const searchQuery = useTmStore((state) => state.searchQuery);
+  const activeParagraph = useBridgeStore((state) => state.activeParagraph);
 
   const isApplying = propIsApplying || candidate.status === 'applying';
   const isApplied = candidate.status === 'applied';
   const isFailed = candidate.status === 'failed';
+  const canEdit = !isApplying && !isApplied;
+  const effectiveTarget = editedSuggestion ?? candidate.target;
+  const hasUsableTarget = effectiveTarget.trim().length > 0;
+  const currentParagraphText = tmCurrentParagraph?.text || activeParagraph?.text || '';
+  const hasCurrentParagraph = Boolean(currentParagraphText.trim());
+  const isCurrentParagraphSearch = searchQuery.trim() === currentParagraphText.trim();
+  const isSingleSentence = sentenceCount(currentParagraphText) === 1;
+  const canSaveToTm = searchMode === 'fuzzy'
+    && hasCurrentParagraph
+    && isCurrentParagraphSearch
+    && hasUsableTarget;
+  const saveDisabledReason = searchMode !== 'fuzzy'
+    ? 'TM 검색 결과는 문장 단위로 저장할 수 없습니다.'
+    : !hasCurrentParagraph
+      ? '현재 문단이 없어 TM에 저장할 수 없습니다.'
+      : !isCurrentParagraphSearch
+        ? '직접 검색한 결과는 현재 문단과 연결되지 않아 TM에 저장할 수 없습니다.'
+      : !hasUsableTarget
+        ? '빈 번역은 TM에 저장할 수 없습니다.'
+        : undefined;
 
   const badgeStyle = getGradeBadgeClasses(candidate.grade, candidate.scorePercent);
 
   const handleCopyTarget = async () => {
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        await navigator.clipboard.writeText(candidate.target);
+        await navigator.clipboard.writeText(effectiveTarget);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       }
     } catch (err) {
       console.warn('Failed to copy to clipboard:', err);
     }
+  };
+
+  const startEditingSuggestion = () => {
+    if (!canEdit) return;
+    setEditedSuggestion((previous) => previous ?? candidate.target);
+    setIsEditingSuggestion(true);
+  };
+
+  const cancelEditingSuggestion = () => {
+    setEditedSuggestion(null);
+    setIsEditingSuggestion(false);
+    setIsTmSaved(false);
+  };
+
+  const saveToTm = () => {
+    if (!canSaveToTm) return;
+    const config = useConfigStore.getState();
+    const conflict = config.findUserTmConflict(currentParagraphText);
+    const sameTarget = conflict?.target === effectiveTarget;
+    const conflictWarning = conflict && !sameTarget
+      ? `\n\n같은 원문으로 저장된 다른 TM 번역이 있습니다.\n기존 번역:\n${conflict.target}`
+      : '';
+    const multiSentenceWarning = !isSingleSentence
+      ? '\n\n경고: 이 문단에는 여러 문장이 포함되어 있습니다. 문단 전체가 하나의 TM 항목으로 저장됩니다.'
+      : '';
+    if (!window.confirm(`다음 문장쌍을 TM에 저장하시겠습니까?\n\n원문:\n${currentParagraphText}\n\n번역:\n${effectiveTarget}${multiSentenceWarning}${conflictWarning}`)) return;
+    const result = config.addUserTmEntry({
+      source: currentParagraphText,
+      target: effectiveTarget,
+      targetLang: config.targetLang,
+    }, Boolean(conflict && !sameTarget));
+    if (result === 'added' || result === 'duplicate') setIsTmSaved(true);
   };
 
   return (
@@ -186,15 +260,21 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
             <span className="flex items-center gap-1 uppercase tracking-wider">
               <Zap className="w-3 h-3 text-cyan-400" /> TM 번역 제안 (TGT)
             </span>
+            {editedSuggestion !== null && (
+              <span data-testid="tm-edited-suggestion-label" className="rounded bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-amber-300">
+                수정된 제안
+              </span>
+            )}
           </div>
-          <p
-            data-testid="tm-card-target"
-            className="text-xs font-medium text-slate-100 leading-relaxed break-words select-text"
-          >
-            {candidate.matchMode === 'keyword'
-              ? renderHighlightedText(candidate.target, candidate.matchedKeyword)
-              : candidate.target}
-          </p>
+          {isEditingSuggestion ? (
+            <textarea data-testid="tm-edit-target-textarea" value={effectiveTarget} onChange={(event) => { setEditedSuggestion(event.target.value); setIsTmSaved(false); }} disabled={!canEdit} aria-label="TM 번역 제안 편집" className="w-full min-h-20 resize-y rounded-md border border-cyan-800 bg-slate-950 px-2 py-1.5 text-xs font-medium leading-relaxed text-slate-100 outline-none focus:border-cyan-500 disabled:opacity-60" />
+          ) : (
+            <p data-testid="tm-card-target" className="text-xs font-medium text-slate-100 leading-relaxed break-words select-text">
+              {candidate.matchMode === 'keyword' && editedSuggestion === null
+                ? renderHighlightedText(effectiveTarget, candidate.matchedKeyword)
+                : effectiveTarget}
+            </p>
+          )}
         </div>
       </div>
 
@@ -226,12 +306,18 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-none">
+          {isEditingSuggestion ? (
+            <><button type="button" data-testid="tm-edit-confirm-btn" onClick={() => setIsEditingSuggestion(false)} disabled={!hasUsableTarget || !canEdit} className="p-1.5 rounded-md text-emerald-300 hover:bg-emerald-950 disabled:opacity-50" title="편집 완료"><Save className="w-3.5 h-3.5" /></button><button type="button" data-testid="tm-edit-cancel-btn" onClick={cancelEditingSuggestion} disabled={!canEdit} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-800 disabled:opacity-50" title="편집 취소"><X className="w-3.5 h-3.5" /></button></>
+          ) : <button type="button" data-testid="tm-edit-target-btn" onClick={startEditingSuggestion} disabled={!canEdit} className="p-1.5 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-slate-800 disabled:opacity-50" title="번역 제안 편집"><Pencil className="w-3.5 h-3.5" /></button>}
+          <button type="button" data-testid="tm-save-btn" onClick={saveToTm} disabled={!canSaveToTm} title={isTmSaved ? 'TM에 저장됨' : saveDisabledReason || '현재 문단과 번역을 TM에 저장'} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 text-violet-200 bg-violet-950/70 border border-violet-800 hover:bg-violet-900 disabled:opacity-50 disabled:cursor-not-allowed">
+            {isTmSaved ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Database className="w-3.5 h-3.5" />}<span>{isTmSaved ? 'TM 저장됨' : 'TM 저장'}</span>
+          </button>
           {/* [TM 적용] Button */}
           <button
             type="button"
             data-testid="tm-apply-btn"
-            disabled={isApplying || isApplied}
-            onClick={() => onApply?.(candidate)}
+            disabled={isApplying || isApplied || !hasUsableTarget}
+            onClick={() => editedSuggestion !== null ? onApply?.(candidate, editedSuggestion) : onApply?.(candidate)}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
               isApplied
                 ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-700/60 cursor-default'
