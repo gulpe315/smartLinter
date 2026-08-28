@@ -16,6 +16,8 @@ import {
     isParagraphPayload,
 } from '../../../shared/protocol/types.ts';
 
+const DEFAULT_DEV_PAIRING_TOKEN = 'smartlinter-default-dev-token-secret-32b';
+
 export type BridgeConnectionStatus =
     | 'DISCONNECTED'
     | 'CONNECTING'
@@ -72,7 +74,9 @@ export class WordBridgeClient {
     constructor(config: BridgeClientConfig = {}) {
         this.serverHost = config.serverHost || '127.0.0.1';
         this.serverPort = config.serverPort || 49152;
-        this.tokenSupplier = config.token || 'smartlinter-default-dev-token-secret-32b';
+        this.tokenSupplier = config.token
+            || import.meta.env?.VITE_SMARTLINTER_DEV_TOKEN
+            || DEFAULT_DEV_PAIRING_TOKEN;
         this.version = config.version || '0.1.0';
         this.enableWebSocket = config.enableWebSocket !== false;
         this.heartbeatIntervalMs = config.heartbeatIntervalMs ?? 5000;

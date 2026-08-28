@@ -5,11 +5,31 @@ import tailwindcss from '@tailwindcss/vite';
 import mkcert from 'vite-plugin-mkcert';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import type { Plugin, ViteDevServer } from 'vite';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const DEFAULT_DEV_PAIRING_TOKEN = 'smartlinter-default-dev-token-secret-32b';
+
+/**
+ * Reads the native app's local pairing token only while starting Vite's dev server.
+ * A missing, unreadable, or blank file must never prevent frontend development.
+ */
+function readDevPairingToken(): string {
+  const localAppData = process.env.LOCALAPPDATA;
+  if (!localAppData) {
+    return DEFAULT_DEV_PAIRING_TOKEN;
+  }
+
+  try {
+    const token = readFileSync(path.join(localAppData, 'SmartLinter', 'pairing_token.txt'), 'utf8').trim();
+    return token || DEFAULT_DEV_PAIRING_TOKEN;
+  } catch {
+    return DEFAULT_DEV_PAIRING_TOKEN;
+  }
+}
 
 const wordTaskpaneRoute: Plugin = {
   name: 'smartlinter-word-taskpane-route',
@@ -37,7 +57,14 @@ const wordTaskpaneRoute: Plugin = {
 };
 
 // https://vitejs.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command }) => {
+  // This value deliberately exists only in `vite serve`. Never set it for a
+  // production build: doing so would embed a developer machine's secret in dist/.
+  if (command === 'serve') {
+    process.env.VITE_SMARTLINTER_DEV_TOKEN = readDevPairingToken();
+  }
+
+  return {
   // Certificate generation is needed only for the HTTPS development server.
   // Keeping it out of `vite build` makes the multi-page production build
   // independent of a developer's local certificate store.
@@ -72,4 +99,5 @@ export default defineConfig(({ command }) => ({
       },
     },
   },
-}));
+  };
+});
