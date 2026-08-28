@@ -44,6 +44,8 @@ export interface QACardItemProps {
   onMarkObsolete?: (cardId: string) => void;
   /** Keeps a locate failure visible when the card is removed from the active list. */
   onLocateFailure?: (message: string) => void;
+  /** Records the card that explicitly initiated a locate request. */
+  onLocateStart?: () => void;
   isApplying?: boolean;
   isFocused?: boolean;
   readOnly?: boolean;
@@ -57,6 +59,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   onDismiss,
   onMarkObsolete,
   onLocateFailure,
+  onLocateStart,
   isApplying: propIsApplying,
   isFocused = false,
   readOnly = false,
@@ -128,6 +131,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
 
   const handleLocate = async () => {
     if (!editorConnected) return;
+    onLocateStart?.();
     setIsLocating(true);
     setLocateError(null);
     try {

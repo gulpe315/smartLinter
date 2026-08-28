@@ -43,12 +43,14 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     analysisError,
     appliedCards,
     dismissedCards,
+    cards,
     lastEditorDisconnectAt,
     validateLiveCards,
   } = useQaStore();
 
   const [view, setView] = useState<'active' | 'history'>('active');
   const [locateFailureNotice, setLocateFailureNotice] = useState<string | null>(null);
+  const [lastLocatedCardId, setLastLocatedCardId] = useState<string | null>(null);
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const liveValidationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -67,12 +69,20 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
   useEffect(() => {
     if (!activeParagraph || focusedCardIds.size === 0) return;
 
-    const focusedCardId = filteredCards.find((card) => focusedCardIds.has(card.id))?.id;
+    const focusedCardId = lastLocatedCardId && focusedCardIds.has(lastLocatedCardId)
+      ? lastLocatedCardId
+      : filteredCards.find((card) => focusedCardIds.has(card.id))?.id;
     cardRefs.current.get(focusedCardId ?? '')?.scrollIntoView({
       behavior: 'smooth',
       block: 'nearest',
     });
-  }, [activeParagraph?.paragraphId]);
+  }, [activeParagraph?.paragraphId, lastLocatedCardId]);
+
+  useEffect(() => {
+    if (lastLocatedCardId && !cards.some((card) => card.id === lastLocatedCardId)) {
+      setLastLocatedCardId(null);
+    }
+  }, [cards, lastLocatedCardId]);
   const counts = getCardCountBySeverity();
   const historyCards = useMemo(
     () => [...appliedCards, ...dismissedCards].sort((a, b) => b.createdAt - a.createdAt),
@@ -279,6 +289,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
                   onDismiss={(id) => dismissCard(id)}
                   onMarkObsolete={(id) => markCardObsolete(id)}
                   onLocateFailure={setLocateFailureNotice}
+                  onLocateStart={() => setLastLocatedCardId(card.id)}
                 />
               </div>
             ))}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor, within } from '@testing-library/react';
 import { QACardList } from '../QACardList.tsx';
 import { useQaStore } from '../../../stores/qaStore.ts';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
@@ -128,17 +128,70 @@ describe('QACardList Component', () => {
     expect(screen.queryByTestId('qa-card-item-focused-low')).not.toBeInTheDocument();
   });
 
-  it('smoothly scrolls to the first matching focused card when telemetry arrives', () => {
+  it('smoothly scrolls to the first matching focused card when telemetry arrives without an explicit locate', () => {
     useQaStore.getState().addCard({ id: 'other-card', paragraphId: 'para-other', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Other', severity: 'LOW' });
-    useQaStore.getState().addCard({ id: 'focused-card', paragraphId: 'para-focused', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Focused', severity: 'LOW' });
+    useQaStore.getState().addCard({ id: 'first-focused-card', paragraphId: 'para-focused', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'First focused', severity: 'LOW' });
+    useQaStore.getState().addCard({ id: 'second-focused-card', paragraphId: 'para-focused', category: 'Style', originalSegment: 'wordy', suggestedSegment: 'concise', reason: 'Second focused', severity: 'LOW' });
+    const scrolledElements: HTMLElement[] = [];
+    scrollSpy.mockImplementation(function (this: HTMLElement) {
+      scrolledElements.push(this);
+    });
     render(<QACardList />);
 
     act(() => {
       useBridgeStore.getState().addParagraph({ paragraphId: 'para-focused', text: 'A focused paragraph.', hash: 'hash-focused', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
     });
 
-    expect(scrollSpy).toHaveBeenCalledTimes(1);
-    expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(scrollSpy).toHaveBeenCalledOnce();
+    expect(scrolledElements).toEqual([screen.getByTestId('qa-card-item-second-focused-card').parentElement]);
+  });
+
+  it('scrolls to the explicitly located card when multiple cards match the active paragraph', async () => {
+    useQaStore.getState().addCard({ id: 'clicked-second-card', paragraphId: 'para-shared', paragraphHash: 'hash-shared', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Clicked second', severity: 'LOW' });
+    useQaStore.getState().addCard({ id: 'top-card', paragraphId: 'para-shared', paragraphHash: 'hash-shared', category: 'Style', originalSegment: 'wordy', suggestedSegment: 'concise', reason: 'Top card', severity: 'LOW' });
+    const scrolledElements: HTMLElement[] = [];
+    const locateSpy = vi.spyOn(mockBridge, 'locateParagraph');
+    scrollSpy.mockImplementation(function (this: HTMLElement) {
+      scrolledElements.push(this);
+    });
+    render(<QACardList />);
+
+    fireEvent.click(within(screen.getByTestId('qa-card-item-clicked-second-card')).getByTestId('qa-locate-paragraph-btn'));
+    await waitFor(() => expect(locateSpy).toHaveBeenCalledWith('para-shared', 'hash-shared'));
+
+    act(() => {
+      useBridgeStore.getState().addParagraph({ paragraphId: 'para-shared', text: 'A shared paragraph.', hash: 'hash-shared', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    });
+
+    expect(scrolledElements).toEqual([screen.getByTestId('qa-card-item-clicked-second-card').parentElement]);
+  });
+
+  it('scrolls to a newly located card when telemetry repeats the active paragraph ID', async () => {
+    useQaStore.getState().addCard({ id: 'card-a', paragraphId: 'P1', paragraphHash: 'hash-p1', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Card A', severity: 'LOW' });
+    useQaStore.getState().addCard({ id: 'card-b', paragraphId: 'P1', paragraphHash: 'hash-p1', category: 'Style', originalSegment: 'wordy', suggestedSegment: 'concise', reason: 'Card B', severity: 'LOW' });
+    const scrolledElements: HTMLElement[] = [];
+    const locateSpy = vi.spyOn(mockBridge, 'locateParagraph');
+    scrollSpy.mockImplementation(function (this: HTMLElement) {
+      scrolledElements.push(this);
+    });
+    render(<QACardList />);
+
+    act(() => {
+      useBridgeStore.getState().addParagraph({ paragraphId: 'P1', text: 'Shared paragraph.', hash: 'hash-p1', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    });
+
+    fireEvent.click(within(screen.getByTestId('qa-card-item-card-a')).getByTestId('qa-locate-paragraph-btn'));
+    await waitFor(() => expect(locateSpy).toHaveBeenCalledWith('P1', 'hash-p1'));
+    expect(scrolledElements.at(-1)).toBe(screen.getByTestId('qa-card-item-card-a').parentElement);
+
+    fireEvent.click(within(screen.getByTestId('qa-card-item-card-b')).getByTestId('qa-locate-paragraph-btn'));
+    await waitFor(() => expect(locateSpy).toHaveBeenLastCalledWith('P1', 'hash-p1'));
+
+    act(() => {
+      useBridgeStore.getState().addParagraph({ paragraphId: 'P1', text: 'Shared paragraph.', hash: 'hash-p1', source: 'Doc.docx', timestamp: Date.now(), editorType: 'Word' });
+    });
+
+    expect(scrolledElements.at(-1)).toBe(screen.getByTestId('qa-card-item-card-b').parentElement);
   });
 
   it('does not scroll without a matching active card or on unrelated rerenders', () => {
