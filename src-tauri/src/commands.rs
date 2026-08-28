@@ -473,11 +473,21 @@ async fn request_word_locate(
 ) -> Result<crate::indesign_com::LocateParagraphResult, String> {
     let command_id = format!("locate-{paragraph_id}");
     match session_manager.request_locate(paragraph_id, base_hash, start_offset, end_offset).await {
-        Ok(response) => Ok(crate::indesign_com::LocateParagraphResult {
-            command_id,
-            status: locate_status_name(response.status).to_string(),
-            message: response.message.unwrap_or_default(),
-        }),
+        Ok(response) => {
+            if response.status == LocateStatus::Found {
+                match tokio::task::spawn_blocking(crate::window_focus::focus_word_window).await {
+                    Ok(Ok(true)) => tracing::debug!("Brought located Word window to the foreground"),
+                    Ok(Ok(false)) => tracing::debug!("No visible Word window was available to foreground"),
+                    Ok(Err(error)) => tracing::debug!(%error, "Could not foreground located Word window"),
+                    Err(error) => tracing::debug!(%error, "Word window foreground task failed"),
+                }
+            }
+            Ok(crate::indesign_com::LocateParagraphResult {
+                command_id,
+                status: locate_status_name(response.status).to_string(),
+                message: response.message.unwrap_or_default(),
+            })
+        }
         Err(SessionError::LocateTimeout | SessionError::LocateCancelled | SessionError::ChannelClosed) => Ok(crate::indesign_com::LocateParagraphResult {
             command_id,
             status: "BUSY".to_string(),
