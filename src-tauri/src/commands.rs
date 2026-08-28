@@ -10,11 +10,13 @@ use crate::ai::{
     CorrectionPreference, GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
     QaReport, QaStatus, QueueJobRequest, TmReference,
 };
-use crate::protocol::{EditorType, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
-use crate::server::{HealthResponse, ServerHandle};
+use crate::protocol::{EditorType, LiveSnapshotItem, LiveSnapshotStatus, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
+use crate::server::{HealthResponse, ServerHandle, SessionError, SessionManager};
 use crate::tm::{parse_tm_content, GuidelineLoader, GuidelineSet, TmEntry};
 use tauri::{State, WebviewWindow};
 use tracing::debug;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::indesign_com;
 use crate::language::LanguageTag;
@@ -373,8 +375,16 @@ pub async fn get_live_paragraph_snapshot(
         .await
         .ok_or_else(|| "No active editor session".to_string())?;
 
+    if session.editor_type == EditorType::Word {
+        return request_word_live_paragraph_snapshot(
+            server_handle.session_manager(),
+            paragraph_id,
+            base_hash,
+        ).await;
+    }
+
     if session.editor_type != EditorType::InDesign {
-        return Err("Live paragraph snapshot is supported only for InDesign".to_string());
+        return Err("Live paragraph snapshot is supported only for InDesign or Word".to_string());
     }
 
     tokio::task::spawn_blocking(move || indesign_com::get_live_paragraph_snapshot(paragraph_id, base_hash))
@@ -394,13 +404,135 @@ pub async fn get_live_paragraph_snapshots(
         .await
         .ok_or_else(|| "No active editor session".to_string())?;
 
+    if session.editor_type == EditorType::Word {
+        return request_word_live_paragraph_snapshots(server_handle.session_manager(), paragraph_ids).await;
+    }
+
     if session.editor_type != EditorType::InDesign {
-        return Err("Live paragraph snapshots are supported only for InDesign".to_string());
+        return Err("Live paragraph snapshots are supported only for InDesign or Word".to_string());
     }
 
     tokio::task::spawn_blocking(move || indesign_com::get_live_paragraph_snapshots(paragraph_ids))
         .await
         .map_err(|error| format!("InDesign batch live paragraph snapshot task failed: {error}"))?
+}
+
+/// Converts a Word bridge snapshot item to the legacy InDesign-compatible DTO.
+fn word_snapshot_result(command_id: String, item: LiveSnapshotItem) -> crate::indesign_com::LiveParagraphSnapshotResult {
+    crate::indesign_com::LiveParagraphSnapshotResult {
+        command_id,
+        status: live_snapshot_status_name(item.status).to_string(),
+        current_text: item.current_text,
+        current_hash: item.current_hash,
+        message: item.message,
+    }
+}
+
+fn word_snapshot_entry(item: LiveSnapshotItem) -> crate::indesign_com::LiveParagraphSnapshotEntry {
+    crate::indesign_com::LiveParagraphSnapshotEntry {
+        paragraph_id: item.paragraph_id,
+        status: live_snapshot_status_name(item.status).to_string(),
+        current_text: item.current_text,
+        current_hash: item.current_hash,
+        message: item.message,
+    }
+}
+
+fn live_snapshot_status_name(status: LiveSnapshotStatus) -> &'static str {
+    match status {
+        LiveSnapshotStatus::Found => "FOUND",
+        LiveSnapshotStatus::NotFound => "NOT_FOUND",
+        LiveSnapshotStatus::Ambiguous => "AMBIGUOUS",
+        LiveSnapshotStatus::Busy => "BUSY",
+        LiveSnapshotStatus::Error => "ERROR",
+    }
+}
+
+fn word_snapshot_error(command_id: String, status: &str, message: impl Into<String>) -> crate::indesign_com::LiveParagraphSnapshotResult {
+    crate::indesign_com::LiveParagraphSnapshotResult {
+        command_id,
+        status: status.to_string(),
+        current_text: None,
+        current_hash: None,
+        message: Some(message.into()),
+    }
+}
+
+fn word_snapshot_error_entry(paragraph_id: String, status: &str, message: impl Into<String>) -> crate::indesign_com::LiveParagraphSnapshotEntry {
+    crate::indesign_com::LiveParagraphSnapshotEntry {
+        paragraph_id,
+        status: status.to_string(),
+        current_text: None,
+        current_hash: None,
+        message: Some(message.into()),
+    }
+}
+
+fn word_snapshot_session_error(error: SessionError) -> Result<(&'static str, String), String> {
+    match error {
+        // A Word timeout or a connection that vanished while awaiting a response is retryable.
+        SessionError::SnapshotTimeout | SessionError::SnapshotCancelled | SessionError::ChannelClosed => {
+            Ok(("BUSY", error.to_string()))
+        }
+        other => Err(other.to_string()),
+    }
+}
+
+async fn request_word_live_paragraph_snapshot(
+    session_manager: Arc<SessionManager>,
+    paragraph_id: String,
+    base_hash: Option<String>,
+) -> Result<crate::indesign_com::LiveParagraphSnapshotResult, String> {
+    let command_id = format!("live-snapshot-{paragraph_id}");
+    match session_manager.request_live_snapshots(vec![paragraph_id.clone()], base_hash).await {
+        Ok(response) => match response.results.into_iter().next() {
+            Some(item) if item.paragraph_id == paragraph_id => Ok(word_snapshot_result(command_id, item)),
+            Some(item) => Ok(word_snapshot_error(
+                command_id,
+                "ERROR",
+                format!("Word live snapshot response paragraph ID mismatch: expected '{paragraph_id}', got '{}'", item.paragraph_id),
+            )),
+            None => Ok(word_snapshot_error(
+                command_id,
+                "ERROR",
+                format!("Word live snapshot response did not contain paragraph '{paragraph_id}'"),
+            )),
+        },
+        Err(error) => match word_snapshot_session_error(error) {
+            Ok((status, message)) => Ok(word_snapshot_error(command_id, status, message)),
+            Err(message) => Err(message),
+        },
+    }
+}
+
+async fn request_word_live_paragraph_snapshots(
+    session_manager: Arc<SessionManager>,
+    paragraph_ids: Vec<String>,
+) -> Result<Vec<crate::indesign_com::LiveParagraphSnapshotEntry>, String> {
+    match session_manager.request_live_snapshots(paragraph_ids.clone(), None).await {
+        Ok(response) => {
+            let mut results_by_id: HashMap<String, LiveSnapshotItem> = response
+                .results
+                .into_iter()
+                .map(|item| (item.paragraph_id.clone(), item))
+                .collect();
+            Ok(paragraph_ids.into_iter().map(|paragraph_id| {
+                results_by_id.remove(&paragraph_id)
+                    .map(word_snapshot_entry)
+                    .unwrap_or_else(|| word_snapshot_error_entry(
+                        paragraph_id.clone(),
+                        "ERROR",
+                        format!("Word live snapshot response did not contain paragraph '{paragraph_id}'"),
+                    ))
+            }).collect())
+        }
+        Err(error) => match word_snapshot_session_error(error) {
+            Ok((status, message)) => Ok(paragraph_ids.into_iter().map(|paragraph_id| {
+                word_snapshot_error_entry(paragraph_id, status, message.clone())
+            }).collect()),
+            Err(message) => Err(message),
+        },
+    }
 }
 
 /// Lists models available from the configured Ollama host or the queue's provider.
@@ -596,6 +728,87 @@ fn strip_surrounding_quotes(text: &str) -> String {
 mod tests {
     use super::*;
     use crate::ai::LocalLlmProvider;
+    use crate::protocol::{BridgeMessage, LiveSnapshotResponse};
+    use crate::server::NoopEventSink;
+    use std::sync::Arc;
+    use tokio::sync::mpsc;
+
+    #[tokio::test]
+    async fn word_snapshot_commands_dispatch_single_and_batch_through_session_manager() {
+        let manager = Arc::new(SessionManager::new(Arc::new(NoopEventSink)));
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let session_id = manager
+            .acquire_session(EditorType::Word, None, Some(sender))
+            .await
+            .expect("Word session should be acquired");
+
+        let single_task = tokio::spawn(request_word_live_paragraph_snapshot(
+            manager.clone(),
+            "word-para-one".to_string(),
+            Some("base-hash".to_string()),
+        ));
+        let BridgeMessage::LiveSnapshotRequest(single_request) = receiver.recv().await.expect("single request") else {
+            panic!("expected a live snapshot request");
+        };
+        assert_eq!(single_request.paragraph_ids, ["word-para-one"]);
+        assert_eq!(single_request.base_hash.as_deref(), Some("base-hash"));
+        manager.complete_live_snapshot(&session_id, LiveSnapshotResponse {
+            request_id: single_request.request_id,
+            results: vec![LiveSnapshotItem {
+                paragraph_id: "word-para-one".to_string(),
+                status: LiveSnapshotStatus::Found,
+                current_text: Some("Current Word text".to_string()),
+                current_hash: Some("base-hash".to_string()),
+                message: None,
+            }],
+        }).await;
+        let single = single_task.await.expect("single task").expect("single result");
+        assert_eq!(single.command_id, "live-snapshot-word-para-one");
+        assert_eq!(single.status, "FOUND");
+        assert_eq!(single.current_text.as_deref(), Some("Current Word text"));
+
+        let batch_task = tokio::spawn(request_word_live_paragraph_snapshots(
+            manager.clone(),
+            vec!["word-para-one".to_string(), "word-para-two".to_string()],
+        ));
+        let BridgeMessage::LiveSnapshotRequest(batch_request) = receiver.recv().await.expect("batch request") else {
+            panic!("expected a live snapshot request");
+        };
+        assert_eq!(batch_request.paragraph_ids, ["word-para-one", "word-para-two"]);
+        assert_eq!(batch_request.base_hash, None);
+        // Deliberately reverse the bridge response to verify DTO mapping restores request order.
+        manager.complete_live_snapshot(&session_id, LiveSnapshotResponse {
+            request_id: batch_request.request_id,
+            results: vec![
+                LiveSnapshotItem {
+                    paragraph_id: "word-para-two".to_string(),
+                    status: LiveSnapshotStatus::Busy,
+                    current_text: None,
+                    current_hash: None,
+                    message: Some("Word is busy".to_string()),
+                },
+                LiveSnapshotItem {
+                    paragraph_id: "word-para-one".to_string(),
+                    status: LiveSnapshotStatus::Found,
+                    current_text: Some("First".to_string()),
+                    current_hash: Some("hash-one".to_string()),
+                    message: None,
+                },
+            ],
+        }).await;
+        let batch = batch_task.await.expect("batch task").expect("batch result");
+        assert_eq!(batch.iter().map(|entry| entry.paragraph_id.as_str()).collect::<Vec<_>>(), ["word-para-one", "word-para-two"]);
+        assert_eq!(batch[0].status, "FOUND");
+        assert_eq!(batch[1].status, "BUSY");
+    }
+
+    #[test]
+    fn word_snapshot_timeout_and_disconnect_map_to_busy() {
+        for error in [SessionError::SnapshotTimeout, SessionError::SnapshotCancelled, SessionError::ChannelClosed] {
+            let (status, _) = word_snapshot_session_error(error).expect("retryable snapshot errors map to DTO status");
+            assert_eq!(status, "BUSY");
+        }
+    }
 
     #[test]
     fn test_get_bridge_status_maps_health_response_to_dashboard_payload() {
