@@ -1,5 +1,115 @@
 # SmartLinter — 오케스트레이터 현황판
 
+**⭐⭐ 마지막 업데이트: 2026-08-29 새 PC 이관 세션. 아래 이 절을 먼저 읽을 것.**
+
+## 새 PC 이관 (2026-08-29) — 다른 PC에서 이어받을 때 반드시 읽을 것
+
+**프로젝트 경로가 바뀜: `D:\data\dev\App\SmartLinter` → `D:\smartLinter`.**
+이 파일 아래쪽 옛 절들에 나오는 예전 경로는 전부 새 경로로 바꿔 읽을 것.
+GitHub 원격(`https://github.com/gulpe315/smartLinter.git`)에서 클론하면 됨.
+
+### 새 PC에서 먼저 해야 할 것
+1. `npm install` (node_modules는 커밋 안 됨).
+2. git identity 확인 — 전역 설정이 비어있을 수 있음. 커밋 이력과 맞추려면
+   `git config user.name user` / `git config user.email gulpe315@gmail.com`.
+3. **TM 샘플 파일은 git에 없음**(`.gitignore` 대상). `KO-EN.tmx`(60MB),
+   `SD.sdltm`(8.5MB)을 프로젝트 루트에 다시 넣어야 TM 작업 가능.
+   실제 고객 데이터일 수 있으므로 **절대 커밋 금지**.
+
+### 이 PC(2026-08-29 세션)의 환경 제약 — 새 PC에선 다를 수 있으니 재확인할 것
+- **Word/InDesign 라이브 검증 불가**(사용자 확인). 자동테스트로만 진행함.
+- 로컬 모델은 **exaone3.5:2.4b**만 사용 가능(저사양). 과거 벤치마크 기준
+  모델은 `exaone3.5:7.8b`였으므로 **수치 직접 비교 금지**.
+- `cargo test`의 `test_live_ollama_analyze_paragraph_and_execute_ai_command`
+  1건은 라이브 Ollama 타임아웃으로 실패함(98/99). **코드 회귀 아님.**
+- **codex CLI 주의 2가지:**
+  (a) `--approve-for-me` 플래그가 제거됨. 분석은 `-s read-only`,
+      구현은 `-s workspace-write`.
+  (b) PATH의 `codex`가 agy 번들본(`%LOCALAPPDATA%\agy\bin\codex.exe`)이면
+      옆에 `codex-command-runner.exe`가 없어서 쓰기 모드가
+      `CreateProcessWithLogonW failed: 2`로 전부 실패함.
+      `~/.codex/.sandbox-bin/`의 동일 버전 헬퍼를 그 폴더에 복사하면 해결.
+- **agy/codex 프롬프트 제약이 정반대임.** agy에는 `명령 실행 없이 파일
+  읽기만 하세요`를 넣어야 함(명령 시도 시 headless 권한 거부로 통째 실패,
+  diff는 파일로 저장해 경로를 알려줄 것). codex는 반대로 명령을 막으면
+  파일을 아예 못 읽음(셸로 읽기 때문).
+
+### 이번 세션 완료 내역
+
+**1. Phase 0(문장단위 CAT 정합성 데이터 계약 스파이크) 완료 —
+`PHASE0_SOURCE_DATA_CONTRACT_FINDINGS.md`.** release gate가 `코드 배포 없음`
+이라 산출물은 결정 문서다. 핵심 결론:
+- 사용자 확정: **QA와 TM은 모드가 아니라 병렬 기능**이다. QA 린터는 대시보드
+  언어 설정에 따른 그 언어의 **monolingual** 문법/스펠링 검수이고, TM은
+  별개의 지식베이스다.
+- 따라서 Phase 0의 원래 선결과제였던 **`진짜 bilingual source 공급원 확보`는
+  이 제품에 필요 없다** — 질문 자체가 해체됐다. `ParagraphPayload.source`를
+  문서 메타데이터로 두고 `qaStore`가 `source`를 빈 문자열로 고정하는 현재
+  동작은 **버그가 아니라 올바른 동작**이다. 재검토 불필요.
+- 그러므로 Codex가 권고했던 `XLIFF/SDLXLIFF를 canonical contract로` 하는
+  Phase 1 ADR은 **채택하지 않는다**(틀린 전제 위의 권고였음).
+- 실제 TM 파일 실측으로 미결 쟁점 3개 해소: `segtype="sentence"`(문장 단위
+  확정, 오래된 agy↔Codex 쟁점 종결), `srclang="ko-KR"`(문서가 한국어 원문,
+  번역 방향 ko→en), 인라인 태그 실재(앞 20MB에 bpt/ept 각 8,704개, ph 1,127개)
+  하는데 현 파서 `clean_segment_text()`는 전부 strip함(평문 매칭엔 타당,
+  버그 아님 — 다만 tagged IR은 이 경로 재사용 불가).
+- 남은 진짜 과제는 둘뿐: **문장/TU 경계 계약**과 **다국어 QA 프로파일 작성**.
+
+**2. TM 패널 인라인 수정 + [TM 저장] 구현 완료.** 사용자가 요청한 버튼 세트
+중 **치환·복사·검색은 이미 구현돼 있었고**(mock 아님, 실제 IPC 경로 확인),
+비어 있던 인라인 수정과 [TM 저장]만 새로 만들었다. Codex 구현 → Codex+agy
+독립 리뷰 **3라운드** → 결함 14건 수정. 주요 결함:
+- 화면은 원본을 보여주는데 적용/복사/저장은 편집본을 쓰던 불일치.
+- `applyMatch`가 `source+target`으로 카드를 식별해서, 편집본을 넘기면
+  applying/applied 상태가 영영 갱신 안 되던 문제 → `overrideTarget` 분리.
+- `useTmStore.getState()`를 렌더 본문에서 호출해 문단 변경 시 리렌더가
+  안 걸리던 문제(안전 게이트가 stale 판정) → 선택자 훅 구독으로 수정.
+- **키워드 검색을 한 번 쓰면 [TM 저장]이 영구 비활성화**되던 문제 —
+  `new-paragraph-detected`가 `searchMode`를 되돌리지 않았음.
+- React key에 후보 목록 전체를 직렬화해 모든 카드가 리마운트되던 성능 회귀.
+
+**TM 저장의 source 결정(중요):** `candidate.source`(퍼지매치의 원문)가 아니라
+**현재 문단 텍스트**를 저장한다. 다만 문단/문장 입도 불일치로 TM이 오염될 수
+있으므로 fail-closed 게이트를 둔다 — `searchMode === 'fuzzy'` + 검색어가 현재
+문단과 일치(trim 비교) + 문단 존재 + 타깃 비어있지 않음. **다문장 문단은
+사용자 결정으로 차단이 아니라 경고 후 허용**(짧은 2문장 문단도 실무에선 하나의
+TU로 등록하므로). 저장 직전 확인 대화상자가 원문/번역 전문 + 다문장 경고 +
+충돌 시 기존 번역까지 보여주는 것이 실질 안전망이다.
+
+**문장 판정:** `[.!?\u2026](?=\s|$)|\n+`. **`。`(U+3002)는 의도적으로 제외** —
+실제 TM 20,885개 TU에서 0건이고 한국어에 안 쓰인다(사용자 확인). 향후 일본어
+문서를 실제 지원할 때만 재검토. 이 건으로 Codex가 한때 커밋 보류 판정을
+냈다가, 근거를 다시 제시한 재조율 라운드에서 스스로 판정을 뒤집었다.
+
+**검증:** `npm test` 197/197, `npx vitest run` 312/312, `npm run build` 성공
+(Claude가 독립 재실행). `cargo test`는 위 라이브 Ollama 1건 제외 98/99.
+
+### 다음 세션 우선순위 (사용자가 정할 것 — 자동 결정 금지)
+1. **[붙여넣기](인접 삽입)** — 원문 옆에 번역을 붙이는 버튼. 사용자가 요청한
+   버튼 세트 중 유일한 미구현. **비용 재평가 결과 예상보다 쌈**: 두 호스트 모두
+   삽입 프리미티브가 이미 증명돼 있다. Word는 `Paragraph.insertText(text,'After')`
+   (커밋 `d12a9ce`의 버그가 바로 이게 동작한다는 증거), InDesign은
+   `paragraph.insertionPoints[i].contents`(`atomic_replacer.jsx:473-479`에서
+   이미 사용 중). 실제 비용은 삽입 자체가 아니라 **프로토콜에 삽입 모드를
+   추가하는 배관**(shared/protocol + Rust + 양쪽 플러그인). 라이브 검증은 불가.
+2. **문장/TU 경계 계약** — Phase 0가 남긴 진짜 과제. 가장 크고 나머지의 기반.
+   `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 1단계에 해당. LLM 호출은
+   문단 1회 유지, 결과만 문장 단위로 귀속시키는 합의는 그대로 유효.
+3. **영어 QA 프로파일 작성** — 배관(`LanguageTag` ko/en/ja/zh, 두 축 UI)은
+   이미 완료돼 있고 **한국어 지시문만 존재**, 나머지는 의도적 fail-loud
+   (`prompt_builder.rs:54-72`). 단 문서가 한국어 원문이므로 영어 프로파일은
+   **번역 산출물 검수용**이라 급하지 않다.
+   **착수 시 함정:** `get_explanation_directive(Ko)`가 빈 문자열을 반환하는데,
+   이건 한국어 지시문이 암묵적으로 한국어 출력을 보장한다는 전제에 얹혀 있다.
+   영어 프로파일을 추가하면 `문서=en` + `설명=ko` 조합에서 한국어로 설명하라는
+   지시가 어디에도 없게 되고, `ko`는 지원 언어라 fail-loud에도 안 걸린다 —
+   조용히 틀리는 경로. `(문서언어 × 설명언어)` 조합 단위로 다룰 것.
+4. 비차단 잔여 개선점: `…` 테스트 예문을 실측 한국어 예문으로 교체,
+   키워드 모드 툴팁 문구 다듬기.
+5. (여전히 보류) Kiwi 스파이크 Step 2 — 이 PC엔 VirtualBox 자체가 없음.
+
+---
+
 **마지막 업데이트: 2026-08-28 세 번째 후속 세션(초장문, 세션 종료
 시점). Word 위치찾기/적용이 이번에야말로 실라이브에서 끝까지 확인됨.**
 직전 세션 종료 시점엔 "코드는 커밋됐지만 Word 실라이브 미확인" 상태
