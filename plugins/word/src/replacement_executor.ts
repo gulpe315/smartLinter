@@ -431,13 +431,22 @@ export class WordReplacementExecutor {
                         );
                     }
                     const contentRange = paragraph.getRange?.('Content');
-                    if (contentRange?.getSubstring) {
+                    if (contentRange && typeof contentRange.getSubstring === 'function') {
                         const targetRange = contentRange.getSubstring(startOffset, endOffset - startOffset);
                         targetRange.insertText(newText, 'Replace');
                     } else {
-                        // Compatibility fallback for older Word API sets. It preserves correctness,
-                        // but not rich formatting inside the paragraph.
-                        paragraph.text = currentPText.substring(0, startOffset) + newText + currentPText.substring(endOffset);
+                        // Range.getSubstring is unavailable in some Word hosts. Paragraph.text is
+                        // read-only, so replace the paragraph/range rather than assigning to it.
+                        // This retains correct text transaction semantics, but can replace inline
+                        // formatting within this paragraph.
+                        const replacementText = currentPText.substring(0, startOffset) + newText + currentPText.substring(endOffset);
+                        if (typeof paragraph.insertText === 'function') {
+                            paragraph.insertText(replacementText, 'Replace');
+                        } else if (contentRange && typeof contentRange.insertText === 'function') {
+                            contentRange.insertText(replacementText, 'Replace');
+                        } else {
+                            throw new Error('Word Paragraph does not support insertText');
+                        }
                     }
                     await context.sync();
                 });

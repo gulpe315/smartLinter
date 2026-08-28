@@ -416,7 +416,16 @@ describe('Task 8: MS Word Lossless Reverse Replacement & Compensating Transactio
             const paragraphs = [selectedText, targetText];
             const makeParagraph = (index: number) => ({
                 get text() { return paragraphs[index]; },
-                set text(value: string) { paragraphs[index] = value; },
+                getRange: (location: string) => {
+                    assert.equal(location, 'Content');
+                    return {
+                        // Deliberately omit getSubstring to exercise the compatibility path.
+                        insertText: (value: string, insertLocation: string) => {
+                            assert.equal(insertLocation, 'Replace');
+                            paragraphs[index] = value;
+                        },
+                    };
+                },
             });
             const context = {
                 document: {
