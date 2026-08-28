@@ -6,3 +6,5 @@ target/
 dist/
 src-tauri/gen/
 src-tauri/src/bin/
+*.sdltm
+*.tmx

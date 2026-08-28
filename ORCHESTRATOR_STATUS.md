@@ -1,11 +1,17 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**마지막 업데이트: 2026-08-28. Word 사이드로딩 Step 1(서빙+부트스트랩) +
-pairing token 부트스트랩 + 실제 Word 2024 사이드로딩 성공(브릿지
-`connected:true` 라이브 확인, 커밋 `06cdda7`→`c31b3cf`→`d4e3879`).
-"동일 이슈 일괄 적용" 기능도 완료됨(커밋 `296d510`, 2026-08-27 — 이
-문서에 반영 누락돼 있었음, 이번에 정정). Kiwi 스파이크 Step 2는 여전히
-보류(사용자가 VirtualBox VM "win11"을 준비 중, 아직 Windows 미설치).
+**마지막 업데이트: 2026-08-28 후속 세션(장문). Word가 InDesign과
+동등하게 실제로 동작하는 상태까지 도달함 — 사이드로딩 성공 이후
+"LLM 분석이 아예 안 되는 것처럼 보이던" 문제를 3단계로 파고들어 전부
+해결(Live Snapshot 인프라 신설 → InDesign전용 하드코딩 제거 →
+telemetry 자체가 한 번도 안 나가던 근본버그 수정). Word에서 실제로
+QA 카드가 뜨고 diff/적용까지 확인됨. 이어서 "위치 보기"의 동일한
+InDesign 하드코딩 버그도 발견해 수정 착수(아래 우선순위 1번 참고 —
+이번 세션에 완료됐는지 다음 세션 시작 시 git log로 먼저 확인할 것).
+세션 후반에 사용자가 QA 카드/TM 아키텍처를 "번역업계 표준 CAT
+(Trados류) 정합성"으로 격상하자는 대형 설계를 제기해 agy+Codex가
+깊이 스코핑함(문장단위 카드+TM왕복저장+SDLTM지원+인라인태그 보존) —
+착수는 다음 세션으로 미룸, 상세는 아래 "다음 세션 우선순위" 2번 참고.
 다음 세션 시작 시 아래 "다음 세션 우선순위"부터 읽을 것.**
 
 ## QA 카드 생명주기 정합성 (`DESIGN_QA_CARD_LIVE_INTEGRITY.md`) 진행 상황
@@ -65,40 +71,91 @@ test 시 C++ 예외가 프로세스를 죽이지 않고 2초 이내 정상 에�
 
 ## 다음 세션 우선순위 (사용자가 정할 것 — 자동 결정 금지)
 
-**중요(2026-08-27 확정): "실제 InDesign 라이브 확인"을 더 이상 태스크/백로그로
-올리지 말 것.** 사용자가 명시: "라이브 검토는 실제 사용하면서 검토할 거야.
-이번 프로젝트에서는 생략해." 조사호응 27개 매핑/Part A·B/QA카드 Step 4~5 등
-자동테스트만 통과하고 실제 InDesign 확인 안 된 항목들은 전부 이 방침으로
-덮임 — 사용자가 실사용 중 문제를 발견하면 그때 알려주는 방식으로 대체됨.
-(단, 실제 앱 환경 없이는 애초에 검증 자체가 불가능한 항목 — 예: Kiwi
-스파이크 Step 2의 clean VM 콜드기동처럼 그게 곧 완료조건인 경우 — 은
-이 방침의 예외. [[feedback_skip_live_review_when_tests_pass]] 참고.)
+**중요(2026-08-27 확정, 계속 유효): "실제 InDesign 라이브 확인"을 더
+이상 태스크/백로그로 올리지 말 것.** 사용자가 명시: "라이브 검토는
+실제 사용하면서 검토할 거야. 이번 프로젝트에서는 생략해." 자동테스트만
+통과하고 실제 확인 안 된 항목은 전부 이 방침으로 덮임 — 사용자가
+실사용 중 문제를 발견하면 그때 알려주는 방식으로 대체됨. (단, 실제 앱
+환경 없이는 애초에 검증 자체가 불가능한 항목 — 예: Kiwi Step 2의 clean
+VM 콜드기동 — 은 예외. [[feedback_skip_live_review_when_tests_pass]] 참고.)
+**Word는 예외적으로 이번 세션에 라이브 검증을 계속 진행함**(사용자가
+매 수정 후 실제 Word에서 직접 재현·확인해줌 — 이 패턴 덕분에 스냅샷
+gate/텔레메트리 근본버그를 실제로 잡아냄, 다음 세션도 이 흐름 유지).
 
-1. **Kiwi 스파이크 Step 2 환경 준비 (보류 중, 2026-08-28).** VirtualBox에
-   `win11` VM 틀은 생성돼 있으나 디스크가 비어있음(약 2MB, Windows 미설치)
-   — 사용자가 직접 설치 진행 중. Hyper-V도 서비스는 켜져 있으나 (a) Claude의
-   셸이 비관리자 권한이라 직접 조회/제어 불가 (b) `user` 계정이 Hyper-V
-   Administrators 그룹에 없음 — 사용자가 VirtualBox 경로로 진행하기로 확정.
-   설치 완료 전엔 착수하지 말 것.
-2. **Word Step 2 나머지 완료조건 미검증.** 사이드로딩 자체는 성공했지만
-   (연결만), 문단 편집 시 텔레메트리가 실제로 대시보드까지 도달하는지,
-   대시보드→Word 치환 명령 왕복은 아직 실라이브로 확인 안 됨. 실제 Word
-   조작이 필요해 사용자 참여 필수.
-3. **`bridge_client.ts`의 `connect()` WS→REST 폴백 부재 — 완료됨(커밋
-   `dce4510`, 2026-08-28).** agy 설계검증(좀비 재연결 타이머로 인한 상태
-   플래핑, `reconnectAttempts` 미초기화, 폐기 WS 리스너 비동기 간섭 3가지
-   위험 발견) → Codex 구현(agy 안 그대로 동의, 이견 없음) → Claude가
-   `npm test`(171/171)/`npm run test:ui`(295/295)/`npm run build` 독립
-   재검증 후 커밋. 신규 테스트 4개(WS즉시거부→REST성공/WS인증거부/REST폴백
-   후 좀비타이머 부재/정상연결후 단락시 재연결예약) 추가.
-4. **"동일 이슈 일괄 적용" 기능 — 완료됨(정정, 2026-08-28).** 이전 항목에
-   "미구현"으로 적혀 있었으나 실제로는 2026-08-27에 이미 구현·커밋됨
-   (`296d510`, `acceptMatchingCards()`). 이 문서 갱신이 그 세션에 누락됐던
-   것으로 추정 — 재작업 불필요.
+### 1. Word "위치 보기" InDesign 하드코딩 버그 — 착수함, 상태는 git log로 확인
+`TASK_REQUEST_WORD_LOCATE_FIX.md`로 Codex에게 구현 위임(설계는
+`AGY_ANSWER_LOCATE_WORD_AND_SENTENCE_SCOPING.md`/
+`CODEX_ANSWER_LOCATE_WORD_AND_SENTENCE_SCOPING.md`에서 이미 완전
+수렴 — 새 `LOCATE_REQUEST`/`RESPONSE` RPC, snapshot과 동일한
+fail-closed 전수후보수집 규칙). **이 문서가 마지막으로 갱신된 시점에는
+아직 Claude의 diff 검토·독립 재검증·커밋이 끝났는지 불확실** — 다음
+세션 시작 시 `git log --oneline -5`로 관련 커밋이 있는지 먼저 확인할
+것. 없으면 Codex 결과물이 uncommitted 상태로 남아있을 수 있으니
+`git status`도 같이 확인.
 
-1~3은 순서와 무관하게 진행 가능(1은 사용자의 VM 설치 완료 대기, 2는 사용자
-Word 세션 필요, 3은 Claude가 바로 착수 가능). 사용자가 우선순위를 명시하면
-그 순서를 따를 것.
+### 2. 문장 단위 CAT 정합성 대형 설계 — 착수 전, 다음 세션 시작점
+사용자가 세션 후반에 명확히 재확인한 목표: **"QA 카드 발생 단위 =
+번역업계 표준 TU(Translation Unit) 경계"**여야 하며, TM 왕복 저장도
+같은 단위로, SDLTM(Trados Studio TM) 임포트도 지원하고, 문장 내부
+인라인 태그도 보존해야 함. TU 경계 규칙(사용자 확정): **하드브레이크
+= 문단(Enter), 소프트브레이크 = 구두점(마침표/느낌표 등), 탭 = 옵션.**
+
+**읽을 문서 순서:** `DESIGN_REQUEST_SENTENCE_UNIT_CAT_PARITY.md`(요청
+배경) → `AGY_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` /
+`CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md`(두 모델 완전 수렴한 설계,
+각각 4~6단계 로드맵 제시). 핵심 합의: LLM 호출은 **문단 전체 1회
+유지**(문맥·비용 보존), 결과만 세그먼트 단위로 분해해 카드 생성 —
+카드 상태는 이슈(개별)→문장(집계)→문단(실제 치환 트랜잭션) 3계층으로
+분리해야 기존 "부분적용 시 상태머신 붕괴" 우려를 해소함.
+
+**다음 세션 착수 전 반드시 먼저 풀어야 할 것 (Codex가 지적, agy 답변엔
+빠져있던 blocker):** Word의 `ParagraphPayload.source`가 실제 번역
+원문이 아니라 문서 파일명류 메타데이터임(`TASK_REQUEST_TM_SAVE_CORRECTION.md`
+에서 이미 확인된 기존 사실) — 이걸 안 풀면 "문장 단위 TM 저장"은
+저장할 진짜 원문/번역문 쌍 자체가 없는 상태. Codex의 로드맵 "0단계
+데이터 계약 스파이크"가 바로 이 문제부터 다룸 — 여기서 시작할 것.
+
+**검증 안 된 채로 넘어가면 안 되는 것 (agy·Codex 불일치) — 스키마 쟁점은
+이번 세션에 실제로 해소됨:**
+- SDLTM 실제 스키마: agy는 `translation_units` 테이블+`source_segment`/
+  `target_segment` XML 컬럼이라고 구체적으로 단정했으나 출처 링크가
+  없었고, Codex는 "RWS가 SQLite 기반이라고만 공식 확인, 스키마는
+  비공개"라며 훨씬 신중했음. **이번 세션 후반에 사용자가 프로젝트
+  루트에 실제 샘플 `.sdltm` 파일을 넣어줘서 Claude가 Python
+  `sqlite3`(읽기전용, `mode=ro`)로 직접 열어 검증함 — agy의 스키마
+  주장이 정확히 맞았음:** `translation_units` 테이블에 `source_segment`/
+  `target_segment` TEXT 컬럼 존재, XML 구조도 agy 예시와 동일
+  (`<Segment><Elements><Text><Value>...</Value></Text></Elements><CultureName>.../></Segment>`).
+  `translation_memories` 테이블에 `source_language`/`target_language`도
+  있음. 실측 샘플: TU 4141개, ko-KR→en-US, TM명 "SDS_EMM".
+  **이 파일은 실제 고객/업무 번역 데이터일 수 있어 git에 커밋 안 함**
+  (`.gitignore`에 `*.sdltm`/`*.tmx` 추가 완료) — 파일 자체는 프로젝트
+  루트에 그대로 있으니(`SD.sdltm`) 다음 세션 SDLTM 파서 구현 시 이
+  실파일로 직접 테스트할 것. 다른 관련 테이블(`translation_unit_fragments`,
+  `translation_unit_contexts`, `fuzzy_data`, `trans_model` 등)은 아직
+  구조 파악 안 함 — 실제 구현 시 필요한 만큼만 추가로 조사할 것.
+- TM 검색 개선 효과의 즉시성: 이전 라운드(SRX 재평가)에서 agy는
+  "즉시 큰 이득", Codex는 "조건부/제한적"이라 갈렸었음(TMX가 실제로
+  문장단위인지가 관건) — 사용자가 "CAT툴은 기본적으로 문장단위"라고
+  확인해줬으므로 이 불일치는 사실상 agy 쪽으로 해소된 것으로 보이나,
+  실제 구현 착수 시 이 프로젝트에서 쓰는 실제 TMX 샘플로 재확인할 것.
+
+로드맵 규모(양쪽 다 최소 4단계, Codex는 SDLTM/스타일매퍼까지 포함해
+6단계)상 **한 세션에 끝낼 일이 아님** — Phase 0(데이터 계약)부터
+순서대로, 매 단계 release gate/rollback 기준을 지킬 것(각 답변 문서
+5~6장 참고). Word 위치찾기(1번)와는 완전히 직교하는 별도 트랙이라
+순서 걱정 없이 병행 가능.
+
+### 3. (여전히 보류) Kiwi 스파이크 Step 2 환경 준비
+VirtualBox에 `win11` VM 틀은 생성돼 있으나 디스크가 비어있음(약 2MB,
+Windows 미설치) — 사용자가 직접 설치 진행 중이었음(2026-08-28 기준).
+Hyper-V는 (a) Claude 셸이 비관리자 권한이라 직접 조회/제어 불가
+(b) `user` 계정이 Hyper-V Administrators 그룹에 없어서 VirtualBox
+경로로 진행하기로 확정됨. 설치 완료 전엔 착수하지 말 것 — 다음 세션
+시작 시 VM 상태부터 확인(`VBoxManage showvminfo win11 --machinereadable`
+로 VMState/디스크 크기 확인 가능).
+
+우선순위는 사용자가 명시하는 대로 따를 것 — 자동으로 정하지 말 것.
 
 ---
 
