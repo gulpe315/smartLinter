@@ -11,7 +11,7 @@ use axum::extract::{Query, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::IntoResponse;
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio::time::timeout;
 use tracing::{debug, error, info, warn};
 
@@ -23,6 +23,7 @@ use crate::server::ServerState;
 pub mod close_codes {
     pub const UNAUTHORIZED: u16 = 4401;
     pub const SESSION_LOCKED: u16 = 4409;
+    pub const ADMISSION_REJECTED: u16 = 4410;
     pub const TIMEOUT: u16 = 4408;
     pub const PROTOCOL_ERROR: u16 = 4400;
 }
@@ -84,11 +85,12 @@ async fn handle_websocket_connection(
 
     // Create channel for sending outgoing commands to this editor
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<BridgeMessage>();
+    let (close_tx, mut close_rx) = oneshot::channel::<()>();
 
     // Attempt to acquire single session lock
     let session_id = match state
         .session_manager
-        .acquire_session(editor_type, None, Some(cmd_tx))
+        .acquire_session_with_close(editor_type, None, Some(cmd_tx), Some(close_tx))
         .await
     {
         Ok(id) => {
@@ -118,6 +120,14 @@ async fn handle_websocket_connection(
             }))).await;
             return;
         }
+        Err(SessionError::EditorNotAdmitted { allowed_editor }) => {
+            reject_admission(&mut socket, format!("Editor admission is restricted to {}", allowed_editor)).await;
+            return;
+        }
+        Err(SessionError::AdmissionBlocked) => {
+            reject_admission(&mut socket, "Editor admission is currently blocked".to_string()).await;
+            return;
+        }
         Err(e) => {
             error!("Failed to acquire session: {}", e);
             return;
@@ -144,10 +154,22 @@ async fn handle_websocket_connection(
 
     // Spawn task to send outgoing BridgeMessages (e.g. ReplacementCommand) to WebSocket
     let send_task = tokio::spawn(async move {
-        while let Some(msg) = cmd_rx.recv().await {
-            if let Ok(json) = serde_json::to_string(&msg) {
-                if ws_sender.send(Message::Text(json)).await.is_err() {
+        loop {
+            tokio::select! {
+                _ = &mut close_rx => {
+                    let _ = ws_sender.send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                        code: close_codes::ADMISSION_REJECTED,
+                        reason: "Editor target switched".into(),
+                    }))).await;
                     break;
+                }
+                maybe_msg = cmd_rx.recv() => match maybe_msg {
+                    Some(msg) => {
+                        if let Ok(json) = serde_json::to_string(&msg) {
+                            if ws_sender.send(Message::Text(json)).await.is_err() { break; }
+                        }
+                    }
+                    None => break,
                 }
             }
         }
@@ -218,6 +240,19 @@ async fn handle_websocket_connection(
     send_task.abort();
     session_mgr.release_session(&current_session_id, "WebSocket disconnected").await;
     info!("Editor session {} terminated", current_session_id);
+}
+
+async fn reject_admission(socket: &mut WebSocket, message: String) {
+    let rejection = BridgeMessage::AuthResponse(AuthResponse {
+        success: false, session_token: None, server_nonce: None, message: Some(message.clone()),
+    });
+    if let Ok(json) = serde_json::to_string(&rejection) {
+        let _ = socket.send(Message::Text(json)).await;
+    }
+    let _ = socket.send(Message::Close(Some(axum::extract::ws::CloseFrame {
+        code: close_codes::ADMISSION_REJECTED,
+        reason: message.into(),
+    }))).await;
 }
 
 /// Authenticates the socket either via pre-authenticated token or via initial AuthHandshake frame.

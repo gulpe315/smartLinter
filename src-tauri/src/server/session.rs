@@ -168,7 +168,7 @@ impl BridgeEventSink for BroadcastEventSink {
 }
 
 /// Active connected editor session metadata.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EditorSession {
     pub session_id: String,
     pub editor_type: EditorType,
@@ -176,6 +176,7 @@ pub struct EditorSession {
     pub last_heartbeat_at: i64,
     pub active_document: Option<String>,
     pub command_sender: Option<mpsc::UnboundedSender<BridgeMessage>>,
+    pub close_sender: Option<oneshot::Sender<()>>,
 }
 
 /// Immutable snapshot of active session data.
@@ -192,6 +193,10 @@ pub struct SessionSnapshot {
 /// Errors related to session lifecycle and concurrency locking.
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum SessionError {
+    #[error("Editor admission is restricted to {allowed_editor}")]
+    EditorNotAdmitted { allowed_editor: EditorType },
+    #[error("Editor admission is currently blocked")]
+    AdmissionBlocked,
     #[error("Session is already locked by active {active_editor} connection (session {session_id})")]
     SessionLocked {
         active_editor: EditorType,
@@ -216,10 +221,21 @@ pub enum SessionError {
     LocateCancelled,
 }
 
+/// Determines which editor, if any, may establish the next session.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdmissionPolicy {
+    Open,
+    Only(EditorType),
+    Blocked,
+}
+
 /// Manages active editor session with atomic single-session locking.
 #[derive(Clone)]
 pub struct SessionManager {
     active_session: Arc<RwLock<Option<EditorSession>>>,
+    admission_policy: Arc<Mutex<AdmissionPolicy>>,
+    /// Serializes admission changes with session acquisition so a reconnect cannot race a switch.
+    lifecycle_gate: Arc<Mutex<()>>,
     event_sink: Arc<dyn BridgeEventSink>,
     result_sender: broadcast::Sender<ReplacementResult>,
     pending_snapshots: Arc<Mutex<HashMap<String, PendingSnapshot>>>,
@@ -231,6 +247,8 @@ impl SessionManager {
         let (result_sender, _) = broadcast::channel(128);
         Self {
             active_session: Arc::new(RwLock::new(None)),
+            admission_policy: Arc::new(Mutex::new(AdmissionPolicy::Open)),
+            lifecycle_gate: Arc::new(Mutex::new(())),
             event_sink,
             result_sender,
             pending_snapshots: Arc::new(Mutex::new(HashMap::new())),
@@ -259,6 +277,25 @@ impl SessionManager {
         initial_doc: Option<String>,
         command_sender: Option<mpsc::UnboundedSender<BridgeMessage>>,
     ) -> Result<String, SessionError> {
+        self.acquire_session_with_close(editor_type, initial_doc, command_sender, None).await
+    }
+
+    /// Acquires a session and, for WebSocket sessions, retains a control channel that can close
+    /// the actual socket when the user switches editor targets.
+    pub async fn acquire_session_with_close(
+        &self,
+        editor_type: EditorType,
+        initial_doc: Option<String>,
+        command_sender: Option<mpsc::UnboundedSender<BridgeMessage>>,
+        close_sender: Option<oneshot::Sender<()>>,
+    ) -> Result<String, SessionError> {
+        let _lifecycle_guard = self.lifecycle_gate.lock().await;
+        match *self.admission_policy.lock().await {
+            AdmissionPolicy::Open => {}
+            AdmissionPolicy::Only(allowed_editor) if allowed_editor == editor_type => {}
+            AdmissionPolicy::Only(allowed_editor) => return Err(SessionError::EditorNotAdmitted { allowed_editor }),
+            AdmissionPolicy::Blocked => return Err(SessionError::AdmissionBlocked),
+        }
         let mut session_guard = self.active_session.write().await;
 
         if let Some(existing) = session_guard.as_ref() {
@@ -278,6 +315,7 @@ impl SessionManager {
             last_heartbeat_at: now,
             active_document: initial_doc.clone(),
             command_sender,
+            close_sender,
         };
 
         *session_guard = Some(session);
@@ -286,6 +324,35 @@ impl SessionManager {
         self.event_sink.emit_status_changed(&event).await;
 
         Ok(session_id)
+    }
+
+    /// Atomically selects a target editor and closes any current WebSocket connection.
+    /// The returned value tells callers whether a session had to be terminated; connection of
+    /// the newly selected editor remains asynchronous.
+    pub async fn switch_editor_target(&self, target: EditorType) -> bool {
+        self.set_admission_and_disconnect(AdmissionPolicy::Only(target), "Editor target switched").await
+    }
+
+    /// Blocks all future admissions and closes any current WebSocket connection.
+    pub async fn block_and_disconnect(&self, reason: &str) -> bool {
+        self.set_admission_and_disconnect(AdmissionPolicy::Blocked, reason).await
+    }
+
+    async fn set_admission_and_disconnect(&self, policy: AdmissionPolicy, reason: &str) -> bool {
+        let _lifecycle_guard = self.lifecycle_gate.lock().await;
+        *self.admission_policy.lock().await = policy;
+        let session = self.active_session.write().await.take();
+        let Some(session) = session else { return false; };
+        if let Some(close_sender) = session.close_sender {
+            let _ = close_sender.send(());
+        }
+        self.clear_pending_snapshots_for_session(&session.session_id).await;
+        self.event_sink.emit_status_changed(&BridgeStatusEvent::disconnected(reason)).await;
+        true
+    }
+
+    pub async fn admission_policy(&self) -> AdmissionPolicy {
+        *self.admission_policy.lock().await
     }
 
     /// Records a heartbeat from the active session, updating `last_heartbeat_at` and active document.
@@ -601,5 +668,52 @@ mod tests {
             }
             _ => panic!("Expected HeartbeatTimeout state"),
         }
+    }
+
+    #[tokio::test]
+    async fn admission_policy_allows_only_the_selected_editor_and_can_block_all() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        assert!(!manager.switch_editor_target(EditorType::Word).await);
+        assert!(matches!(
+            manager.acquire_session(EditorType::InDesign, None, None).await,
+            Err(SessionError::EditorNotAdmitted { allowed_editor: EditorType::Word })
+        ));
+        let word_id = manager.acquire_session(EditorType::Word, None, None).await.unwrap();
+        manager.release_session(&word_id, "test").await;
+
+        assert!(!manager.block_and_disconnect("test").await);
+        for editor in [EditorType::Word, EditorType::InDesign] {
+            assert!(matches!(manager.acquire_session(editor, None, None).await, Err(SessionError::AdmissionBlocked)));
+        }
+    }
+
+    #[tokio::test]
+    async fn switch_closes_existing_socket_and_rejects_its_immediate_reconnect() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        let (commands, _command_rx) = mpsc::unbounded_channel();
+        let (close_tx, close_rx) = oneshot::channel();
+        manager.acquire_session_with_close(EditorType::Word, None, Some(commands), Some(close_tx)).await.unwrap();
+
+        assert!(manager.switch_editor_target(EditorType::InDesign).await);
+        assert!(close_rx.await.is_ok(), "switch must signal the live WebSocket to close");
+        assert!(matches!(
+            manager.acquire_session(EditorType::Word, None, None).await,
+            Err(SessionError::EditorNotAdmitted { allowed_editor: EditorType::InDesign })
+        ));
+    }
+
+    #[tokio::test]
+    async fn old_session_heartbeat_cannot_update_the_replacement_session() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        let old_id = manager.acquire_session(EditorType::InDesign, None, None).await.unwrap();
+        manager.switch_editor_target(EditorType::InDesign).await;
+        let new_id = manager.acquire_session(EditorType::InDesign, None, None).await.unwrap();
+
+        assert!(matches!(
+            manager.record_heartbeat(&old_id, Some("stale.indd".to_string())).await,
+            Err(SessionError::SessionMismatch { .. })
+        ));
+        manager.record_heartbeat(&new_id, Some("fresh.indd".to_string())).await.unwrap();
+        assert_eq!(manager.get_snapshot().await.unwrap().active_document.as_deref(), Some("fresh.indd"));
     }
 }

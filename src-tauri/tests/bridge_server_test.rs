@@ -149,7 +149,7 @@ async fn test_rest_telemetry_authentication_and_event_dispatch() {
     let client = reqwest::Client::new();
     let valid_token = auth.get_token().await;
 
-    let payload = ParagraphPayload {
+    let mut payload = ParagraphPayload {
         paragraph_id: "para-42".to_string(),
         text: "SmartLinter ensures high-quality terminology.".to_string(),
         hash: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
@@ -158,6 +158,7 @@ async fn test_rest_telemetry_authentication_and_event_dispatch() {
         is_locked: None,
         timestamp: 1724450000000,
         editor_type: EditorType::Word,
+        session_id: None,
     };
 
     // 1. Without Auth Header -> 401
@@ -179,7 +180,25 @@ async fn test_rest_telemetry_authentication_and_event_dispatch() {
         .unwrap();
     assert_eq!(res_bad_auth.status(), StatusCode::UNAUTHORIZED);
 
-    // 3. With Valid Bearer Token -> 200 OK and Dispatched to EventSink
+    // 3. HTTP telemetry must carry the session returned by its handshake.
+    let handshake = AuthHandshake {
+        token: valid_token.clone(),
+        editor_type: EditorType::Word,
+        version: "1.0.0".to_string(),
+        client_nonce: generate_nonce(),
+    };
+    let auth_res: AuthResponse = client
+        .post(format!("{}/auth/handshake", server.http_url()))
+        .json(&handshake)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    payload.session_id = auth_res.session_token;
+
+    // 4. With Valid Bearer Token -> 200 OK and Dispatched to EventSink
     let res_valid = client
         .post(format!("{}/telemetry", server.http_url()))
         .header("Authorization", format!("Bearer {}", valid_token))
@@ -341,6 +360,7 @@ async fn test_bidirectional_websocket_messaging_and_commands() {
         is_locked: None,
         timestamp: 1724450010000,
         editor_type: EditorType::Word,
+        session_id: None,
     };
     let ws_telemetry = BridgeMessage::ParagraphPayload(payload);
     ws_stream
@@ -399,6 +419,7 @@ async fn test_bidirectional_websocket_messaging_and_commands() {
     // 4. Client sends periodic Heartbeat
     let heartbeat = BridgeMessage::Heartbeat(HeartbeatPayload {
         editor_type: EditorType::Word,
+        session_id: None,
         timestamp: 1724450020000,
         active_document: Some("guide.docx".to_string()),
     });
@@ -620,6 +641,8 @@ async fn test_http_heartbeat_keeps_session_alive_and_updates_doc() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
+    let auth_res: AuthResponse = res.json().await.unwrap();
+    let indesign_session_id = auth_res.session_token.expect("session_token must be present");
 
     // Verify connected: true
     let health: serde_json::Value = client
@@ -638,6 +661,7 @@ async fn test_http_heartbeat_keeps_session_alive_and_updates_doc() {
         tokio::time::sleep(Duration::from_millis(100)).await;
         let hb = HeartbeatPayload {
             editor_type: EditorType::InDesign,
+            session_id: Some(indesign_session_id.clone()),
             timestamp: smart_linter::server::session::current_timestamp_ms(),
             active_document: Some(format!("Magazine_Page_{}.indd", i)),
         };
@@ -683,6 +707,7 @@ async fn test_http_heartbeat_keeps_session_alive_and_updates_doc() {
     // 4. Test POST /heartbeat without active session returns 404 Not Found (session expired / zombie recovery trigger)
     let hb_no_session = HeartbeatPayload {
         editor_type: EditorType::InDesign,
+        session_id: Some("expired-session".to_string()),
         timestamp: smart_linter::server::session::current_timestamp_ms(),
         active_document: Some("OrphanDoc.indd".to_string()),
     };

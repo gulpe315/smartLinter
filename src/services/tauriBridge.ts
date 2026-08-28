@@ -995,7 +995,7 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     try {
-      await invoke('connect_indesign');
+      await invoke('switch_editor_target', { target: 'InDesign' });
     } catch (e) {
       console.warn('Tauri invoke connect_indesign failed:', e);
       throw e;

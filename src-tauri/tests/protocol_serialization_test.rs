@@ -28,6 +28,7 @@ fn test_paragraph_payload_serialization_roundtrip() {
         is_locked: Some(true),
         timestamp: 1724490000000,
         editor_type: EditorType::Word,
+        session_id: None,
     };
 
     let json_str = serde_json::to_string_pretty(&payload).expect("Serialization failed");
@@ -52,6 +53,7 @@ fn test_paragraph_payload_optional_target_omitted() {
         is_locked: None,
         timestamp: 1724490001000,
         editor_type: EditorType::InDesign,
+        session_id: None,
     };
 
     let json_str = serde_json::to_string(&payload).expect("Serialization failed");
@@ -160,6 +162,7 @@ fn test_auth_handshake_and_response() {
 fn test_heartbeat_payload() {
     let hb = HeartbeatPayload {
         editor_type: EditorType::InDesign,
+        session_id: None,
         timestamp: 1724490010000,
         active_document: Some("Magazine.indd".to_string()),
     };
@@ -184,6 +187,7 @@ fn test_bridge_message_multiplex_envelope() {
         is_locked: None,
         timestamp: 1724490000000,
         editor_type: EditorType::Word,
+        session_id: None,
     });
 
     let json_str = serde_json::to_string(&msg).expect("Serialization failed");

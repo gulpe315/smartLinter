@@ -266,6 +266,8 @@
         if (!payload || !payload.paragraphId || !payload.hash) {
             return false;
         }
+        payload.editorType = 'InDesign';
+        payload.sessionId = this.sessionToken || undefined;
         var res = this.httpRequest('POST', '/telemetry', payload);
         if (res.ok) {
             this.status = 'CONNECTED';
@@ -285,6 +287,7 @@
     SmartLinterBridgeSocket.prototype.sendHeartbeat = function(activeDocument) {
         var payload = {
             editorType: 'InDesign',
+            sessionId: this.sessionToken || undefined,
             timestamp: (new Date()).getTime(),
             activeDocument: activeDocument || undefined
         };

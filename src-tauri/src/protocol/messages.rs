@@ -82,6 +82,9 @@ pub struct ParagraphPayload {
     pub timestamp: i64,
     /// Host editor type originating this paragraph.
     pub editor_type: EditorType,
+    /// Session token returned by the HTTP handshake (used by HTTP editor integrations).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 /// Replacement command sent from the Dashboard to an editor plugin.
@@ -223,6 +226,9 @@ pub struct AuthResponse {
 pub struct HeartbeatPayload {
     /// Host editor platform.
     pub editor_type: EditorType,
+    /// Session token returned by the handshake. Required for HTTP editor updates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
     /// Current client millisecond Unix epoch timestamp.
     pub timestamp: i64,
     /// Currently active document title or identifier if open.

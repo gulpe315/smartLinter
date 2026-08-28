@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::protocol::{
-    AuthHandshake, AuthResponse, HeartbeatPayload, ParagraphPayload, ReplacementCommand,
+    AuthHandshake, AuthResponse, EditorType, HeartbeatPayload, ParagraphPayload, ReplacementCommand,
 };
 use crate::server::session::{SessionError, SessionSnapshot};
 use crate::server::ws_handler::ws_upgrade_handler;
@@ -142,6 +142,18 @@ pub async fn auth_handshake_handler(
                     };
                     (StatusCode::CONFLICT, Json(conflict_res)).into_response()
                 }
+                Err(SessionError::EditorNotAdmitted { allowed_editor }) => {
+                    (StatusCode::CONFLICT, Json(AuthResponse {
+                        success: false, session_token: None, server_nonce: None,
+                        message: Some(format!("Editor admission is restricted to {}", allowed_editor)),
+                    })).into_response()
+                }
+                Err(SessionError::AdmissionBlocked) => {
+                    (StatusCode::CONFLICT, Json(AuthResponse {
+                        success: false, session_token: None, server_nonce: None,
+                        message: Some("Editor admission is currently blocked".to_string()),
+                    })).into_response()
+                }
                 Err(err) => {
                     let err_res = AuthResponse {
                         success: false,
@@ -186,15 +198,14 @@ pub async fn telemetry_handler(
             .into_response();
     }
 
-    state.event_sink.emit_telemetry(&payload).await;
-
-    // If active session exists, update heartbeat
-    if let Some(snapshot) = state.session_manager.get_snapshot().await {
-        let _ = state
-            .session_manager
-            .record_heartbeat(&snapshot.session_id, payload.source.clone().into())
-            .await;
+    if let Err(response) = validate_http_session(&state, payload.editor_type, payload.session_id.as_deref()).await {
+        return response;
     }
+    let session_id = payload.session_id.as_deref().expect("validated HTTP session id");
+    if let Err(error) = state.session_manager.record_heartbeat(session_id, payload.source.clone().into()).await {
+        return (StatusCode::CONFLICT, Json(ApiResponse::<()>::err(error.to_string()))).into_response();
+    }
+    state.event_sink.emit_telemetry(&payload).await;
 
     (
         StatusCode::OK,
@@ -227,11 +238,12 @@ pub async fn heartbeat_handler(
             .into_response();
     }
 
-    if let Some(snapshot) = state.session_manager.get_snapshot().await {
-        let _ = state
-            .session_manager
-            .record_heartbeat(&snapshot.session_id, payload.active_document)
-            .await;
+    if let Err(response) = validate_http_session(&state, payload.editor_type, payload.session_id.as_deref()).await {
+        return response;
+    }
+    let session_id = payload.session_id.as_deref().expect("validated HTTP session id");
+    match state.session_manager.record_heartbeat(session_id, payload.active_document).await {
+        Ok(()) => {
 
         (
             StatusCode::OK,
@@ -240,12 +252,23 @@ pub async fn heartbeat_handler(
             }))),
         )
             .into_response()
-    } else {
-        (
-            StatusCode::NOT_FOUND,
-            Json(ApiResponse::<()>::err("404 Not Found: No active editor session")),
-        )
-            .into_response()
+        }
+        Err(error) => (StatusCode::CONFLICT, Json(ApiResponse::<()>::err(error.to_string()))).into_response(),
+    }
+}
+
+async fn validate_http_session(
+    state: &ServerState,
+    editor_type: EditorType,
+    session_id: Option<&str>,
+) -> Result<(), Response> {
+    let Some(session_id) = session_id.filter(|id| !id.is_empty()) else {
+        return Err((StatusCode::CONFLICT, Json(ApiResponse::<()>::err("409 Conflict: Missing session ID"))).into_response());
+    };
+    match state.session_manager.get_snapshot().await {
+        Some(snapshot) if snapshot.session_id == session_id && snapshot.editor_type == editor_type => Ok(()),
+        Some(_) => Err((StatusCode::CONFLICT, Json(ApiResponse::<()>::err("409 Conflict: Stale or mismatched editor session"))).into_response()),
+        None => Err((StatusCode::NOT_FOUND, Json(ApiResponse::<()>::err("404 Not Found: No active editor session"))).into_response()),
     }
 }
 

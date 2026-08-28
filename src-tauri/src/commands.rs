@@ -420,6 +420,38 @@ pub async fn get_live_paragraph_snapshots(
         .map_err(|error| format!("InDesign batch live paragraph snapshot task failed: {error}"))?
 }
 
+/// Accepts an editor-target transition. This does not mean that the target has
+/// connected yet; callers should observe the bridge status event for that.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditorTargetSwitchResult {
+    pub accepted: bool,
+    pub target: EditorType,
+    pub disconnected_existing_session: bool,
+}
+
+#[tauri::command]
+pub async fn switch_editor_target(
+    target: EditorType,
+    server_handle: State<'_, ServerHandle>,
+) -> Result<EditorTargetSwitchResult, String> {
+    let disconnected_existing_session = server_handle
+        .session_manager()
+        .switch_editor_target(target)
+        .await;
+
+    if target == EditorType::InDesign {
+        // Reuse the established COM automation path; it will complete its HTTP handshake later.
+        connect_indesign()?;
+    }
+
+    Ok(EditorTargetSwitchResult {
+        accepted: true,
+        target,
+        disconnected_existing_session,
+    })
+}
+
 /// Forcefully disconnects the currently active editor session at the user's request.
 #[tauri::command]
 pub async fn disconnect_editor_session(
@@ -429,11 +461,7 @@ pub async fn disconnect_editor_session(
 }
 
 async fn disconnect_active_editor_session(session_manager: Arc<SessionManager>) -> Result<bool, String> {
-    let had_active_session = session_manager.get_snapshot().await.is_some();
-    session_manager
-        .clear_session("User requested disconnect")
-        .await;
-    Ok(had_active_session)
+    Ok(session_manager.block_and_disconnect("User requested disconnect").await)
 }
 
 async fn request_word_locate(
@@ -1005,6 +1033,7 @@ mod tests {
             is_locked: None,
             timestamp: 1000,
             editor_type: crate::protocol::EditorType::Word,
+            session_id: None,
         };
 
         let builder = PromptBuilder::new().source(&para.source).target(&para.text);
@@ -1043,6 +1072,7 @@ mod tests {
             is_locked: None,
             timestamp: 1000,
             editor_type: crate::protocol::EditorType::Word,
+            session_id: None,
         };
 
         let req = QueueJobRequest::new(&para.paragraph_id, "더 간결하게 다듬어줘");
@@ -1089,6 +1119,7 @@ mod tests {
             is_locked: None,
             timestamp: 1000,
             editor_type: crate::protocol::EditorType::Word,
+            session_id: None,
         };
 
         let builder = PromptBuilder::new().source(&para.source).target(&para.text);

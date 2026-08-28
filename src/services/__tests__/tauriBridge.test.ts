@@ -78,7 +78,7 @@ describe('TauriBridgeService & IPC Integration', () => {
     expect(await service.checkIndesignStatus()).toBe(true);
     await expect(service.connectIndesign()).resolves.toBeUndefined();
     expect(invokeMock).toHaveBeenNthCalledWith(1, 'check_indesign_status', {}, undefined);
-    expect(invokeMock).toHaveBeenNthCalledWith(2, 'connect_indesign', {}, undefined);
+    expect(invokeMock).toHaveBeenNthCalledWith(2, 'switch_editor_target', { target: 'InDesign' }, undefined);
 
     service.destroy();
   });
