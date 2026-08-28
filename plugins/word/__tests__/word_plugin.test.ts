@@ -746,4 +746,46 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
             await runtime.shutdown();
         });
     });
+
+    describe('Replacement command runtime wiring', () => {
+        it('registers a command handler and replies with FAILED when Word.run is unavailable', async () => {
+            const env = new MockWordEnvironment();
+            const runtime = new WordRuntimeManager({
+                officeHost: env.office,
+                bridgeConfig: { enableWebSocket: false },
+                listenerConfig: { wordRunner: env.createWordRunner() },
+            });
+            const originalWord = (globalThis as any).Word;
+            delete (globalThis as any).Word;
+            try {
+                await runtime.initialize();
+                const client = runtime.getBridgeClient()!;
+                const results: any[] = [];
+                client.sendReplacementResult = async (result: any) => {
+                    results.push(result);
+                    return true;
+                };
+
+                const handlers = (client as any).commandHandlers as Set<(command: any) => Promise<void>>;
+                assert.equal(handlers.size, 1);
+                await [...handlers][0]({
+                    commandId: 'cmd-no-word-runner',
+                    paragraphId: 'word-para-any',
+                    baseHash: 'base',
+                    expectedHash: 'expected',
+                    hunks: [],
+                });
+
+                assert.deepEqual(results, [{
+                    commandId: 'cmd-no-word-runner',
+                    status: 'FAILED',
+                    currentHash: '',
+                    message: 'Office.js Word.run is unavailable',
+                }]);
+                await runtime.shutdown();
+            } finally {
+                (globalThis as any).Word = originalWord;
+            }
+        });
+    });
 });

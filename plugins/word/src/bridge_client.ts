@@ -456,7 +456,7 @@ export class WordBridgeClient {
             case 'REPLACEMENT_COMMAND':
                 for (const handler of this.commandHandlers) {
                     try {
-                        handler(message.payload);
+                        void Promise.resolve(handler(message.payload)).catch(() => {});
                     } catch {
                         // Error isolated
                     }

@@ -410,6 +410,43 @@ describe('Task 8: MS Word Lossless Reverse Replacement & Compensating Transactio
     // 7. Bridge Client Dispatch & Office.js Simulation Integration
     // =========================================================================
     describe('Bridge Client Dispatch & Office.js Simulation Integration', () => {
+        it('targets the command paragraph by paragraphId and baseHash, not the current selection', async () => {
+            const targetText = 'Target paragraph with typo.';
+            const selectedText = 'Unrelated selected paragraph.';
+            const paragraphs = [selectedText, targetText];
+            const makeParagraph = (index: number) => ({
+                get text() { return paragraphs[index]; },
+                set text(value: string) { paragraphs[index] = value; },
+            });
+            const context = {
+                document: {
+                    // Deliberately points at the wrong paragraph: the default adapter must not use it.
+                    getSelection: () => ({ paragraphs: { items: [makeParagraph(0)] } }),
+                    body: { paragraphs: { items: [makeParagraph(0), makeParagraph(1)], load: () => {} } },
+                },
+                sync: async () => {},
+            };
+            const originalWord = (globalThis as any).Word;
+            (globalThis as any).Word = { run: async (callback: (ctx: any) => Promise<any>) => callback(context) };
+            try {
+                const replacement = 'Target paragraph without typo.';
+                const command: ReplacementCommand = {
+                    commandId: 'cmd-targeted-default-adapter',
+                    paragraphId: `word-para-${computeParagraphHash(targetText).slice(0, 12)}`,
+                    baseHash: computeParagraphHash(targetText),
+                    expectedHash: computeParagraphHash(replacement),
+                    hunks: extractDiffHunks(targetText, replacement),
+                };
+
+                const result = await new WordReplacementExecutor().execute(command);
+                assert.equal(result.status, 'SUCCESS');
+                assert.equal(paragraphs[0], selectedText);
+                assert.equal(paragraphs[1], replacement);
+            } finally {
+                (globalThis as any).Word = originalWord;
+            }
+        });
+
         it('should dispatch ReplacementResult to connected WordBridgeClient', async () => {
             const initialText = 'Clean sentence for bridge dispatch test.';
             const targetText = 'Clean sentence for bridge dispatch verified.';

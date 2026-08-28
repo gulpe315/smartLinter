@@ -19,7 +19,7 @@ import {
 } from '../../../shared/protocol/types.ts';
 import { computeParagraphHash } from '../../../shared/engine/hash_util.ts';
 import { sortHunksReverse, validateHunks } from '../../../shared/engine/diff_engine.ts';
-import { CompensatingJournal, type RollbackAction } from './compensating_journal.ts';
+import { CompensatingJournal } from './compensating_journal.ts';
 import { HashVerifier } from './hash_verifier.ts';
 import { WordBridgeClient } from './bridge_client.ts';
 
@@ -104,8 +104,19 @@ export class WordReplacementExecutor {
             return errorResult;
         }
 
-        const adapter = options.adapter || (await this.createDefaultAdapter(options));
-        const bridgeClient = options.bridgeClient || this.defaultBridgeClient;
+        let adapter: WordParagraphAdapter;
+        try {
+            adapter = options.adapter || (await this.createDefaultAdapter(command, options));
+        } catch (err) {
+            const result: ReplacementResult = {
+                commandId: command.commandId,
+                status: 'FAILED',
+                currentHash: '',
+                message: `Failed to resolve target paragraph from Word: ${(err as Error).message}`,
+            };
+            await this.dispatchResultIfNeeded(result, options);
+            return result;
+        }
 
         // =========================================================================
         // Step 1: Read Current Paragraph & Perform Stale Base Hash Check
@@ -215,9 +226,11 @@ export class WordReplacementExecutor {
 
             const successResult: ReplacementResult = {
                 commandId: command.commandId,
-                status: 'SUCCESS',
+                status: HashVerifier.verifyExpectedHash(postApplyText, command.expectedHash) ? 'SUCCESS' : 'FAILED',
                 currentHash: postApplyHash,
-                message: `Successfully applied ${sortedHunks.length} diff hunks in reverse order`,
+                message: HashVerifier.verifyExpectedHash(postApplyText, command.expectedHash)
+                    ? `Successfully applied ${sortedHunks.length} diff hunks in reverse order`
+                    : `Replacement completed but final paragraph hash did not match expectedHash`,
             };
 
             await this.dispatchResultIfNeeded(successResult, options);
@@ -344,9 +357,13 @@ export class WordReplacementExecutor {
     }
 
     /**
-     * Creates a default WordParagraphAdapter targeting the active cursor selection in Office.js.
+     * Creates a default WordParagraphAdapter targeting the command's paragraph,
+     * never the user's current selection. The content-derived paragraphId changes
+     * after the first hunk, so the first lookup records its index for the rest of
+     * this one transaction.
      */
     private async createDefaultAdapter(
+        command: ReplacementCommand,
         options: ReplacementExecutionOptions
     ): Promise<WordParagraphAdapter> {
         const runner =
@@ -359,21 +376,42 @@ export class WordReplacementExecutor {
                 return Promise.reject(new Error('Word Office.js API is not available'));
             });
 
+        let targetIndex: number | null = null;
+
+        const resolveTargetParagraph = async (context: any): Promise<any> => {
+            const paragraphs = context.document.body?.paragraphs;
+            if (!paragraphs) throw new Error('Word document body paragraphs are unavailable');
+            paragraphs.load('text');
+            await context.sync();
+
+            if (targetIndex !== null) {
+                const paragraph = paragraphs.items?.[targetIndex];
+                if (!paragraph) throw new Error('Target paragraph no longer exists');
+                return paragraph;
+            }
+
+            const candidates = (paragraphs.items || [])
+                .map((paragraph: any, index: number) => ({
+                    paragraph,
+                    index,
+                    text: paragraph.text || '',
+                }))
+                .filter((candidate: { text: string }) =>
+                    `word-para-${computeParagraphHash(candidate.text).slice(0, 12)}` === command.paragraphId
+                    && computeParagraphHash(candidate.text) === command.baseHash
+                );
+            if (candidates.length === 0) throw new Error(`Paragraph '${command.paragraphId}' was not found with its base hash`);
+            if (candidates.length > 1) throw new Error(`Paragraph '${command.paragraphId}' is ambiguous (${candidates.length} matches)`);
+            targetIndex = candidates[0].index;
+            return candidates[0].paragraph;
+        };
+
         return {
             getText: async () => {
                 let text = '';
                 await runner(async (context: any) => {
-                    const selection = context.document.getSelection();
-                    const paragraphs = selection.paragraphs;
-                    paragraphs.load('text');
-                    await context.sync();
-
-                    if (paragraphs.items && paragraphs.items.length > 0) {
-                        text = paragraphs.items[0].text || '';
-                    } else if (paragraphs.getFirst) {
-                        const p = paragraphs.getFirst();
-                        text = p ? p.text || '' : '';
-                    }
+                    const paragraph = await resolveTargetParagraph(context);
+                    text = paragraph.text || '';
                 });
                 return text;
             },
@@ -384,33 +422,7 @@ export class WordReplacementExecutor {
                 newText: string
             ) => {
                 await runner(async (context: any) => {
-                    const selection = context.document.getSelection();
-                    const paragraphs = selection.paragraphs;
-                    await context.sync();
-
-                    const paragraph = paragraphs.items ? paragraphs.items[0] : paragraphs.getFirst();
-                    if (!paragraph) {
-                        throw new Error('Target paragraph not found in selection');
-                    }
-
-                    // Office.js Range search / replace
-                    if (paragraph.search) {
-                        const searchResults = paragraph.search(oldText, { matchCase: true, matchWholeWord: false });
-                        searchResults.load('text');
-                        await context.sync();
-
-                        if (searchResults.items && searchResults.items.length > 0) {
-                            // Replace first matching range
-                            const targetRange = searchResults.items[0];
-                            targetRange.insertText(newText, 'Replace');
-                            await context.sync();
-                            return;
-                        }
-                    }
-
-                    // Fallback to paragraph text update if direct search is not available
-                    paragraph.load('text');
-                    await context.sync();
+                    const paragraph = await resolveTargetParagraph(context);
                     const currentPText = paragraph.text || '';
                     const actualSlice = currentPText.substring(startOffset, endOffset);
                     if (actualSlice !== oldText) {
@@ -418,7 +430,15 @@ export class WordReplacementExecutor {
                             `Range mismatch: expected ${JSON.stringify(oldText)} at [${startOffset}:${endOffset}], found ${JSON.stringify(actualSlice)}`
                         );
                     }
-                    paragraph.text = currentPText.substring(0, startOffset) + newText + currentPText.substring(endOffset);
+                    const contentRange = paragraph.getRange?.('Content');
+                    if (contentRange?.getSubstring) {
+                        const targetRange = contentRange.getSubstring(startOffset, endOffset - startOffset);
+                        targetRange.insertText(newText, 'Replace');
+                    } else {
+                        // Compatibility fallback for older Word API sets. It preserves correctness,
+                        // but not rich formatting inside the paragraph.
+                        paragraph.text = currentPText.substring(0, startOffset) + newText + currentPText.substring(endOffset);
+                    }
                     await context.sync();
                 });
             },
