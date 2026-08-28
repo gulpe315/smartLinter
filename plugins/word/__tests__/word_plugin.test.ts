@@ -287,6 +287,179 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
         });
     });
 
+    describe('WebSocket-to-REST connection fallback', () => {
+        interface MockWebSocket {
+            readyState: number;
+            onopen: (() => void) | null;
+            onmessage: ((event: { data: string }) => void) | null;
+            onclose: ((event: { code: number }) => void) | null;
+            onerror: (() => void) | null;
+            send: (data: string) => void;
+            close: () => void;
+            triggerOpen: () => void;
+            triggerError: () => void;
+            triggerMessage: (data: BridgeMessage) => void;
+            triggerClose: (code?: number) => void;
+        }
+
+        function createMockWebSocketHarness() {
+            const instances: MockWebSocket[] = [];
+            const waiters: Array<(socket: MockWebSocket) => void> = [];
+
+            const WebSocketMock = function (this: unknown, _url: string) {
+                const socket: MockWebSocket = {
+                    readyState: 0,
+                    onopen: null,
+                    onmessage: null,
+                    onclose: null,
+                    onerror: null,
+                    send: () => {},
+                    close: () => {
+                        socket.readyState = 3;
+                        socket.onclose?.({ code: 1000 });
+                    },
+                    triggerOpen: () => {
+                        socket.readyState = 1;
+                        socket.onopen?.();
+                    },
+                    triggerError: () => socket.onerror?.(),
+                    triggerMessage: (data) => socket.onmessage?.({ data: JSON.stringify(data) }),
+                    triggerClose: (code = 1006) => {
+                        socket.readyState = 3;
+                        socket.onclose?.({ code });
+                    },
+                };
+                instances.push(socket);
+                waiters.shift()?.(socket);
+                return socket;
+            };
+
+            return {
+                instances,
+                WebSocketMock,
+                nextSocket: (): Promise<MockWebSocket> => {
+                    const socket = instances.at(-1);
+                    if (socket) {
+                        return Promise.resolve(socket);
+                    }
+                    return new Promise((resolve) => waiters.push(resolve));
+                },
+            };
+        }
+
+        let originalWebSocket: unknown;
+        let originalFetch: typeof fetch;
+
+        beforeEach(() => {
+            originalWebSocket = (globalThis as { WebSocket?: unknown }).WebSocket;
+            originalFetch = globalThis.fetch;
+        });
+
+        afterEach(() => {
+            (globalThis as { WebSocket?: unknown }).WebSocket = originalWebSocket;
+            globalThis.fetch = originalFetch;
+        });
+
+        it('falls back to REST when WebSocket is immediately rejected', async () => {
+            const harness = createMockWebSocketHarness();
+            (globalThis as { WebSocket?: unknown }).WebSocket = harness.WebSocketMock;
+            let handshakeRequests = 0;
+            globalThis.fetch = (async () => {
+                handshakeRequests++;
+                return { ok: true, json: async () => ({ success: true, sessionToken: 'rest-session' }) } as Response;
+            }) as typeof fetch;
+
+            const client = new WordBridgeClient({ token: 'test-token', heartbeatIntervalMs: 0 });
+            try {
+                const connected = client.connect();
+                const socket = await harness.nextSocket();
+                socket.triggerError();
+
+                assert.equal(await connected, true);
+                assert.equal(handshakeRequests, 1);
+                assert.equal(client.getStatus(), 'CONNECTED');
+                assert.equal(client.getSessionToken(), 'rest-session');
+            } finally {
+                client.disconnect();
+            }
+        });
+
+        it('falls back to REST and reports an error when WebSocket authentication is rejected', async () => {
+            const harness = createMockWebSocketHarness();
+            (globalThis as { WebSocket?: unknown }).WebSocket = harness.WebSocketMock;
+            let handshakeRequests = 0;
+            globalThis.fetch = (async () => {
+                handshakeRequests++;
+                return { ok: false, json: async () => ({ success: false }) } as Response;
+            }) as typeof fetch;
+
+            const client = new WordBridgeClient({ token: 'test-token', heartbeatIntervalMs: 0 });
+            try {
+                const connected = client.connect();
+                const socket = await harness.nextSocket();
+                socket.triggerOpen();
+                socket.triggerMessage({ type: 'AUTH_RESPONSE', payload: { success: false, message: 'Rejected' } });
+
+                assert.equal(await connected, false);
+                assert.equal(handshakeRequests, 1);
+                assert.equal(client.getStatus(), 'ERROR');
+            } finally {
+                client.disconnect();
+            }
+        });
+
+        it('does not leave a zombie WebSocket reconnect timer after REST fallback succeeds', async () => {
+            const harness = createMockWebSocketHarness();
+            (globalThis as { WebSocket?: unknown }).WebSocket = harness.WebSocketMock;
+            globalThis.fetch = (async () => {
+                return { ok: true, json: async () => ({ success: true, sessionToken: 'rest-session' }) } as Response;
+            }) as typeof fetch;
+
+            const client = new WordBridgeClient({
+                token: 'test-token',
+                heartbeatIntervalMs: 0,
+                reconnectDelayMs: 15,
+            });
+            try {
+                const connected = client.connect();
+                const socket = await harness.nextSocket();
+                socket.triggerClose();
+
+                assert.equal(await connected, true);
+                await new Promise((resolve) => setTimeout(resolve, 40));
+                assert.equal(harness.instances.length, 1);
+                assert.equal(client.getStatus(), 'CONNECTED');
+            } finally {
+                client.disconnect();
+            }
+        });
+
+        it('schedules a WebSocket reconnect only after a normally authenticated connection drops', async () => {
+            const harness = createMockWebSocketHarness();
+            (globalThis as { WebSocket?: unknown }).WebSocket = harness.WebSocketMock;
+
+            const client = new WordBridgeClient({
+                token: 'test-token',
+                heartbeatIntervalMs: 0,
+                reconnectDelayMs: 15,
+            });
+            try {
+                const connected = client.connect();
+                const socket = await harness.nextSocket();
+                socket.triggerOpen();
+                socket.triggerMessage({ type: 'AUTH_RESPONSE', payload: { success: true, sessionToken: 'ws-session' } });
+                assert.equal(await connected, true);
+
+                socket.triggerClose();
+                await new Promise((resolve) => setTimeout(resolve, 40));
+                assert.equal(harness.instances.length, 2);
+                assert.equal(client.getStatus(), 'CONNECTING');
+            } finally {
+                client.disconnect();
+            }
+        });
+    });
+
     // =========================================================================
     // 4. Acceptance Criterion 4: onSelectionChanged & 1.5s Idle Debounce
     // =========================================================================

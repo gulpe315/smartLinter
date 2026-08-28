@@ -135,13 +135,20 @@ export class WordBridgeClient {
             return false;
         }
 
+        this.clearReconnectTimer();
         const token = await this.resolveToken();
 
         if (this.enableWebSocket && typeof WebSocket !== 'undefined') {
-            return this.connectWebSocket(token);
-        } else {
-            return this.connectRestFallback(token);
+            const wsOk = await this.connectWebSocket(token);
+            if (wsOk || this.isDisposed) {
+                return wsOk;
+            }
+
+            this.cleanupWebSocket();
+            this.clearReconnectTimer();
         }
+
+        return this.connectRestFallback(token);
     }
 
     /** Disconnects and cleans up resources */
@@ -325,13 +332,15 @@ export class WordBridgeClient {
 
                 socket.onclose = (event) => {
                     this.clearHeartbeat();
-                    if (this.status !== 'DISCONNECTED' && !this.isDisposed) {
-                        this.setStatus('DISCONNECTED', `WebSocket closed (code: ${event.code})`);
-                        this.scheduleReconnect();
-                    }
                     if (!authResolved) {
                         authResolved = true;
                         resolve(false);
+                        return;
+                    }
+
+                    if (this.status !== 'DISCONNECTED' && !this.isDisposed) {
+                        this.setStatus('DISCONNECTED', `WebSocket closed (code: ${event.code})`);
+                        this.scheduleReconnect();
                     }
                 };
             } catch (err) {
@@ -362,6 +371,8 @@ export class WordBridgeClient {
                 const authRes = (await response.json()) as AuthResponse;
                 if (authRes.success) {
                     this.sessionToken = authRes.sessionToken || null;
+                    this.reconnectAttempts = 0;
+                    this.clearReconnectTimer();
                     this.setStatus('CONNECTED', 'REST connection verified');
                     this.startHeartbeat();
                     return true;
@@ -442,6 +453,21 @@ export class WordBridgeClient {
         if (this.heartbeatTimer) {
             clearInterval(this.heartbeatTimer);
             this.heartbeatTimer = null;
+        }
+    }
+
+    private cleanupWebSocket(): void {
+        if (this.ws) {
+            try {
+                this.ws.onopen = null;
+                this.ws.onmessage = null;
+                this.ws.onerror = null;
+                this.ws.onclose = null;
+                this.ws.close();
+            } catch {
+                // Ignore close errors
+            }
+            this.ws = null;
         }
     }
 
