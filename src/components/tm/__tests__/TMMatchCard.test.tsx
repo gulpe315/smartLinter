@@ -4,12 +4,13 @@
 
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TMMatchCard } from '../TMMatchCard.tsx';
 import { type TmMatchCandidate } from '../../../types/tm.ts';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { useConfigStore } from '../../../stores/configStore.ts';
 import { useTmStore } from '../../../stores/tmStore.ts';
+import { getBridgeService } from '../../../services/tauriBridge.ts';
 
 describe('TMMatchCard Component', () => {
   const exactCandidate: TmMatchCandidate = {
@@ -171,14 +172,14 @@ describe('TMMatchCard Component', () => {
     render(<TMMatchCard candidate={exactCandidate} onApply={onApplyMock} />);
 
     fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
-    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Edited translation.' } });
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: '수정한 번역입니다.' } });
     fireEvent.click(screen.getByTestId('tm-apply-btn'));
 
-    expect(onApplyMock).toHaveBeenCalledWith(exactCandidate, 'Edited translation.');
+    expect(onApplyMock).toHaveBeenCalledWith(exactCandidate, '수정한 번역입니다.');
   });
 
-  it('saves the edited target using the current paragraph rather than candidate.source', () => {
-    const currentSource = 'The actual current paragraph.';
+  it('saves the edited target using the current paragraph rather than candidate.source', async () => {
+    const currentSource = '현재 문단 원문입니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-1', text: currentSource, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchMode: 'fuzzy', searchQuery: currentSource });
     const addSpy = vi.spyOn(useConfigStore.getState(), 'addUserTmEntry');
@@ -186,10 +187,10 @@ describe('TMMatchCard Component', () => {
     render(<TMMatchCard candidate={exactCandidate} />);
 
     fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
-    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Edited translation.' } });
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: '수정한 번역입니다.' } });
     fireEvent.click(screen.getByTestId('tm-save-btn'));
 
-    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ source: currentSource, target: 'Edited translation.' }), false);
+    await waitFor(() => expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ source: currentSource, target: '수정한 번역입니다.' }), false));
     expect(addSpy).not.toHaveBeenCalledWith(expect.objectContaining({ source: exactCandidate.source }), expect.anything());
   });
 
@@ -199,7 +200,7 @@ describe('TMMatchCard Component', () => {
   });
 
   it('disables apply and TM saving when the target is blank', () => {
-    const source = 'Current paragraph.';
+    const source = '현재 문단입니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-empty', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
     render(<TMMatchCard candidate={{ ...exactCandidate, target: '   ' }} />);
@@ -214,53 +215,54 @@ describe('TMMatchCard Component', () => {
     render(<TMMatchCard candidate={exactCandidate} />);
 
     fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
-    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Visible edited translation.' } });
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: '표시할 수정 번역입니다.' } });
     expect(screen.getByTestId('tm-edited-suggestion-label')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('tm-edit-confirm-btn'));
 
-    expect(screen.getByTestId('tm-card-target')).toHaveTextContent('Visible edited translation.');
+    expect(screen.getByTestId('tm-card-target')).toHaveTextContent('표시할 수정 번역입니다.');
     expect(screen.getByTestId('tm-edited-suggestion-label')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('tm-copy-target-btn'));
-    expect(writeText).toHaveBeenCalledWith('Visible edited translation.');
+    expect(writeText).toHaveBeenCalledWith('표시할 수정 번역입니다.');
   });
 
   it('disables TM saving for keyword and custom fuzzy searches', () => {
-    const source = 'Current paragraph.';
+    const source = '현재 문단입니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-2', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchMode: 'keyword', searchQuery: source });
     const { rerender } = render(<TMMatchCard candidate={{ ...exactCandidate, matchMode: 'keyword' }} />);
     expect(screen.getByTestId('tm-save-btn')).toBeDisabled();
+    expect(screen.getByTestId('tm-save-btn')).toHaveAttribute('title', '키워드로 검색한 결과는 현재 문단과 연결되지 않아 TM에 저장할 수 없습니다.');
 
     useTmStore.setState({ searchMode: 'fuzzy', searchQuery: 'A manually entered query.' });
     rerender(<TMMatchCard candidate={exactCandidate} />);
     expect(screen.getByTestId('tm-save-btn')).toBeDisabled();
   });
 
-  it('allows multi-sentence source text but warns before saving, including ellipsis boundaries', () => {
-    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-3', text: 'One sentence. Another sentence.', hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
-    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: 'One sentence. Another sentence.' });
+  it('allows multi-sentence source text but warns before saving, including ellipsis boundaries', async () => {
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-3', text: '첫 문장입니다. 다음 문장입니다.', hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: '첫 문장입니다. 다음 문장입니다.' });
     const { rerender } = render(<TMMatchCard candidate={exactCandidate} />);
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     expect(screen.getByTestId('tm-save-btn')).toBeEnabled();
     fireEvent.click(screen.getByTestId('tm-save-btn'));
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('여러 문장'));
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('여러 문장')));
 
-    const singleSentence = 'Version v2.0 costs 1.5x at docs.google.com';
+    const singleSentence = '버전 v2.0은 1.5배이며 docs.google.com에서 확인합니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-4', text: singleSentence, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchQuery: singleSentence });
     rerender(<TMMatchCard candidate={exactCandidate} />);
     expect(screen.getByTestId('tm-save-btn')).toBeEnabled();
 
-    const ellipsisParagraph = 'Wait… Another sentence.';
+    const ellipsisParagraph = '잠시만요… 다음 문장입니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-ellipsis', text: ellipsisParagraph, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchQuery: ellipsisParagraph });
     rerender(<TMMatchCard candidate={exactCandidate} />);
     fireEvent.click(screen.getByTestId('tm-save-btn'));
-    expect(confirmSpy).toHaveBeenLastCalledWith(expect.stringContaining('여러 문장'));
+    await waitFor(() => expect(confirmSpy).toHaveBeenLastCalledWith(expect.stringContaining('여러 문장')));
   });
 
-  it('does not warn for a single sentence and stops saving when confirmation is cancelled', () => {
-    const source = 'A single sentence.';
+  it('does not warn for a single sentence and stops saving when confirmation is cancelled', async () => {
+    const source = '단일 문장입니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-confirm', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchMode: 'fuzzy', searchQuery: `  ${source}  ` });
     const addSpy = vi.spyOn(useConfigStore.getState(), 'addUserTmEntry');
@@ -269,13 +271,64 @@ describe('TMMatchCard Component', () => {
     render(<TMMatchCard candidate={exactCandidate} />);
 
     fireEvent.click(screen.getByTestId('tm-save-btn'));
-    expect(confirmSpy).toHaveBeenCalledWith(expect.not.stringContaining('여러 문장'));
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith(expect.not.stringContaining('여러 문장')));
     expect(addSpy).not.toHaveBeenCalled();
   });
 
-  it('shows the existing translation in a conflicting-save confirmation', () => {
-    const source = 'Conflicting source.';
-    const existingTarget = 'Existing translation.';
+  it('stores aligned multi-sentence source and target as separate TM entries', async () => {
+    const source = '첫 원문입니다. 다음 원문입니다.';
+    const target = '첫 번역입니다. 다음 번역입니다.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-pairs', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
+    const addSpy = vi.spyOn(useConfigStore.getState(), 'addUserTmEntry');
+    addSpy.mockClear();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<TMMatchCard candidate={{ ...exactCandidate, target }} />);
+
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    await waitFor(() => expect(addSpy).toHaveBeenCalledTimes(2));
+    expect(addSpy).toHaveBeenNthCalledWith(1, expect.objectContaining({ source: '첫 원문입니다.', target: '첫 번역입니다.' }), false);
+    expect(addSpy).toHaveBeenNthCalledWith(2, expect.objectContaining({ source: '다음 원문입니다.', target: '다음 번역입니다.' }), false);
+  });
+
+  it('falls back to one paragraph TU when source and target sentence counts differ', async () => {
+    const source = '첫 원문입니다. 다음 원문입니다.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-mismatch', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
+    const addSpy = vi.spyOn(useConfigStore.getState(), 'addUserTmEntry');
+    addSpy.mockClear();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<TMMatchCard candidate={{ ...exactCandidate, target: '문장 하나로 합쳐진 번역입니다.' }} />);
+
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    await waitFor(() => expect(addSpy).toHaveBeenCalledTimes(1));
+    expect(addSpy).toHaveBeenCalledWith(expect.objectContaining({ source, target: '문장 하나로 합쳐진 번역입니다.' }), false);
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('여러 문장'));
+  });
+
+  it('disables TM saving and ignores a second click while sentence segmentation is pending', async () => {
+    const source = '저장 대기 문장입니다.';
+    useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-pending', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
+    useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
+    let resolveSegments: (spans: { text: string; start: number; end: number }[]) => void;
+    const pendingSegments = new Promise<{ text: string; start: number; end: number }[]>((resolve) => { resolveSegments = resolve; });
+    const segmentSpy = vi.spyOn(getBridgeService(), 'segmentSentences').mockReturnValue(pendingSegments);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<TMMatchCard candidate={exactCandidate} />);
+
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(screen.getByTestId('tm-save-btn')).toBeDisabled();
+    fireEvent.click(screen.getByTestId('tm-save-btn'));
+    expect(segmentSpy).toHaveBeenCalledTimes(2);
+
+    resolveSegments!([{ text: source, start: 0, end: source.length }]);
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByTestId('tm-save-btn')).toBeEnabled());
+  });
+
+  it('shows the existing translation in a conflicting-save confirmation', async () => {
+    const source = '충돌 확인 문장입니다.';
+    const existingTarget = '기존 번역입니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-conflict', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
     useConfigStore.setState({ tmEntries: [{ id: 'existing', source, target: existingTarget }] });
@@ -283,23 +336,23 @@ describe('TMMatchCard Component', () => {
     render(<TMMatchCard candidate={exactCandidate} />);
 
     fireEvent.click(screen.getByTestId('tm-save-btn'));
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(existingTarget));
+    await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining(existingTarget)));
   });
 
-  it('clears the saved indicator after cancelling an edit', () => {
-    const source = 'Current paragraph.';
+  it('clears the saved indicator after cancelling an edit', async () => {
+    const source = '현재 문단입니다.';
     useBridgeStore.setState({ activeParagraph: { paragraphId: 'p-5', text: source, hash: 'h', source: 'WORD' as any, timestamp: 1, editorType: 'Word' } });
     useTmStore.setState({ searchMode: 'fuzzy', searchQuery: source });
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<TMMatchCard candidate={exactCandidate} />);
 
     fireEvent.click(screen.getByTestId('tm-save-btn'));
-    expect(screen.getByTestId('tm-save-btn')).toHaveTextContent('TM 저장됨');
+    await waitFor(() => expect(screen.getByTestId('tm-save-btn')).toHaveTextContent('TM 저장됨'));
     fireEvent.click(screen.getByTestId('tm-edit-target-btn'));
-    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: 'Changed target.' } });
+    fireEvent.change(screen.getByTestId('tm-edit-target-textarea'), { target: { value: '변경한 번역입니다.' } });
     expect(screen.getByTestId('tm-save-btn')).not.toHaveTextContent('TM 저장됨');
     fireEvent.click(screen.getByTestId('tm-save-btn'));
-    expect(screen.getByTestId('tm-save-btn')).toHaveTextContent('TM 저장됨');
+    await waitFor(() => expect(screen.getByTestId('tm-save-btn')).toHaveTextContent('TM 저장됨'));
     fireEvent.click(screen.getByTestId('tm-edit-cancel-btn'));
     expect(screen.getByTestId('tm-save-btn')).not.toHaveTextContent('TM 저장됨');
     expect(screen.queryByTestId('tm-edited-suggestion-label')).not.toBeInTheDocument();

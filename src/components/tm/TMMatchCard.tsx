@@ -32,6 +32,8 @@ import { InlineDiffViewer } from '../qa/InlineDiffViewer.tsx';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
 import { useConfigStore } from '../../stores/configStore.ts';
 import { useTmStore } from '../../stores/tmStore.ts';
+import { sentenceCount } from '../../utils/sentenceBoundary.ts';
+import { getBridgeService } from '../../services/tauriBridge.ts';
 
 export interface TMMatchCardProps {
   candidate: TmMatchCandidate;
@@ -49,14 +51,6 @@ const renderHighlightedText = (text: string, keyword?: string) => {
   return <>{text.slice(0, start)}<mark className="rounded bg-amber-300/25 px-0.5 text-inherit">{text.slice(start, end)}</mark>{text.slice(end)}</>;
 };
 
-// A period only ends a sentence when it is followed by whitespace or the end
-// of the paragraph.  This deliberately leaves decimals, file names, and
-// abbreviations such as U.S.A. intact.
-const sentenceCount = (text: string) => text.trim()
-  .split(/[.!?\u2026](?=\s|$)|\n+/)
-  .filter((segment) => segment.trim().length > 0)
-  .length;
-
 export const TMMatchCard: React.FC<TMMatchCardProps> = ({
   candidate,
   currentText = '',
@@ -69,6 +63,7 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
   const [editedSuggestion, setEditedSuggestion] = useState<string | null>(null);
   const [isEditingSuggestion, setIsEditingSuggestion] = useState(false);
   const [isTmSaved, setIsTmSaved] = useState(false);
+  const [isSavingToTm, setIsSavingToTm] = useState(false);
   const tmCurrentParagraph = useTmStore((state) => state.currentParagraph);
   const searchMode = useTmStore((state) => state.searchMode);
   const searchQuery = useTmStore((state) => state.searchQuery);
@@ -89,7 +84,7 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
     && isCurrentParagraphSearch
     && hasUsableTarget;
   const saveDisabledReason = searchMode !== 'fuzzy'
-    ? 'TM 검색 결과는 문장 단위로 저장할 수 없습니다.'
+    ? '키워드로 검색한 결과는 현재 문단과 연결되지 않아 TM에 저장할 수 없습니다.'
     : !hasCurrentParagraph
       ? '현재 문단이 없어 TM에 저장할 수 없습니다.'
       : !isCurrentParagraphSearch
@@ -124,24 +119,56 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
     setIsTmSaved(false);
   };
 
-  const saveToTm = () => {
-    if (!canSaveToTm) return;
-    const config = useConfigStore.getState();
-    const conflict = config.findUserTmConflict(currentParagraphText);
-    const sameTarget = conflict?.target === effectiveTarget;
-    const conflictWarning = conflict && !sameTarget
-      ? `\n\n같은 원문으로 저장된 다른 TM 번역이 있습니다.\n기존 번역:\n${conflict.target}`
-      : '';
-    const multiSentenceWarning = !isSingleSentence
-      ? '\n\n경고: 이 문단에는 여러 문장이 포함되어 있습니다. 문단 전체가 하나의 TM 항목으로 저장됩니다.'
-      : '';
-    if (!window.confirm(`다음 문장쌍을 TM에 저장하시겠습니까?\n\n원문:\n${currentParagraphText}\n\n번역:\n${effectiveTarget}${multiSentenceWarning}${conflictWarning}`)) return;
-    const result = config.addUserTmEntry({
-      source: currentParagraphText,
-      target: effectiveTarget,
-      targetLang: config.targetLang,
-    }, Boolean(conflict && !sameTarget));
-    if (result === 'added' || result === 'duplicate') setIsTmSaved(true);
+  const saveToTm = async () => {
+    if (!canSaveToTm || isSavingToTm) return;
+    setIsSavingToTm(true);
+    try {
+      const config = useConfigStore.getState();
+      const bridge = getBridgeService();
+      const [sourceSegments, targetSegments] = await Promise.all([
+        bridge.segmentSentences(currentParagraphText),
+        bridge.segmentSentences(effectiveTarget),
+      ]);
+
+      if (sourceSegments.length >= 2 && sourceSegments.length === targetSegments.length) {
+        const pairs = sourceSegments.map((source, index) => ({ source: source.text, target: targetSegments[index].text }));
+        const conflicts = pairs.map(({ source, target }) => {
+          const conflict = config.findUserTmConflict(source);
+          return conflict && conflict.target !== target ? conflict : undefined;
+        });
+        const pairList = pairs.map(({ source, target }, index) => {
+          const conflict = conflicts[index];
+          return `${index + 1}. 원문:\n${source}\n번역:\n${target}${conflict ? `\n기존 번역:\n${conflict.target}` : ''}`;
+        }).join('\n\n');
+        if (!window.confirm(`다음 문장쌍 ${pairs.length}개를 TM에 저장하시겠습니까?\n\n${pairList}`)) return;
+
+        let saved = false;
+        pairs.forEach(({ source, target }, index) => {
+          const result = config.addUserTmEntry({ source, target, targetLang: config.targetLang }, Boolean(conflicts[index]));
+          saved ||= result === 'added' || result === 'duplicate';
+        });
+        if (saved) setIsTmSaved(true);
+        return;
+      }
+
+      const conflict = config.findUserTmConflict(currentParagraphText);
+      const sameTarget = conflict?.target === effectiveTarget;
+      const conflictWarning = conflict && !sameTarget
+        ? `\n\n같은 원문으로 저장된 다른 TM 번역이 있습니다.\n기존 번역:\n${conflict.target}`
+        : '';
+      const multiSentenceWarning = !isSingleSentence
+        ? '\n\n경고: 이 문단에는 여러 문장이 포함되어 있습니다. 문단 전체가 하나의 TM 항목으로 저장됩니다.'
+        : '';
+      if (!window.confirm(`다음 문장쌍을 TM에 저장하시겠습니까?\n\n원문:\n${currentParagraphText}\n\n번역:\n${effectiveTarget}${multiSentenceWarning}${conflictWarning}`)) return;
+      const result = config.addUserTmEntry({
+        source: currentParagraphText,
+        target: effectiveTarget,
+        targetLang: config.targetLang,
+      }, Boolean(conflict && !sameTarget));
+      if (result === 'added' || result === 'duplicate') setIsTmSaved(true);
+    } finally {
+      setIsSavingToTm(false);
+    }
   };
 
   return (
@@ -309,7 +336,7 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
           {isEditingSuggestion ? (
             <><button type="button" data-testid="tm-edit-confirm-btn" onClick={() => setIsEditingSuggestion(false)} disabled={!hasUsableTarget || !canEdit} className="p-1.5 rounded-md text-emerald-300 hover:bg-emerald-950 disabled:opacity-50" title="편집 완료"><Save className="w-3.5 h-3.5" /></button><button type="button" data-testid="tm-edit-cancel-btn" onClick={cancelEditingSuggestion} disabled={!canEdit} className="p-1.5 rounded-md text-slate-400 hover:bg-slate-800 disabled:opacity-50" title="편집 취소"><X className="w-3.5 h-3.5" /></button></>
           ) : <button type="button" data-testid="tm-edit-target-btn" onClick={startEditingSuggestion} disabled={!canEdit} className="p-1.5 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-slate-800 disabled:opacity-50" title="번역 제안 편집"><Pencil className="w-3.5 h-3.5" /></button>}
-          <button type="button" data-testid="tm-save-btn" onClick={saveToTm} disabled={!canSaveToTm} title={isTmSaved ? 'TM에 저장됨' : saveDisabledReason || '현재 문단과 번역을 TM에 저장'} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 text-violet-200 bg-violet-950/70 border border-violet-800 hover:bg-violet-900 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button type="button" data-testid="tm-save-btn" onClick={saveToTm} disabled={!canSaveToTm || isSavingToTm} title={isTmSaved ? 'TM에 저장됨' : saveDisabledReason || '현재 문단과 번역을 TM에 저장'} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 text-violet-200 bg-violet-950/70 border border-violet-800 hover:bg-violet-900 disabled:opacity-50 disabled:cursor-not-allowed">
             {isTmSaved ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Database className="w-3.5 h-3.5" />}<span>{isTmSaved ? 'TM 저장됨' : 'TM 저장'}</span>
           </button>
           {/* [TM 적용] Button */}

@@ -9,6 +9,7 @@ pub mod deterministic_qa;
 pub mod indesign_com;
 pub mod language;
 pub mod protocol;
+pub mod segmenter;
 pub mod server;
 pub mod tm;
 pub mod window_focus;

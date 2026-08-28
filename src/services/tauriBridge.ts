@@ -24,6 +24,7 @@ import {
   parseGuidelineContent,
   parseTmContent,
 } from '../utils/parserUtils.ts';
+import { splitIntoSentences, type SentenceSpan } from '../utils/sentenceBoundary.ts';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { emit as emitTauriEvent, listen as listenTauriEvent } from '@tauri-apps/api/event';
 
@@ -169,6 +170,9 @@ export interface IBridgeService {
 
   /** Analyzes paragraph text with LLM and returns structured QaReport */
   analyzeParagraph(paragraph: ParagraphPayload, options?: AnalysisOptions): Promise<QaReport>;
+
+  /** Splits text into TM-safe sentence spans. */
+  segmentSentences(text: string): Promise<SentenceSpan[]>;
 
   /** Executes an interactive AI natural language revision command on a paragraph */
   executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult>;
@@ -418,6 +422,10 @@ export class MockBridgeService implements IBridgeService {
       report,
     });
     return report;
+  }
+
+  async segmentSentences(text: string): Promise<SentenceSpan[]> {
+    return splitIntoSentences(text);
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {
@@ -815,6 +823,18 @@ export class TauriBridgeService implements IBridgeService {
     }
 
     return await invoke('analyze_paragraph', options ? { paragraph, options } : { paragraph });
+  }
+
+  async segmentSentences(text: string): Promise<SentenceSpan[]> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.segmentSentences(text);
+    }
+    try {
+      return await invoke('segment_sentences', { text });
+    } catch (error) {
+      console.warn('Tauri invoke segment_sentences failed:', error);
+      return this.fallbackService.segmentSentences(text);
+    }
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {

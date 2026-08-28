@@ -87,7 +87,8 @@ fn main() {
             commands::check_ollama_health,
             commands::set_ollama_model,
             commands::load_guideline_content,
-            commands::load_tm_content
+            commands::load_tm_content,
+            commands::segment_sentences
         ])
         .run(tauri::generate_context!())
         .expect("error while running SmartLinter tauri application");

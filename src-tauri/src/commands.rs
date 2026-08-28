@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use crate::indesign_com;
 use crate::language::LanguageTag;
+use crate::segmenter::{segment_sentences as segment_text, SegmentSpan};
 
 const BRIDGE_HEALTH_URL: &str = "http://127.0.0.1:49152/health";
 
@@ -706,6 +707,12 @@ pub fn load_tm_content(content: String, filename: Option<String>) -> Result<TmCo
     let entries = parse_tm_content(&content, format_hint)
         .map_err(|error| format!("Failed to load translation-memory content: {error}"))?;
     Ok(TmContentDto { count: entries.len(), entries })
+}
+
+/// Splits text into TM-safe sentence spans using UTF-16 offsets.
+#[tauri::command]
+pub fn segment_sentences(text: String) -> Vec<SegmentSpan> {
+    segment_text(&text)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
