@@ -359,7 +359,7 @@
 
     /**
      * Locates and selects a QA paragraph without changing document contents.
-     * @param {{commandId: string, paragraphId: string, baseHash?: string}} command
+     * @param {{commandId: string, paragraphId: string, baseHash?: string, startOffset?: number, endOffset?: number}} command
      * @param {Object} [options]
      * @returns {{commandId: string, status: 'FOUND'|'NOT_FOUND'|'AMBIGUOUS'|'SELECTION_FAILED'|'ERROR', message: string}}
      */
@@ -386,7 +386,7 @@
                 if (paragraph && paragraph.isValid !== false &&
                         (!command.baseHash || getHashUtil().computeParagraphHash(paragraph.contents || '', true)
                             .toLowerCase() === command.baseHash.toLowerCase())) {
-                    return selectLocatedParagraph(inApp, doc, paragraph, commandId);
+                    return selectLocatedParagraph(inApp, doc, paragraph, commandId, command.startOffset, command.endOffset);
                 }
             }
 
@@ -401,13 +401,26 @@
             if (matches.length > 1) {
                 return { commandId: commandId, status: 'AMBIGUOUS', message: 'Multiple paragraphs match the stored paragraph hash.' };
             }
-            return selectLocatedParagraph(inApp, doc, matches[0], commandId);
+            return selectLocatedParagraph(inApp, doc, matches[0], commandId, command.startOffset, command.endOffset);
         } catch (e) {
             return { commandId: commandId, status: 'ERROR', message: 'Unable to resolve the paragraph location: ' + e.message };
         }
     };
 
-    function selectLocatedParagraph(inApp, doc, paragraph, commandId) {
+    function getCharacterRange(paragraph, start, end) {
+        if (!paragraph || !paragraph.characters || typeof paragraph.characters.itemByRange !== 'function') {
+            throw new Error('InDesign character range API is unavailable');
+        }
+
+        // InDesign itemByRange is 0-based inclusive for both start and end.
+        var charRange = paragraph.characters.itemByRange(start, end - 1);
+        if (!charRange || charRange.isValid === false) {
+            throw new Error('InDesign character range is invalid');
+        }
+        return charRange;
+    }
+
+    function selectLocatedParagraph(inApp, doc, paragraph, commandId, startOffset, endOffset) {
         try {
             // Make the owning document/window active before selecting its text range.
             if (doc.windows && doc.windows.length > 0 && typeof doc.windows[0].activate === 'function') {
@@ -416,8 +429,25 @@
             if (!inApp || typeof inApp.select !== 'function') {
                 throw new Error('InDesign selection API is unavailable');
             }
-            inApp.select(paragraph.texts && paragraph.texts.length > 0 ? paragraph.texts[0] : paragraph);
-            return { commandId: commandId, status: 'FOUND', message: 'Paragraph selected in InDesign' };
+
+            var hasStartOffset = typeof startOffset !== 'undefined' && startOffset !== null;
+            var hasEndOffset = typeof endOffset !== 'undefined' && endOffset !== null;
+            if (!hasStartOffset && !hasEndOffset) {
+                inApp.select(paragraph.texts && paragraph.texts.length > 0 ? paragraph.texts[0] : paragraph);
+                return { commandId: commandId, status: 'FOUND', message: 'Paragraph selected in InDesign' };
+            }
+
+            var paragraphText = paragraph.contents || '';
+            if (typeof paragraphText !== 'string') {
+                paragraphText = String(paragraphText);
+            }
+            if (!hasStartOffset || !hasEndOffset || typeof startOffset !== 'number' || typeof endOffset !== 'number' ||
+                    startOffset < 0 || startOffset >= endOffset || endOffset > paragraphText.length) {
+                throw new Error('Invalid character selection range [' + startOffset + ':' + endOffset + '] for paragraph length ' + paragraphText.length);
+            }
+
+            inApp.select(getCharacterRange(paragraph, startOffset, endOffset));
+            return { commandId: commandId, status: 'FOUND', message: 'Text span selected in InDesign' };
         } catch (e) {
             return { commandId: commandId, status: 'SELECTION_FAILED', message: 'Unable to select the located paragraph: ' + e.message };
         }
@@ -455,7 +485,7 @@
         // Case 2: Range Replacement or Deletion (end > start)
         if (paragraph.characters && paragraph.characters.itemByRange) {
             // InDesign itemByRange is 0-based inclusive for both start and end
-            var charRange = paragraph.characters.itemByRange(start, end - 1);
+            var charRange = getCharacterRange(paragraph, start, end);
             var currentContent = this.normalizeContents(charRange.contents);
 
             if (currentContent !== oldText) {

@@ -450,7 +450,12 @@ mod platform {
             .map_err(|error| format!("Cannot decode InDesign replacement result: {error}"))
     }
 
-    pub fn locate_paragraph(paragraph_id: String, base_hash: Option<String>) -> Result<LocateParagraphResult, String> {
+    pub fn locate_paragraph(
+        paragraph_id: String,
+        base_hash: Option<String>,
+        start_offset: Option<usize>,
+        end_offset: Option<usize>,
+    ) -> Result<LocateParagraphResult, String> {
         if !is_indesign_process_running()? {
             return Err("InDesign is not running".to_string());
         }
@@ -459,6 +464,8 @@ mod platform {
             "commandId": command_id,
             "paragraphId": paragraph_id,
             "baseHash": base_hash,
+            "startOffset": start_offset,
+            "endOffset": end_offset,
         });
         let script = format!(
             "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{\n    var res = $.global.SmartLinterDaemonInstance.locateParagraph({command_json});\n    return JSON.stringify(res);\n  }}\n  return JSON.stringify({{ commandId: {}, status: 'ERROR', message: 'InDesign SmartLinterDaemonInstance is not initialized' }});\n}})();",
@@ -588,7 +595,12 @@ pub fn execute_replacement(_command: crate::protocol::ReplacementCommand) -> Res
 }
 
 #[cfg(not(windows))]
-pub fn locate_paragraph(_paragraph_id: String, _base_hash: Option<String>) -> Result<LocateParagraphResult, String> {
+pub fn locate_paragraph(
+    _paragraph_id: String,
+    _base_hash: Option<String>,
+    _start_offset: Option<usize>,
+    _end_offset: Option<usize>,
+) -> Result<LocateParagraphResult, String> {
     Err("InDesign COM automation is only supported on Windows".to_string())
 }
 

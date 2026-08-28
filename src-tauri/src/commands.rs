@@ -358,7 +358,9 @@ pub async fn locate_paragraph_in_editor(
     if session.editor_type == EditorType::Word {
         return request_word_locate(server_handle.session_manager(), paragraph_id, base_hash, start_offset, end_offset).await;
     }
-    tokio::task::spawn_blocking(move || indesign_com::locate_paragraph(paragraph_id, base_hash))
+    tokio::task::spawn_blocking(move || {
+        indesign_com::locate_paragraph(paragraph_id, base_hash, start_offset, end_offset)
+    })
         .await
         .map_err(|error| format!("InDesign paragraph location task failed: {error}"))?
 }

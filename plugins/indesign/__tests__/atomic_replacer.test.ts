@@ -203,6 +203,86 @@ describe('Task 10: Adobe InDesign Plugin (Atomic Reverse Replacement & doScript 
             assert.equal(targetParagraph.contents, paragraphText);
         });
 
+        it('locates and selects exactly the requested character span', () => {
+            const paragraphText = 'Locate only this span.';
+            const targetParagraph = env.createParagraph(paragraphText, 'locate-span');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'locate-span'
+                    ? { paragraphs: [targetParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            let selected: any = null;
+            app.select = (value: unknown) => { selected = value; };
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.locateParagraph({
+                commandId: 'locate-span-001',
+                paragraphId: 'indesign-para-locate-span-0',
+                baseHash: computeParagraphHash(paragraphText),
+                startOffset: 7,
+                endOffset: 11
+            });
+
+            assert.equal(result.status, 'FOUND');
+            assert.deepEqual(selected.contents, ['only']);
+            assert.equal(targetParagraph.contents, paragraphText);
+        });
+
+        it('returns SELECTION_FAILED for an out-of-bounds character selection range', () => {
+            const paragraphText = 'Short paragraph.';
+            const targetParagraph = env.createParagraph(paragraphText, 'locate-span-bounds');
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'locate-span-bounds'
+                    ? { paragraphs: [targetParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            let selected = false;
+            app.select = () => { selected = true; };
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.locateParagraph({
+                commandId: 'locate-span-bounds-001',
+                paragraphId: 'indesign-para-locate-span-bounds-0',
+                baseHash: computeParagraphHash(paragraphText),
+                startOffset: 0,
+                endOffset: paragraphText.length + 1
+            });
+
+            assert.equal(result.status, 'SELECTION_FAILED');
+            assert.equal(selected, false);
+        });
+
+        it('returns SELECTION_FAILED when character range resolution throws', () => {
+            const paragraphText = 'Range resolution failure.';
+            const targetParagraph = env.createParagraph(paragraphText, 'locate-span-error');
+            targetParagraph.characters!.itemByRange = () => { throw new Error('range unavailable'); };
+            (env.activeDocument as any).stories = {
+                itemByID: (storyId: string) => storyId === 'locate-span-error'
+                    ? { paragraphs: [targetParagraph] }
+                    : null
+            };
+            const app = env.getApp();
+            let selected = false;
+            app.select = () => { selected = true; };
+            const sandbox = loadExtendScript(replacerScriptPath, { app });
+            const replacer = new sandbox.SmartLinterAtomicReplacer({ appInstance: app });
+
+            const result = replacer.locateParagraph({
+                commandId: 'locate-span-error-001',
+                paragraphId: 'indesign-para-locate-span-error-0',
+                baseHash: computeParagraphHash(paragraphText),
+                startOffset: 0,
+                endOffset: 5
+            });
+
+            assert.equal(result.status, 'SELECTION_FAILED');
+            assert.equal(selected, false);
+        });
+
         it('returns NOT_FOUND when a completed story scan finds no hash matches', () => {
             const paragraphText = 'This paragraph has changed.';
             const targetParagraph = env.createParagraph(paragraphText, 'locate-stale');
