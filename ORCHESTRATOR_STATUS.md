@@ -1,20 +1,26 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐ 마지막 업데이트: 2026-08-29 새 PC 이관 세션. 아래 이 절을 먼저 읽을 것.**
+**⭐⭐ 마지막 업데이트: 2026-08-29 새 PC 이관 후 첫 후속 세션(세그멘터+영어QA 세션).
+아래 이 절을 먼저 읽을 것.**
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `3097c5b`(Shelve the paste-adjacent
-   button)인지 확인.** 아니면 그 이후 커밋을 먼저 훑을 것.
-   세션 종료 시점 상태: **작업 트리 깨끗, 로컬=원격 `3097c5b`로 동기화됨.**
+1. **`git log --oneline -1`로 최신 커밋이 `8e567d8`(Add a sentence/TU boundary
+   contract, an English QA profile, and small cleanups)인지 확인.** 아니면 그
+   이후 커밋을 먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬=원격
+   `8e567d8`로 동기화됨(원격 push는 사용자 확인 후 별도 진행 — 아래 참고).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(312/312), `npm run build`(성공).
-   `cargo test`는 98/99가 정상 — 실패하는 1건
-   (`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은 라이브
-   Ollama 타임아웃이라 **코드 회귀가 아니다.**
-3. **TM 샘플 파일(`KO-EN.tmx`, `SD.sdltm`)은 git에 없다.** 사용자에게 요청해
-   프로젝트 루트에 넣어야 TM 관련 작업이 가능하다. **절대 커밋 금지**
-   (실제 고객 데이터일 수 있음, `.gitignore` 처리돼 있음).
+   확인: `npm test`(197/197), `npx vitest run`(29 files / **315**/315),
+   `npm run build`(성공). `cargo test --release`는 **104/105**가 정상 —
+   실패하는 1건(`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은
+   라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.** (참고: 이번 세션에
+   `Windows Credential Manager` roundtrip 테스트가 다른 무거운 프로세스와
+   동시 실행될 때 1회성으로 실패한 적 있음 — 단독/재실행 시 항상 통과, 코드
+   무관한 리소스 경합 플레이크이니 재현되면 그냥 재실행할 것.)
+3. **TM 샘플 파일(`KO-EN.tmx`, `SD.sdltm`)은 git에 없다.** 이번 세션 기준
+   `D:\smartLinter` 루트에 이미 있었음(사용자가 이전에 넣어둠) — 없으면
+   사용자에게 다시 요청할 것. **절대 커밋 금지**(실제 고객 데이터일 수 있음,
+   `.gitignore` 처리돼 있음).
 4. **아래 `다음 세션 우선순위` 절로 갈 것.** 우선순위는 **사용자가 정한다 —
    자동 결정 금지.**
 
@@ -33,6 +39,87 @@
 - **테스트 통과 = 올바름이 아니다.** 이 세션에 vitest 303개가 통과하는
   상태에서 실제 결함이 6건 있었다. 리뷰를 반드시 거칠 것.
 
+## 이번 세션 완료 내역 (2026-08-29, 새 PC 이관 후 첫 후속 세션)
+
+**커밋 1개(`8e567d8`, 아직 원격 push 안 함 — 사용자 확인 후 push할 것):**
+Phase 0가 남긴 두 과제 중 **문장/TU 경계 계약**과 **영어 QA 프로파일**을
+처리하고, 사소한 정리(예문 한국어화, 툴팁)도 같은 커밋에 포함했다.
+
+**진행 방식이 이번 세션에 바뀜 — 다음 세션도 이어갈 것:** 사용자가 명시적으로
+확인해, **Claude가 직접 구현하지 않고 이 프로젝트의 기존 관행대로 Codex가
+구현·agy+Claude가 독립 리뷰**하는 흐름으로 진행했다. Claude의 역할은
+오케스트레이션(계획 수립·Codex/agy 호출·독립 빌드/테스트 재검증·최종 커밋
+판단)이었다.
+
+**1. 문장/TU 경계 계약 — Stage 1a(세그멘터 기반 + `[TM 저장]` 다문장 처리)만
+완료, `SentenceCard`/QA `segmentId` 귀속은 의도적으로 다음 세션으로 미뤘다.**
+`CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md`/`AGY_ANSWER_SENTENCE_UNIT_CAT_PARITY.md`
+가 제시한 1단계는 원래 "세그멘터 + `SentenceCard` 3계층 상태머신"을 한
+덩어리로 묶었지만, `SentenceCard` UI 없이는 QA 카드 쪽 `segmentId` 부여가
+사용자에게 아무 효과가 없어서, 사용자가 직접 언급한 페인포인트(TM 저장)만
+먼저 풀리게 스코프를 좁혔다.
+- `src-tauri/src/segmenter.rs`(신규): UTF-16 오프셋 기반 `segment_sentences()`.
+  하드브레이크=개행, 소프트브레이크=`.!?…`(뒤에 공백/EOF), `。`는 의도적 제외
+  (실측 TM 20,885개 TU 중 0건, 한국어에 안 씀 — Phase 0 결론 그대로 유지).
+  서로게이트 페어(이모지 등) 테스트 포함, agy가 오프셋 정확성 확인함.
+- `src/utils/sentenceBoundary.ts`(신규): 프런트 미러 구현. 기존
+  `TMMatchCard.tsx`의 로컬 `sentenceCount`(카운트 전용, 구두점을 버리는
+  구현)를 대체 — 새 구현은 실제 TM 저장에 쓸 문장 **텍스트**(구두점 보존)를
+  만든다.
+- Tauri 커맨드 `segment_sentences` 신설, `tauriBridge.ts`에 기존
+  `analyzeParagraph`와 동일한 Mock/Tauri+폴백 패턴으로 배선.
+- `TMMatchCard.tsx`의 `saveToTm`: 원문·번역 양쪽을 세그먼트로 나눠 **개수가
+  일치하고 2개 이상이면** 문장쌍별로 별도 TU 저장(충돌 검사도 문장별), **개수가
+  다르면 기존 동작 그대로**(문단 전체 1개 TU + "여러 문장" 경고) — 100%
+  하위호환 폴백. 이것이 사용자가 명시한 "[TM 저장]이 다문장 문단에서 경고만
+  띄우는 한계"의 해결이다.
+- **agy 리뷰에서 실질 결함 1건 발견·수정**: `saveToTm`이 async로 바뀌었는데
+  재진입 가드가 없어 버튼 더블클릭 시 confirm 중복/중복저장 위험 — `isSavingToTm`
+  state 가드(진입 시 즉시 return, try/finally로 항상 해제, 버튼도 그동안
+  disabled)로 수정, 회귀 테스트 추가.
+- **agy가 남긴 참고 사항(다음 SentenceCard 작업 시 고려)**: 인덱스로만
+  문장을 정렬해 페어링하므로, 번역 과정에서 문장 순서가 도치(원문 A·B →
+  번역 B'·A')되면 잘못된 쌍이 저장될 수 있음 — 현재는 저장 직전 confirm
+  다이얼로그가 실질 안전망이나, 다음 세션 SentenceCard UI에서 개별 매핑
+  수정 기능을 제공하면 더 안전함.
+
+**2. 영어 QA 프로파일 + 잠복 버그 수정.**
+- `prompt_builder.rs`에 `EN_MONOLINGUAL_SYSTEM_INSTRUCTION` 추가(bilingual En
+  경로는 기존 `KO_COMPRESSED_SYSTEM_INSTRUCTION`처럼 유휴 상태로 남김 — 문서
+  원문이 ko이므로 주 흐름 아님, 스코프 최소화).
+- **Phase 0가 미리 지목했던 잠복 결함을 먼저 고침**: `get_explanation_directive`
+  가 `Ko`에 대해 빈 문자열을 반환하던 게 "한국어 base 프로파일이 이미 한국어로
+  답한다"는 암묵 전제에 얹혀 있었음 — 영어 프로파일을 그냥 얹으면 `문서=en`+
+  `설명=ko` 조합에서 한국어로 설명하라는 지시가 어디에도 없어 조용히 틀리는
+  경로가 생길 뻔했다. 이제 `(문서언어×설명언어)` 4개 조합(ko/en × ko/en)
+  전부 명시적 지시문(`"설명은 한국어로 작성하세요."` / `"Write the
+  explanation in English."`)을 갖고, `Ja`/`Zh`는 계속 fail-loud.
+- **부수 발견·수정**: `explanation_directive`가 프롬프트 토큰 예산 계산
+  (`HARD_PROMPT_TOKEN_CAP` 450) 축소 루프에서 빠져 있어서, 새 프로파일을
+  추가하면 예산을 조용히 넘길 수 있었음 — 계산에 포함시키고 회귀 테스트 추가.
+  agy가 이 부분을 별도로 다시 짚어 정상 동작 확인함.
+
+**3. 사소한 정리.** `TMMatchCard.test.tsx`의 영어 placeholder 예문
+(`'One sentence...'`, `'Version v2.0...'`, `'Wait… ...'` 등)을 같은 경계
+조건(버전/URL/말줄임표/다문장)을 보존하는 합성 한국어 예문으로 교체. 키워드
+모드 저장 비활성 툴팁을 `'키워드로 검색한 결과는 현재 문단과 연결되지 않아
+TM에 저장할 수 없습니다.'`로 다른 사유 메시지들과 같은 패턴으로 통일.
+
+**검증(Claude가 매 단계 독립 재실행):** `cargo test --release` 104/105(기존
+라이브 Ollama 타임아웃 1건, 회귀 아님), `npm test` 197/197, `npx vitest run`
+29 files/315 tests, `npm run build` 성공. 전부 최소 2회씩 독립 재확인함(agy
+1차 리뷰 전, Codex 2차 수정 후).
+
+**다음 세션 남은 것(문장/TU 경계 계약 로드맵의 나머지):**
+- Stage 1b: QA 카드에 `segmentId` 귀속 + `SentenceCard`(이슈→문장→문단 3계층
+  상태머신) — LLM 호출은 문단 1회 유지, 결과만 문장 단위로 귀속시키는 합의는
+  그대로 유효. `segmenter.rs`를 그대로 재사용 가능.
+- Stage 2 이후(TM 검색 쪽 문장 단위 전환, SDLTM read-only importer, 인라인
+  태그 보존)는 아직 손대지 않음 — `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md`
+  5장 로드맵 순서 그대로 유효.
+- **원격 push 여부는 사용자에게 확인 후 진행할 것** — 이번 세션엔 로컬
+  커밋까지만 하고 push는 아직 안 함(다음 세션 시작 시 `git log`로 로컬만
+  앞서 있는지 확인).
 
 ## 새 PC 이관 (2026-08-29) — 다른 PC에서 이어받을 때 반드시 읽을 것
 
@@ -158,20 +245,18 @@ TU로 등록하므로). 저장 직전 확인 대화상자가 원문/번역 전�
    - 성공 판정은 `anchorCurrentHash == anchorBaseHash`로 하면 안 된다.
      그건 앵커 보존 증거일 뿐 삽입 증거가 아니다. 생성된 문단의 해시를
      따로 받아 대조해야 한다(fail-closed).
-2. **문장/TU 경계 계약** — Phase 0가 남긴 진짜 과제. 가장 크고 나머지의 기반.
-   `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 1단계에 해당. LLM 호출은
-   문단 1회 유지, 결과만 문장 단위로 귀속시키는 합의는 그대로 유효.
-3. **영어 QA 프로파일 작성** — 배관(`LanguageTag` ko/en/ja/zh, 두 축 UI)은
-   이미 완료돼 있고 **한국어 지시문만 존재**, 나머지는 의도적 fail-loud
-   (`prompt_builder.rs:54-72`). 단 문서가 한국어 원문이므로 영어 프로파일은
-   **번역 산출물 검수용**이라 급하지 않다.
-   **착수 시 함정:** `get_explanation_directive(Ko)`가 빈 문자열을 반환하는데,
-   이건 한국어 지시문이 암묵적으로 한국어 출력을 보장한다는 전제에 얹혀 있다.
-   영어 프로파일을 추가하면 `문서=en` + `설명=ko` 조합에서 한국어로 설명하라는
-   지시가 어디에도 없게 되고, `ko`는 지원 언어라 fail-loud에도 안 걸린다 —
-   조용히 틀리는 경로. `(문서언어 × 설명언어)` 조합 단위로 다룰 것.
-4. 비차단 잔여 개선점: `…` 테스트 예문을 실측 한국어 예문으로 교체,
-   키워드 모드 툴팁 문구 다듬기.
+2. **(완료, `8e567d8`) 문장/TU 경계 계약 — Stage 1a만.** 세그멘터
+   (`segmenter.rs`/`sentenceBoundary.ts`)와 `[TM 저장]` 다문장 분리 저장은
+   끝났다. `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 1단계가 원래
+   묶었던 `SentenceCard`(QA 카드 `segmentId` 귀속, 이슈→문장→문단 3계층
+   상태머신)는 **아직 미착수** — 다음 세션 시작점. LLM 호출은 문단 1회 유지,
+   결과만 문장 단위로 귀속시키는 합의는 그대로 유효. 상세는 위 "이번 세션
+   완료 내역" 참고.
+3. **(완료, `8e567d8`) 영어 QA 프로파일 작성.** `EN_MONOLINGUAL_SYSTEM_INSTRUCTION`
+   추가, `(문서언어×설명언어)` 4개 조합 명시화, 토큰 예산 계산 버그도 같이
+   수정함. `Ja`/`Zh`는 여전히 fail-loud(미착수). 상세는 위 참고.
+4. **(완료, `8e567d8`) 비차단 잔여 개선점** — 예문 한국어화, 키워드 모드
+   툴팁 문구 다듬기 끝남.
 5. (여전히 보류) Kiwi 스파이크 Step 2 — 이 PC엔 VirtualBox 자체가 없음.
 
 ---
