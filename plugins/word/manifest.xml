@@ -6,7 +6,7 @@
            xsi:type="TaskPaneApp">
   
   <Id>d1a3c7b2-84e5-4f2a-9e16-7c3a8b2d4e5f</Id>
-  <Version>0.1.0.0</Version>
+  <Version>1.0.0.0</Version>
   <ProviderName>SmartLinter</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="SmartLinter Bridge" />
@@ -92,6 +92,7 @@
                   </Action>
                 </Control>
               </Group>
+              <Label resid="SmartLinter.TabLabel" />
             </CustomTab>
           </ExtensionPoint>
         </DesktopFormFactor>
@@ -110,6 +111,7 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="SmartLinter Bridge Loaded"/>
+        <bt:String id="SmartLinter.TabLabel" DefaultValue="SmartLinter"/>
         <bt:String id="SmartLinter.GroupLabel" DefaultValue="SmartLinter"/>
         <bt:String id="ShowTaskpane.Label" DefaultValue="Open Linter Pane"/>
         <bt:String id="HideTaskpane.Label" DefaultValue="Hide Linter Pane"/>

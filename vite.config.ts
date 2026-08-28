@@ -35,7 +35,10 @@ const wordTaskpaneRoute: Plugin = {
   name: 'smartlinter-word-taskpane-route',
   configureServer(server: ViteDevServer) {
     server.middlewares.use(async (req, res, next) => {
-      if (req.url !== '/word_taskpane.html') {
+      const pathname = req.url
+        ? new URL(req.url, 'https://localhost').pathname
+        : undefined;
+      if (pathname !== '/word_taskpane.html') {
         next();
         return;
       }
