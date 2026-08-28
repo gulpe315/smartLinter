@@ -422,12 +422,18 @@ impl SessionManager {
     }
 
     /// Sends a correlated locate request and waits at most three seconds for the editor response.
-    pub async fn request_locate(&self, paragraph_id: String, base_hash: Option<String>) -> Result<LocateResponse, SessionError> {
+    pub async fn request_locate(
+        &self,
+        paragraph_id: String,
+        base_hash: Option<String>,
+        start_offset: Option<usize>,
+        end_offset: Option<usize>,
+    ) -> Result<LocateResponse, SessionError> {
         let session_guard = self.active_session.read().await;
         let session = session_guard.as_ref().ok_or(SessionError::NotFound)?;
         let sender = session.command_sender.as_ref().ok_or(SessionError::ChannelClosed)?;
         let request_id = super::auth_manager::generate_session_token();
-        let request = LocateRequest { request_id: request_id.clone(), paragraph_id, base_hash, start_offset: None, end_offset: None };
+        let request = LocateRequest { request_id: request_id.clone(), paragraph_id, base_hash, start_offset, end_offset };
         let (response_tx, response_rx) = oneshot::channel();
         self.pending_locates.lock().await.insert(request_id.clone(), PendingLocate { session_id: session.session_id.clone(), sender: response_tx });
         if sender.send(BridgeMessage::LocateRequest(request)).is_err() {

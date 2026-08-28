@@ -182,6 +182,23 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().cards).toHaveLength(2);
   });
 
+  it('preserves QA issue UTF-16 offsets on created cards', () => {
+    useQaStore.getState().addReport({
+      paragraphId: 'paragraph-offsets',
+      paragraphText: '앞 대상 뒤',
+      paragraphHash: 'offset-hash',
+      report: {
+        status: 'FAIL',
+        issues: [{
+          category: 'Grammar', originalSegment: '대상', suggestedSegment: '수정', reason: 'Fix', severity: 'LOW',
+          startOffset: 2, endOffset: 4,
+        }],
+      },
+    });
+
+    expect(useQaStore.getState().cards[0]).toMatchObject({ startOffset: 2, endOffset: 4 });
+  });
+
   it('archives an obsolete card in dismissedCards instead of leaving it active', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'para-obsolete', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',

@@ -71,6 +71,22 @@ describe('QACardItem Component', () => {
     expect(screen.getByTestId('qa-locate-paragraph-btn')).toBeDisabled();
   });
 
+  it('passes card span offsets to the locate bridge request', async () => {
+    const bridge = new MockBridgeService();
+    const locateSpy = vi.spyOn(bridge, 'locateParagraph');
+    setBridgeService(bridge);
+    render(<QACardItem card={{ ...sampleCard, startOffset: 4, endOffset: 9 }} />);
+
+    fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
+
+    await waitFor(() => expect(locateSpy).toHaveBeenCalledWith(
+      sampleCard.paragraphId,
+      sampleCard.paragraphHash,
+      4,
+      9,
+    ));
+  });
+
   it('shows the matching-issue action only for groups of two or more and invokes its callback', async () => {
     const onAcceptMatching = vi.fn().mockResolvedValue({ succeeded: ['card-101', 'card-102'], failed: [] });
     useQaStore.setState({ cards: [sampleCard] });

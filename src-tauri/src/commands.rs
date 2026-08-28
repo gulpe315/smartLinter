@@ -345,6 +345,8 @@ pub async fn send_replacement_command(
 pub async fn locate_paragraph_in_editor(
     paragraph_id: String,
     base_hash: Option<String>,
+    start_offset: Option<usize>,
+    end_offset: Option<usize>,
     server_handle: State<'_, ServerHandle>,
 ) -> Result<crate::indesign_com::LocateParagraphResult, String> {
     let session = server_handle
@@ -354,7 +356,7 @@ pub async fn locate_paragraph_in_editor(
         .ok_or_else(|| "No active editor session".to_string())?;
 
     if session.editor_type == EditorType::Word {
-        return request_word_locate(server_handle.session_manager(), paragraph_id, base_hash).await;
+        return request_word_locate(server_handle.session_manager(), paragraph_id, base_hash, start_offset, end_offset).await;
     }
     tokio::task::spawn_blocking(move || indesign_com::locate_paragraph(paragraph_id, base_hash))
         .await
@@ -420,9 +422,11 @@ async fn request_word_locate(
     session_manager: Arc<SessionManager>,
     paragraph_id: String,
     base_hash: Option<String>,
+    start_offset: Option<usize>,
+    end_offset: Option<usize>,
 ) -> Result<crate::indesign_com::LocateParagraphResult, String> {
     let command_id = format!("locate-{paragraph_id}");
-    match session_manager.request_locate(paragraph_id, base_hash).await {
+    match session_manager.request_locate(paragraph_id, base_hash, start_offset, end_offset).await {
         Ok(response) => Ok(crate::indesign_com::LocateParagraphResult {
             command_id,
             status: locate_status_name(response.status).to_string(),

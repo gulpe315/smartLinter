@@ -155,8 +155,8 @@ export interface IBridgeService {
   /** Sends a text replacement command to the native editor via bridge */
   sendReplacementCommand(command: ReplacementCommand): Promise<ReplacementResult>;
 
-  /** Selects a QA paragraph in InDesign without editing its document contents. */
-  locateParagraph(paragraphId: string, baseHash?: string): Promise<LocateParagraphResult>;
+  /** Selects a QA paragraph or its verified source span without editing document contents. */
+  locateParagraph(paragraphId: string, baseHash?: string, startOffset?: number, endOffset?: number): Promise<LocateParagraphResult>;
 
   /** Returns current paragraph contents without changing editor selection or focus. */
   getLiveParagraphSnapshot(paragraphId: string, baseHash?: string): Promise<LiveParagraphSnapshotResult>;
@@ -480,7 +480,7 @@ export class MockBridgeService implements IBridgeService {
     return result;
   }
 
-  async locateParagraph(_paragraphId: string, _baseHash?: string): Promise<LocateParagraphResult> {
+  async locateParagraph(_paragraphId: string, _baseHash?: string, _startOffset?: number, _endOffset?: number): Promise<LocateParagraphResult> {
     return { status: 'FOUND', message: 'Mock paragraph located successfully' };
   }
 
@@ -735,15 +735,17 @@ export class TauriBridgeService implements IBridgeService {
     }
   }
 
-  async locateParagraph(paragraphId: string, baseHash?: string): Promise<LocateParagraphResult> {
+  async locateParagraph(paragraphId: string, baseHash?: string, startOffset?: number, endOffset?: number): Promise<LocateParagraphResult> {
     if (!this.isTauriAvailable()) {
-      return this.fallbackService.locateParagraph(paragraphId, baseHash);
+      return this.fallbackService.locateParagraph(paragraphId, baseHash, startOffset, endOffset);
     }
 
     try {
       const result: LocateParagraphResult = await invoke('locate_paragraph_in_editor', {
         paragraphId,
         baseHash,
+        startOffset,
+        endOffset,
       });
       return result;
     } catch (e) {

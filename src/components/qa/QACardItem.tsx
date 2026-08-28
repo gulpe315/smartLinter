@@ -131,7 +131,14 @@ export const QACardItem: React.FC<QACardItemProps> = ({
     setIsLocating(true);
     setLocateError(null);
     try {
-      const result = await getBridgeService().locateParagraph(card.paragraphId, card.paragraphHash);
+      const result = card.startOffset === undefined && card.endOffset === undefined
+        ? await getBridgeService().locateParagraph(card.paragraphId, card.paragraphHash)
+        : await getBridgeService().locateParagraph(
+            card.paragraphId,
+            card.paragraphHash,
+            card.startOffset,
+            card.endOffset,
+          );
       switch (result.status) {
         case 'FOUND':
           break;
