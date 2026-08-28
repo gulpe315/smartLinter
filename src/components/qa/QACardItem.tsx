@@ -42,6 +42,8 @@ export interface QACardItemProps {
   onAcceptMatching?: (cardId: string) => Promise<{ succeeded: string[]; failed: Array<{ cardId: string; reason: string }> }>;
   onDismiss?: (cardId: string) => void;
   onMarkObsolete?: (cardId: string) => void;
+  /** Keeps a locate failure visible when the card is removed from the active list. */
+  onLocateFailure?: (message: string) => void;
   isApplying?: boolean;
   isFocused?: boolean;
   readOnly?: boolean;
@@ -54,6 +56,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   onAcceptMatching,
   onDismiss,
   onMarkObsolete,
+  onLocateFailure,
   isApplying: propIsApplying,
   isFocused = false,
   readOnly = false,
@@ -133,6 +136,11 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         case 'FOUND':
           break;
         case 'NOT_FOUND':
+          {
+            const message = '문서가 변경되어 위치를 찾을 수 없습니다. 해당 제안은 만료 처리되었습니다.';
+            setLocateError(message);
+            onLocateFailure?.(message);
+          }
           onMarkObsolete?.(card.id);
           break;
         case 'AMBIGUOUS':

@@ -48,6 +48,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
   } = useQaStore();
 
   const [view, setView] = useState<'active' | 'history'>('active');
+  const [locateFailureNotice, setLocateFailureNotice] = useState<string | null>(null);
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const liveValidationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -209,6 +210,16 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
         onScroll={handleCardListScroll}
         className="flex-1 overflow-y-auto p-4 space-y-3.5"
       >
+        {locateFailureNotice && (
+          <div
+            data-testid="qa-locate-failure-notice"
+            role="alert"
+            className="p-3 rounded-lg border border-amber-800/70 bg-amber-950/30 text-xs text-amber-200"
+          >
+            {locateFailureNotice}
+          </div>
+        )}
+
         {/* Active Paragraph Telemetry Context Banner */}
         {view === 'active' && activeParagraph && (
           <div
@@ -267,6 +278,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
                   onAcceptMatching={(id) => acceptMatchingCards(id)}
                   onDismiss={(id) => dismissCard(id)}
                   onMarkObsolete={(id) => markCardObsolete(id)}
+                  onLocateFailure={setLocateFailureNotice}
                 />
               </div>
             ))}

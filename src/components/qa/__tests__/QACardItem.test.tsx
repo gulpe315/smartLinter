@@ -370,13 +370,26 @@ describe('QACardItem Component', () => {
   it('shows a clear notice when the paragraph cannot be located', async () => {
     const service = new MockBridgeService();
     const markObsolete = vi.fn();
+    const showLocateFailure = vi.fn();
     vi.spyOn(service, 'locateParagraph').mockResolvedValue({ status: 'NOT_FOUND' });
     setBridgeService(service);
-    render(<QACardItem card={sampleCard} onMarkObsolete={markObsolete} />);
+    render(
+      <QACardItem
+        card={sampleCard}
+        onMarkObsolete={markObsolete}
+        onLocateFailure={showLocateFailure}
+      />
+    );
 
     fireEvent.click(screen.getByTestId('qa-locate-paragraph-btn'));
 
     await waitFor(() => expect(markObsolete).toHaveBeenCalledWith('card-101'));
+    expect(await screen.findByTestId('qa-locate-error')).toHaveTextContent(
+      '문서가 변경되어 위치를 찾을 수 없습니다. 해당 제안은 만료 처리되었습니다.'
+    );
+    expect(showLocateFailure).toHaveBeenCalledWith(
+      '문서가 변경되어 위치를 찾을 수 없습니다. 해당 제안은 만료 처리되었습니다.'
+    );
   });
 
   it('keeps the card active and explains an ambiguous paragraph location', async () => {
