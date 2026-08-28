@@ -456,6 +456,59 @@ describe('Task 8: MS Word Lossless Reverse Replacement & Compensating Transactio
             }
         });
 
+        it('uses Range.insertText with Replace in the getSubstring compatibility path', async () => {
+            const originalText = 'The original paragraph contains a typo.';
+            const replacement = 'The corrected paragraph contains no typo.';
+            const paragraphs = [originalText];
+            let paragraphInsertTextCalls = 0;
+            let rangeInsertTextCalls = 0;
+            const makeParagraph = (index: number) => ({
+                get text() { return paragraphs[index]; },
+                // Paragraph.insertText does not support Replace. Simulate its live-host
+                // behavior so a regression to this API appends instead of replacing.
+                insertText: (value: string, _insertLocation: string) => {
+                    paragraphInsertTextCalls++;
+                    paragraphs[index] += value;
+                },
+                getRange: (location: string) => {
+                    assert.equal(location, 'Content');
+                    return {
+                        // Deliberately omit getSubstring to exercise the compatibility path.
+                        insertText: (value: string, insertLocation: string) => {
+                            rangeInsertTextCalls++;
+                            assert.equal(insertLocation, 'Replace');
+                            paragraphs[index] = value;
+                        },
+                    };
+                },
+            });
+            const context = {
+                document: {
+                    body: { paragraphs: { items: [makeParagraph(0)], load: () => {} } },
+                },
+                sync: async () => {},
+            };
+            const originalWord = (globalThis as any).Word;
+            (globalThis as any).Word = { run: async (callback: (ctx: any) => Promise<any>) => callback(context) };
+            try {
+                const command: ReplacementCommand = {
+                    commandId: 'cmd-range-only-fallback',
+                    paragraphId: `word-para-${computeParagraphHash(originalText).slice(0, 12)}`,
+                    baseHash: computeParagraphHash(originalText),
+                    expectedHash: computeParagraphHash(replacement),
+                    hunks: extractDiffHunks(originalText, replacement),
+                };
+
+                const result = await new WordReplacementExecutor().execute(command);
+                assert.equal(result.status, 'SUCCESS');
+                assert.equal(paragraphInsertTextCalls, 0);
+                assert.ok(rangeInsertTextCalls > 0);
+                assert.equal(paragraphs[0], replacement);
+            } finally {
+                (globalThis as any).Word = originalWord;
+            }
+        });
+
         it('should dispatch ReplacementResult to connected WordBridgeClient', async () => {
             const initialText = 'Clean sentence for bridge dispatch test.';
             const targetText = 'Clean sentence for bridge dispatch verified.';
