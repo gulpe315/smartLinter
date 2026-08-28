@@ -175,10 +175,15 @@ async fn handle_websocket_connection(
                         info!("Received replacement result: {} ({})", result.command_id, result.status);
                         session_mgr.emit_replacement_result(&result).await;
                     }
+                    Ok(BridgeMessage::LiveSnapshotResponse(response)) => {
+                        session_mgr.complete_live_snapshot(&current_session_id, response).await;
+                    }
                     Ok(BridgeMessage::AuthHandshake(_)) => {
                         // Handshake already processed
                     }
-                    Ok(BridgeMessage::AuthResponse(_)) | Ok(BridgeMessage::ReplacementCommand(_)) => {
+                    Ok(BridgeMessage::AuthResponse(_))
+                    | Ok(BridgeMessage::ReplacementCommand(_))
+                    | Ok(BridgeMessage::LiveSnapshotRequest(_)) => {
                         // Unexpected incoming server-to-client message types
                     }
                     Err(e) => {

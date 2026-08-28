@@ -69,6 +69,34 @@ export interface ReplacementResult {
     message?: string;
 }
 
+/** A request for the current contents of one or more editor paragraphs. */
+export interface LiveSnapshotRequest {
+    /** Server-generated ID echoed unchanged by the editor plugin. */
+    requestId: string;
+    /** Paragraph IDs to resolve in one document scan. */
+    paragraphIds: string[];
+    /** Optional full SHA-256 hash used to disambiguate a single-item request. */
+    baseHash?: string;
+}
+
+/** Status returned for one requested paragraph snapshot. */
+export type LiveSnapshotStatus = 'FOUND' | 'NOT_FOUND' | 'AMBIGUOUS' | 'BUSY' | 'ERROR';
+
+/** One resolved (or fail-closed) live paragraph snapshot. */
+export interface LiveSnapshotItem {
+    paragraphId: string;
+    status: LiveSnapshotStatus;
+    currentText?: string;
+    currentHash?: string;
+    message?: string;
+}
+
+/** Response to a live paragraph snapshot request. */
+export interface LiveSnapshotResponse {
+    requestId: string;
+    results: LiveSnapshotItem[];
+}
+
 /** Initial authentication handshake payload sent by an editor plugin on connect */
 export interface AuthHandshake {
     /** 32-byte secret pairing token */
@@ -110,6 +138,8 @@ export type BridgeMessage =
     | { type: 'PARAGRAPH_PAYLOAD'; payload: ParagraphPayload }
     | { type: 'REPLACEMENT_COMMAND'; payload: ReplacementCommand }
     | { type: 'REPLACEMENT_RESULT'; payload: ReplacementResult }
+    | { type: 'LIVE_SNAPSHOT_REQUEST'; payload: LiveSnapshotRequest }
+    | { type: 'LIVE_SNAPSHOT_RESPONSE'; payload: LiveSnapshotResponse }
     | { type: 'HEARTBEAT'; payload: HeartbeatPayload };
 
 // --- Type Guard Functions ---
@@ -180,6 +210,37 @@ export function isReplacementResult(val: unknown): val is ReplacementResult {
     );
 }
 
+export function isLiveSnapshotStatus(val: unknown): val is LiveSnapshotStatus {
+    return val === 'FOUND' || val === 'NOT_FOUND' || val === 'AMBIGUOUS' || val === 'BUSY' || val === 'ERROR';
+}
+
+export function isLiveSnapshotRequest(val: unknown): val is LiveSnapshotRequest {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.requestId === 'string'
+        && Array.isArray(obj.paragraphIds)
+        && obj.paragraphIds.every((id) => typeof id === 'string')
+        && (obj.baseHash === undefined || typeof obj.baseHash === 'string');
+}
+
+export function isLiveSnapshotItem(val: unknown): val is LiveSnapshotItem {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.paragraphId === 'string'
+        && isLiveSnapshotStatus(obj.status)
+        && (obj.currentText === undefined || typeof obj.currentText === 'string')
+        && (obj.currentHash === undefined || typeof obj.currentHash === 'string')
+        && (obj.message === undefined || typeof obj.message === 'string');
+}
+
+export function isLiveSnapshotResponse(val: unknown): val is LiveSnapshotResponse {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.requestId === 'string'
+        && Array.isArray(obj.results)
+        && obj.results.every(isLiveSnapshotItem);
+}
+
 export function isAuthHandshake(val: unknown): val is AuthHandshake {
     if (typeof val !== 'object' || val === null) return false;
     const obj = val as Record<string, unknown>;
@@ -228,6 +289,10 @@ export function isBridgeMessage(val: unknown): val is BridgeMessage {
             return isReplacementCommand(obj.payload);
         case 'REPLACEMENT_RESULT':
             return isReplacementResult(obj.payload);
+        case 'LIVE_SNAPSHOT_REQUEST':
+            return isLiveSnapshotRequest(obj.payload);
+        case 'LIVE_SNAPSHOT_RESPONSE':
+            return isLiveSnapshotResponse(obj.payload);
         case 'HEARTBEAT':
             return isHeartbeatPayload(obj.payload);
         default:

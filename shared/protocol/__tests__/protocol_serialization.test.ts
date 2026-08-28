@@ -28,7 +28,9 @@ import {
     isEditorType,
     isReplacementStatus,
     isTextHunk,
-    isQaIssue
+    isQaIssue,
+    isLiveSnapshotRequest,
+    isLiveSnapshotResponse,
 } from '../types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -199,6 +201,16 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
     });
 
     describe('Heartbeat & Multiplexed BridgeMessage', () => {
+        it('validates live snapshot request and response envelopes', () => {
+            const request = { requestId: 'snapshot-1', paragraphIds: ['word-para-123'], baseHash: 'full-hash' };
+            const response = { requestId: 'snapshot-1', results: [{ paragraphId: 'word-para-123', status: 'FOUND' as const, currentText: 'Text', currentHash: 'full-hash' }] };
+            assert.equal(isLiveSnapshotRequest(request), true);
+            assert.equal(isLiveSnapshotResponse(response), true);
+            assert.equal(isBridgeMessage({ type: 'LIVE_SNAPSHOT_REQUEST', payload: request }), true);
+            assert.equal(isBridgeMessage({ type: 'LIVE_SNAPSHOT_RESPONSE', payload: response }), true);
+            assert.equal(isLiveSnapshotRequest({ paragraphIds: [] }), false);
+            assert.equal(isLiveSnapshotResponse({ requestId: 'x', results: [{ paragraphId: 'x', status: 'INVALID' }] }), false);
+        });
         it('should validate HeartbeatPayload structure', () => {
             const heartbeat = rawFixtures.heartbeatPayload as HeartbeatPayload;
             assert.equal(isHeartbeatPayload(heartbeat), true);

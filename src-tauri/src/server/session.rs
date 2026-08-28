@@ -4,12 +4,21 @@
 //! to prevent concurrent conflicting replacements, tracks heartbeats, and dispatches
 //! real-time status events (`bridge-status-changed`) through an abstract `BridgeEventSink`.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, broadcast, RwLock};
+use tokio::sync::{mpsc, broadcast, oneshot, Mutex, RwLock};
 
-use crate::protocol::{BridgeMessage, EditorType, ParagraphPayload, ReplacementCommand, ReplacementResult};
+use crate::protocol::{BridgeMessage, EditorType, LiveSnapshotRequest, LiveSnapshotResponse, ParagraphPayload, ReplacementCommand, ReplacementResult};
+
+const LIVE_SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(3);
+
+#[derive(Debug)]
+struct PendingSnapshot {
+    session_id: String,
+    sender: oneshot::Sender<LiveSnapshotResponse>,
+}
 
 /// Represents the active connection status of an editor plugin.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,6 +204,10 @@ pub enum SessionError {
     },
     #[error("Failed to send command to editor plugin: channel closed")]
     ChannelClosed,
+    #[error("Live snapshot request exceeded the 3 second deadline")]
+    SnapshotTimeout,
+    #[error("Live snapshot request was cancelled before a response arrived")]
+    SnapshotCancelled,
 }
 
 /// Manages active editor session with atomic single-session locking.
@@ -203,6 +216,7 @@ pub struct SessionManager {
     active_session: Arc<RwLock<Option<EditorSession>>>,
     event_sink: Arc<dyn BridgeEventSink>,
     result_sender: broadcast::Sender<ReplacementResult>,
+    pending_snapshots: Arc<Mutex<HashMap<String, PendingSnapshot>>>,
 }
 
 impl SessionManager {
@@ -212,6 +226,7 @@ impl SessionManager {
             active_session: Arc::new(RwLock::new(None)),
             event_sink,
             result_sender,
+            pending_snapshots: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -307,6 +322,7 @@ impl SessionManager {
                 let last_seen_ms = session.last_heartbeat_at;
 
                 *session_guard = None;
+                self.clear_pending_snapshots_for_session(&session_id).await;
 
                 let event = BridgeStatusEvent::heartbeat_timeout(editor_type, session_id, last_seen_ms);
                 self.event_sink.emit_status_changed(&event).await;
@@ -324,6 +340,7 @@ impl SessionManager {
         if let Some(session) = session_guard.as_ref() {
             if session.session_id == session_id {
                 *session_guard = None;
+                self.clear_pending_snapshots_for_session(session_id).await;
                 let event = BridgeStatusEvent::disconnected(reason);
                 self.event_sink.emit_status_changed(&event).await;
                 return true;
@@ -336,7 +353,8 @@ impl SessionManager {
     /// Forcefully clears any active session (e.g. during server shutdown).
     pub async fn clear_session(&self, reason: &str) {
         let mut session_guard = self.active_session.write().await;
-        if session_guard.take().is_some() {
+        if let Some(session) = session_guard.take() {
+            self.clear_pending_snapshots_for_session(&session.session_id).await;
             let event = BridgeStatusEvent::disconnected(reason);
             self.event_sink.emit_status_changed(&event).await;
         }
@@ -359,6 +377,60 @@ impl SessionManager {
             }
             None => Err(SessionError::NotFound),
         }
+    }
+
+    /// Sends a correlated snapshot request and waits at most three seconds for its response.
+    pub async fn request_live_snapshots(
+        &self,
+        paragraph_ids: Vec<String>,
+        base_hash: Option<String>,
+    ) -> Result<LiveSnapshotResponse, SessionError> {
+        let session_guard = self.active_session.read().await;
+        let session = session_guard.as_ref().ok_or(SessionError::NotFound)?;
+        let sender = session.command_sender.as_ref().ok_or(SessionError::ChannelClosed)?;
+        let request_id = super::auth_manager::generate_session_token();
+        let request = LiveSnapshotRequest { request_id: request_id.clone(), paragraph_ids, base_hash };
+        let (response_tx, response_rx) = oneshot::channel();
+
+        self.pending_snapshots.lock().await.insert(request_id.clone(), PendingSnapshot {
+            session_id: session.session_id.clone(),
+            sender: response_tx,
+        });
+
+        if sender.send(BridgeMessage::LiveSnapshotRequest(request)).is_err() {
+            self.pending_snapshots.lock().await.remove(&request_id);
+            return Err(SessionError::ChannelClosed);
+        }
+        drop(session_guard);
+
+        match tokio::time::timeout(LIVE_SNAPSHOT_TIMEOUT, response_rx).await {
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(_)) => Err(SessionError::SnapshotCancelled),
+            Err(_) => {
+                self.pending_snapshots.lock().await.remove(&request_id);
+                Err(SessionError::SnapshotTimeout)
+            }
+        }
+    }
+
+    /// Completes a pending request only when the response belongs to the originating session.
+    pub async fn complete_live_snapshot(&self, session_id: &str, response: LiveSnapshotResponse) {
+        let request_id = response.request_id.clone();
+        let pending = self.pending_snapshots.lock().await.remove(&request_id);
+        match pending {
+            Some(pending) if pending.session_id == session_id => {
+                let _ = pending.sender.send(response);
+            }
+            Some(pending) => {
+                self.pending_snapshots.lock().await.insert(request_id, pending);
+                tracing::debug!(session_id, "Ignoring snapshot response from a stale session");
+            }
+            None => tracing::debug!(request_id = %response.request_id, "Ignoring unknown or duplicate snapshot response"),
+        }
+    }
+
+    async fn clear_pending_snapshots_for_session(&self, session_id: &str) {
+        self.pending_snapshots.lock().await.retain(|_, pending| pending.session_id != session_id);
     }
 
     /// Returns a snapshot of the active session if currently connected.

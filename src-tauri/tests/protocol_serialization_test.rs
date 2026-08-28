@@ -196,6 +196,44 @@ fn test_bridge_message_multiplex_envelope() {
 }
 
 #[test]
+fn test_live_snapshot_protocol_serialization_all_statuses() {
+    let statuses = [
+        (LiveSnapshotStatus::Found, "FOUND"),
+        (LiveSnapshotStatus::NotFound, "NOT_FOUND"),
+        (LiveSnapshotStatus::Ambiguous, "AMBIGUOUS"),
+        (LiveSnapshotStatus::Busy, "BUSY"),
+        (LiveSnapshotStatus::Error, "ERROR"),
+    ];
+
+    for (status, label) in statuses {
+        let response = LiveSnapshotResponse {
+            request_id: "snapshot-1".to_string(),
+            results: vec![LiveSnapshotItem {
+                paragraph_id: "word-para-abc".to_string(),
+                status,
+                current_text: Some("Live text".to_string()),
+                current_hash: Some("full-hash".to_string()),
+                message: None,
+            }],
+        };
+        let message = BridgeMessage::LiveSnapshotResponse(response.clone());
+        let json = serde_json::to_string(&message).unwrap();
+        assert!(json.contains("\"type\":\"LIVE_SNAPSHOT_RESPONSE\""));
+        assert!(json.contains(&format!("\"status\":\"{}\"", label)));
+        assert_eq!(serde_json::from_str::<BridgeMessage>(&json).unwrap(), message);
+    }
+
+    let request = BridgeMessage::LiveSnapshotRequest(LiveSnapshotRequest {
+        request_id: "snapshot-1".to_string(),
+        paragraph_ids: vec!["word-para-abc".to_string()],
+        base_hash: Some("full-hash".to_string()),
+    });
+    let json = serde_json::to_string(&request).unwrap();
+    assert!(json.contains("\"paragraphIds\""));
+    assert_eq!(serde_json::from_str::<BridgeMessage>(&json).unwrap(), request);
+}
+
+#[test]
 fn test_cross_compatibility_with_shared_json_fixtures() {
     let fixture_path = get_fixture_path();
     assert!(

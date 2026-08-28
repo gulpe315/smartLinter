@@ -115,6 +115,49 @@ pub struct ReplacementResult {
     pub message: Option<String>,
 }
 
+/// A dashboard request for current text from one or more editor paragraphs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveSnapshotRequest {
+    pub request_id: String,
+    pub paragraph_ids: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_hash: Option<String>,
+}
+
+/// Per-paragraph outcome of a live snapshot request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LiveSnapshotStatus {
+    Found,
+    NotFound,
+    Ambiguous,
+    Busy,
+    Error,
+}
+
+/// A resolved or fail-closed live paragraph snapshot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveSnapshotItem {
+    pub paragraph_id: String,
+    pub status: LiveSnapshotStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Editor response to a live snapshot request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveSnapshotResponse {
+    pub request_id: String,
+    pub results: Vec<LiveSnapshotItem>,
+}
+
 /// Initial authentication handshake sent by an editor plugin on connect.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -168,5 +211,7 @@ pub enum BridgeMessage {
     ParagraphPayload(ParagraphPayload),
     ReplacementCommand(ReplacementCommand),
     ReplacementResult(ReplacementResult),
+    LiveSnapshotRequest(LiveSnapshotRequest),
+    LiveSnapshotResponse(LiveSnapshotResponse),
     Heartbeat(HeartbeatPayload),
 }

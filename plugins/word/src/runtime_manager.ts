@@ -8,6 +8,7 @@
 
 import { WordBridgeClient, type BridgeClientConfig } from './bridge_client.ts';
 import { WordDocumentListener, type DocumentListenerConfig } from './document_listener.ts';
+import { queryLiveParagraphSnapshots } from './snapshot_provider.ts';
 
 export type VisibilityMode = 'Visible' | 'Hidden' | 'Uninitialized';
 
@@ -36,6 +37,7 @@ export class WordRuntimeManager {
     private visibility: VisibilityMode = 'Uninitialized';
     private isInitialized = false;
     private isShuttingDown = false;
+    private snapshotRequestUnsubscribe: (() => void) | null = null;
 
     private readonly visibilityChangeHandlers: Set<(mode: VisibilityMode) => void> = new Set();
 
@@ -196,6 +198,8 @@ export class WordRuntimeManager {
         }
 
         if (this.bridgeClient) {
+            this.snapshotRequestUnsubscribe?.();
+            this.snapshotRequestUnsubscribe = null;
             this.bridgeClient.disconnect();
             this.bridgeClient = null;
         }
@@ -213,6 +217,23 @@ export class WordRuntimeManager {
             this.documentListener = new WordDocumentListener({
                 bridgeClient: this.bridgeClient,
                 ...this.listenerConfig,
+            });
+        }
+
+        if (this.bridgeClient && !this.snapshotRequestUnsubscribe) {
+            this.snapshotRequestUnsubscribe = this.bridgeClient.onSnapshotRequest(async (request) => {
+                const wordRunner = (globalThis as any).Word?.run;
+                const response = wordRunner
+                    ? await queryLiveParagraphSnapshots(request, wordRunner)
+                    : {
+                        requestId: request.requestId,
+                        results: request.paragraphIds.map((paragraphId) => ({
+                            paragraphId,
+                            status: 'ERROR' as const,
+                            message: 'Office.js Word.run is unavailable',
+                        })),
+                    };
+                this.bridgeClient?.sendSnapshotResponse(response);
             });
         }
     }

@@ -8,6 +8,9 @@
 import {
     type ParagraphPayload,
     type ReplacementCommand,
+    type ReplacementResult,
+    type LiveSnapshotRequest,
+    type LiveSnapshotResponse,
     type AuthHandshake,
     type AuthResponse,
     type HeartbeatPayload,
@@ -47,6 +50,7 @@ export interface BridgeClientConfig {
 }
 
 export type CommandHandler = (command: ReplacementCommand) => void | Promise<void>;
+export type SnapshotRequestHandler = (request: LiveSnapshotRequest) => void | Promise<void>;
 export type StatusChangeHandler = (status: BridgeConnectionStatus, message?: string) => void;
 
 export class WordBridgeClient {
@@ -69,6 +73,7 @@ export class WordBridgeClient {
     private isDisposed = false;
 
     private readonly commandHandlers: Set<CommandHandler> = new Set();
+    private readonly snapshotRequestHandlers: Set<SnapshotRequestHandler> = new Set();
     private readonly statusHandlers: Set<StatusChangeHandler> = new Set();
 
     constructor(config: BridgeClientConfig = {}) {
@@ -113,6 +118,12 @@ export class WordBridgeClient {
     public onCommand(handler: CommandHandler): () => void {
         this.commandHandlers.add(handler);
         return () => this.commandHandlers.delete(handler);
+    }
+
+    /** Subscribes to live snapshot requests received over the connected WebSocket. */
+    public onSnapshotRequest(handler: SnapshotRequestHandler): () => void {
+        this.snapshotRequestHandlers.add(handler);
+        return () => this.snapshotRequestHandlers.delete(handler);
     }
 
     /** Subscribes to status changes */
@@ -256,6 +267,20 @@ export class WordBridgeClient {
                 signal: AbortSignal.timeout(3000),
             });
             return response.ok;
+        } catch {
+            return false;
+        }
+    }
+
+    /** Sends a live snapshot response. Snapshot RPC is WebSocket-only: no REST fallback exists. */
+    public sendSnapshotResponse(response: LiveSnapshotResponse): boolean {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'CONNECTED') {
+            return false;
+        }
+        try {
+            const message: BridgeMessage = { type: 'LIVE_SNAPSHOT_RESPONSE', payload: response };
+            this.ws.send(JSON.stringify(message));
+            return true;
         } catch {
             return false;
         }
@@ -418,9 +443,19 @@ export class WordBridgeClient {
                     }
                 }
                 break;
+            case 'LIVE_SNAPSHOT_REQUEST':
+                for (const handler of this.snapshotRequestHandlers) {
+                    try {
+                        void Promise.resolve(handler(message.payload)).catch(() => {});
+                    } catch {
+                        // Error isolated
+                    }
+                }
+                break;
             case 'AUTH_RESPONSE':
             case 'PARAGRAPH_PAYLOAD':
             case 'REPLACEMENT_RESULT':
+            case 'LIVE_SNAPSHOT_RESPONSE':
             case 'HEARTBEAT':
             case 'AUTH_HANDSHAKE':
                 break;

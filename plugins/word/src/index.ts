@@ -14,6 +14,7 @@ export * from './document_listener.ts';
 export * from './compensating_journal.ts';
 export * from './hash_verifier.ts';
 export * from './replacement_executor.ts';
+export * from './snapshot_provider.ts';
 
 export interface WordAddinOptions {
     runtimeConfig?: RuntimeManagerConfig;
