@@ -84,14 +84,43 @@ TU로 등록하므로). 저장 직전 확인 대화상자가 원문/번역 전�
 **검증:** `npm test` 197/197, `npx vitest run` 312/312, `npm run build` 성공
 (Claude가 독립 재실행). `cargo test`는 위 라이브 Ollama 1건 제외 98/99.
 
-### 다음 세션 우선순위 (사용자가 정할 것 — 자동 결정 금지)
-1. **[붙여넣기](인접 삽입)** — 원문 옆에 번역을 붙이는 버튼. 사용자가 요청한
-   버튼 세트 중 유일한 미구현. **비용 재평가 결과 예상보다 쌈**: 두 호스트 모두
-   삽입 프리미티브가 이미 증명돼 있다. Word는 `Paragraph.insertText(text,'After')`
-   (커밋 `d12a9ce`의 버그가 바로 이게 동작한다는 증거), InDesign은
-   `paragraph.insertionPoints[i].contents`(`atomic_replacer.jsx:473-479`에서
-   이미 사용 중). 실제 비용은 삽입 자체가 아니라 **프로토콜에 삽입 모드를
-   추가하는 배관**(shared/protocol + Rust + 양쪽 플러그인). 라이브 검증은 불가.
+1. **~~[붙여넣기](인접 삽입)~~ — 폐기됨(2026-08-29, 사용자 결정).**
+   사용자 결정 원문: 이 건은 붙여넣기 보류(폐기)해줘. 치환과 복사면 될 것
+   같아. 아니면 커서를 위치시킨 곳에 바로 붙여넣는다거나.
+   **다시 꺼내지 말 것.** 사용자가 언급한 커서 위치 붙여넣기는 **이미 [복사]
+   버튼으로 충족된다** — 클립보드에 들어가므로 사용자가 커서를 두고 Ctrl+V
+   하면 되고, 이 경로는 플러그인이 문서를 건드리지 않아 아래 위험이 전부
+   회피된다. 앱이 커서 위치에 직접 쓰는 방식보다 안전하다.
+
+   **폐기 전까지 진행한 설계 분석(다시 하지 말 것, 나중에 필요해지면 여기서 재개):**
+   - 삽입 프리미티브 자체는 두 호스트 모두 증명돼 있다. Word는
+     `Paragraph.insertText(text,'After')`(커밋 `d12a9ce`의 버그가 이게
+     동작한다는 증거), InDesign은 `paragraph.insertionPoints[i].contents`
+     (`atomic_replacer.jsx:473-479`에서 이미 사용 중). 비용은 삽입이 아니라
+     프로토콜 배관에 있다.
+   - **paragraphId 체계가 두 호스트에서 비대칭이다.** Word는
+     `word-para-{내용해시}`(`document_listener.ts:304`)라 삽입해도 안 밀리지만
+     같은 텍스트 문단끼리 충돌한다. InDesign은
+     `indesign-para-{storyId}-{인덱스}`(`text_observer.jsx:315`)라 **문단을
+     삽입하면 뒤쪽 카드 ID가 전부 밀린다.**
+   - 다만 명령 실행 경로는 이미 방어돼 있다. `atomic_replacer.jsx`의
+     `findParagraphById`가 인덱스+baseHash로 먼저 찾고, 불일치하면
+     `scanStoryForHashMatches`로 스토리 전체를 스캔해 **정확히 하나일 때만**
+     반환하고 중복이면 `null`로 fail-closed한다. 대시보드가 들고 있는
+     카드 목록의 stale ID는 별개 문제로 남는다.
+   - **삽입한 번역문이 다시 입력으로 되먹임된다.** 새 문단이 에디터
+     텔레메트리를 타고 한국어 QA 린터와 TM 매칭에 원문처럼 들어간다.
+     별도 차단 장치가 필요하다.
+   - **Codex+agy 재조율 결론:** 메시지 형식(`mode` 필드 vs 별도
+     `InsertAdjacentCommand`)은 부차적이고, 진짜 필수는 **핸드셰이크
+     capability 게이트**다. 이 프로젝트는 Word taskpane이 Shared Runtime이라
+     새 대시보드 + 옛 taskpane 조합이 일상적이고, 게이트가 없으면 모르는
+     메시지가 `connection_manager.ts:483`의 `isBridgeMessage`에서 조용히
+     버려져 사용자는 15초 타임아웃만 본다(`commands.rs`). 추가로 agy는
+     타임아웃을 3초로 단축할 것을 권고했다.
+   - 성공 판정은 `anchorCurrentHash == anchorBaseHash`로 하면 안 된다.
+     그건 앵커 보존 증거일 뿐 삽입 증거가 아니다. 생성된 문단의 해시를
+     따로 받아 대조해야 한다(fail-closed).
 2. **문장/TU 경계 계약** — Phase 0가 남긴 진짜 과제. 가장 크고 나머지의 기반.
    `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 1단계에 해당. LLM 호출은
    문단 1회 유지, 결과만 문장 단위로 귀속시키는 합의는 그대로 유효.
