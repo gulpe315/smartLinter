@@ -409,34 +409,25 @@ export const QACardItem: React.FC<QACardItemProps> = ({
           suggestedText={card.suggestedSegment}
           showLabels={true}
         />
-        {!isEditUnavailable && (
+        {!isEditUnavailable && isEditingSuggestion && (
           <div className="mt-2 flex items-center justify-end gap-2">
-            {isEditingSuggestion ? (
-              <>
-                <label className="sr-only" htmlFor={`qa-suggestion-editor-${card.id}`}>제안문 수정</label>
-                <textarea
-                  id={`qa-suggestion-editor-${card.id}`}
-                  data-testid="qa-suggestion-editor"
-                  value={editedSuggestion}
-                  onChange={(event) => setEditedSuggestion(event.target.value)}
-                  rows={3}
-                  className="w-full resize-y rounded-lg border border-emerald-800/70 bg-slate-950 px-2.5 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
-                />
-                <button type="button" data-testid="qa-suggestion-cancel-btn" onClick={cancelEditingSuggestion} className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 border border-slate-700">취소</button>
-                <button
-                  type="button"
-                  data-testid="qa-suggestion-save-btn"
-                  disabled={!editedSuggestion.trim()}
-                  onClick={saveEditedSuggestion}
-                  className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-emerald-100 bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                >저장</button>
-              </>
-            ) : (
-              <button type="button" data-testid="qa-edit-suggestion-btn" onClick={startEditingSuggestion} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-emerald-300 hover:text-emerald-100 hover:bg-emerald-950/40 rounded-md">
-                <Pencil className="w-3 h-3" />
-                수정
-              </button>
-            )}
+            <label className="sr-only" htmlFor={`qa-suggestion-editor-${card.id}`}>제안문 수정</label>
+            <textarea
+              id={`qa-suggestion-editor-${card.id}`}
+              data-testid="qa-suggestion-editor"
+              value={editedSuggestion}
+              onChange={(event) => setEditedSuggestion(event.target.value)}
+              rows={3}
+              className="w-full resize-y rounded-lg border border-emerald-800/70 bg-slate-950 px-2.5 py-2 text-xs text-slate-100 outline-none focus:border-emerald-500"
+            />
+            <button type="button" data-testid="qa-suggestion-cancel-btn" onClick={cancelEditingSuggestion} className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 border border-slate-700">취소</button>
+            <button
+              type="button"
+              data-testid="qa-suggestion-save-btn"
+              disabled={!editedSuggestion.trim()}
+              onClick={saveEditedSuggestion}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-emerald-100 bg-emerald-700 hover:bg-emerald-600 border border-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >저장</button>
           </div>
         )}
       </div>
@@ -501,6 +492,18 @@ export const QACardItem: React.FC<QACardItemProps> = ({
             >
               <Check className="w-3.5 h-3.5" />
               {isTmSaved ? 'TM에 저장됨' : 'TM에 저장'}
+            </button>
+          )}
+          {!isEditUnavailable && !isEditingSuggestion && (
+            <button
+              type="button"
+              data-testid="qa-edit-suggestion-btn"
+              onClick={startEditingSuggestion}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-emerald-300 hover:text-emerald-100 bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-800/70 transition-colors flex items-center gap-1"
+              title="제안문 수정"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              <span>수정</span>
             </button>
           )}
           <button
