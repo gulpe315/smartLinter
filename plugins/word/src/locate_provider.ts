@@ -3,6 +3,17 @@ import type { LocateRequest, LocateResponse } from '../../../shared/protocol/typ
 
 interface Candidate { paragraph: any; hash: string; }
 
+/** Activating the host window is optional: older Word clients may not expose it. */
+function activateWordWindow(context: any): void {
+    try {
+        if (!globalThis.Office?.context?.requirements?.isSetSupported?.('WordApiDesktop', '1.4')) return;
+        const activeWindow = context.document.activeWindow;
+        if (activeWindow && typeof activeWindow.activate === 'function') activeWindow.activate();
+    } catch {
+        // WordApiDesktop 1.4 may be unavailable; selection can still succeed.
+    }
+}
+
 function occurrenceOffsets(text: string, needle: string): number[] {
     const offsets: number[] = [];
     for (let offset = text.indexOf(needle); offset !== -1; offset = text.indexOf(needle, offset + needle.length)) {
@@ -29,6 +40,7 @@ export async function locateWordParagraph(request: LocateRequest, wordRunner: (c
                 if (request.startOffset === undefined && request.endOffset === undefined) {
                     const range = paragraph.getRange ? paragraph.getRange('Whole') : paragraph;
                     if (!range || typeof range.select !== 'function') throw new Error('Word Range.select is unavailable');
+                    activateWordWindow(context);
                     range.select('Select');
                     await context.sync();
                     return;
@@ -56,6 +68,7 @@ export async function locateWordParagraph(request: LocateRequest, wordRunner: (c
                     throw new Error('Word search results could not verify the requested span');
                 }
                 if (typeof ranges[ordinal].select !== 'function') throw new Error('Word Range.select is unavailable');
+                activateWordWindow(context);
                 ranges[ordinal].select('Select');
                 await context.sync();
             } catch (error: any) { throw new SelectionError(error?.message || String(error)); }

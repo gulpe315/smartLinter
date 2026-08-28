@@ -7,10 +7,10 @@ function requestFor(text: string, baseHash?: string, startOffset?: number, endOf
     const hash = computeParagraphHash(text);
     return { requestId: 'locate-1', paragraphId: `word-para-${hash.slice(0, 12)}`, baseHash, startOffset, endOffset };
 }
-function runnerFor(texts: string[], select?: () => void, searchOverride?: (needle: string) => any[]) {
+function runnerFor(texts: string[], select?: () => void, searchOverride?: (needle: string) => any[], activeWindow?: any) {
     const selectRange = select || (() => {});
     return async (callback: (context: any) => Promise<any>) => callback({
-        document: { body: { paragraphs: { load: () => {}, items: texts.map((text) => ({
+        document: { activeWindow, body: { paragraphs: { load: () => {}, items: texts.map((text) => ({
             text,
             getRange: () => ({ select: selectRange }),
             search: (needle: string) => ({
@@ -32,6 +32,53 @@ describe('Word locate provider', () => {
         let selected = 0;
         const response = await locateWordParagraph(requestFor('Target'), runnerFor(['Other', 'Target'], () => { selected++; }));
         assert.equal(response.status, 'FOUND'); assert.equal(selected, 1);
+    });
+    it('activates the Word window before selecting', async () => {
+        let activated = 0;
+        const originalOffice = (globalThis as any).Office;
+        try {
+            (globalThis as any).Office = { context: { requirements: { isSetSupported: () => true } } };
+            const response = await locateWordParagraph(
+                requestFor('Target'),
+                runnerFor(['Target'], undefined, undefined, { activate: () => { activated++; } }),
+            );
+            assert.equal(response.status, 'FOUND'); assert.equal(activated, 1);
+        } finally {
+            (globalThis as any).Office = originalOffice;
+        }
+    });
+    it('does not activate when WordApiDesktop 1.4 is unsupported', async () => {
+        let activated = 0;
+        const originalOffice = (globalThis as any).Office;
+        try {
+            (globalThis as any).Office = { context: { requirements: { isSetSupported: () => false } } };
+            const response = await locateWordParagraph(
+                requestFor('Target'),
+                runnerFor(['Target'], undefined, undefined, { activate: () => { activated++; } }),
+            );
+            assert.equal(response.status, 'FOUND'); assert.equal(activated, 0);
+        } finally {
+            (globalThis as any).Office = originalOffice;
+        }
+    });
+    it('continues safely when the Office global is unavailable', async () => {
+        let activated = 0;
+        const originalOffice = (globalThis as any).Office;
+        try {
+            delete (globalThis as any).Office;
+            const response = await locateWordParagraph(
+                requestFor('Target'),
+                runnerFor(['Target'], undefined, undefined, { activate: () => { activated++; } }),
+            );
+            assert.equal(response.status, 'FOUND'); assert.equal(activated, 0);
+        } finally {
+            (globalThis as any).Office = originalOffice;
+        }
+    });
+    it('continues locating when window activation is unavailable or fails', async () => {
+        for (const activeWindow of [undefined, {}, { activate: () => { throw new Error('unsupported'); } }]) {
+            assert.equal((await locateWordParagraph(requestFor('Target'), runnerFor(['Target'], undefined, undefined, activeWindow))).status, 'FOUND');
+        }
     });
     it('fails closed for zero and duplicate candidates', async () => {
         assert.equal((await locateWordParagraph(requestFor('Missing'), runnerFor(['Other']))).status, 'NOT_FOUND');
