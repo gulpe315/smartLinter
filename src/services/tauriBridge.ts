@@ -203,6 +203,9 @@ export interface IBridgeService {
   /** Opens or connects to the Adobe InDesign integration. */
   connectIndesign(): Promise<void>;
 
+  /** Changes the editor admission target. */
+  switchEditorTarget(target: string): Promise<void>;
+
   /** Disconnects the currently active editor session. */
   disconnectEditor(): Promise<boolean>;
 
@@ -623,6 +626,10 @@ export class MockBridgeService implements IBridgeService {
   }
 
   async connectIndesign(): Promise<void> {
+    return this.switchEditorTarget('InDesign');
+  }
+
+  async switchEditorTarget(_target: string): Promise<void> {
     return Promise.resolve();
   }
 
@@ -990,14 +997,18 @@ export class TauriBridgeService implements IBridgeService {
   }
 
   async connectIndesign(): Promise<void> {
+    return this.switchEditorTarget('InDesign');
+  }
+
+  async switchEditorTarget(target: string): Promise<void> {
     if (!this.isTauriAvailable()) {
-      return this.fallbackService.connectIndesign();
+      return this.fallbackService.switchEditorTarget(target);
     }
 
     try {
-      await invoke('switch_editor_target', { target: 'InDesign' });
+      await invoke('switch_editor_target', { target });
     } catch (e) {
-      console.warn('Tauri invoke connect_indesign failed:', e);
+      console.warn('Tauri invoke switch_editor_target failed:', e);
       throw e;
     }
   }

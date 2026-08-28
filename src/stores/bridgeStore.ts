@@ -19,6 +19,7 @@ import {
   type IBridgeService,
   getBridgeService,
 } from '../services/tauriBridge.ts';
+import { type EditorTargetId } from '../types/editorRegistry.ts';
 
 export type SplitLayoutMode = 'horizontal' | 'vertical';
 export type LayoutPreset = 'qa-focus' | 'balanced' | 'tm-focus';
@@ -34,6 +35,8 @@ export interface BridgeState {
   reconnectAttempt: number;
   nextRetryDelayMs: number;
   isConnectingIndesign: boolean;
+  selectedTarget: EditorTargetId | null;
+  editorConnectionError: string | null;
 
   // --- LLM Status ---
   llmAlive: boolean;
@@ -82,6 +85,8 @@ export interface BridgeState {
   setPinned: (pinned: boolean) => void;
   togglePin: () => void;
   connectIndesign: () => Promise<void>;
+  switchEditorTarget: (target: EditorTargetId) => Promise<void>;
+  disconnectEditorSession: () => Promise<void>;
   addParagraph: (payload: ParagraphPayload) => void;
   setActiveParagraph: (paragraph: ParagraphPayload | null) => void;
   setLastReplacementResult: (result: ReplacementResult | null) => void;
@@ -102,6 +107,8 @@ const initialState = {
   reconnectAttempt: 0,
   nextRetryDelayMs: 0,
   isConnectingIndesign: false,
+  selectedTarget: null as EditorTargetId | null,
+  editorConnectionError: null as string | null,
 
   llmAlive: false,
   llmProvider: 'ollama',
@@ -218,17 +225,32 @@ export const useBridgeStore = create<BridgeState>((set, get) => ({
   },
 
   connectIndesign: async () => {
-    set({ isConnectingIndesign: true });
+    await get().switchEditorTarget('InDesign');
+  },
+
+  switchEditorTarget: async (target) => {
+    set({ selectedTarget: target, editorConnectionError: null, isConnectingIndesign: target === 'InDesign' });
 
     try {
       const bridgeService = getBridgeService();
-      await bridgeService.connectIndesign();
+      await bridgeService.switchEditorTarget(target);
       const status = await bridgeService.fetchBridgeHealth();
       get().setEditorStatus(status);
     } catch (err) {
-      console.error('Failed to connect to InDesign:', err);
+      console.error(`Failed to switch editor target to ${target}:`, err);
+      set({ editorConnectionError: err instanceof Error ? err.message : String(err) });
     } finally {
       set({ isConnectingIndesign: false });
+    }
+  },
+
+  disconnectEditorSession: async () => {
+    try {
+      await getBridgeService().disconnectEditor();
+      const status = await getBridgeService().fetchBridgeHealth();
+      get().setEditorStatus(status);
+    } catch (err) {
+      set({ editorConnectionError: err instanceof Error ? err.message : String(err) });
     }
   },
 

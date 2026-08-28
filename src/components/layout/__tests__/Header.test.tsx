@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Header } from '../Header.tsx';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
@@ -33,61 +33,64 @@ describe('Header Component', () => {
     expect(tmBadge).toHaveTextContent('TM: 미로드');
   });
 
-  it('calls the InDesign connect action when the button is clicked', async () => {
-    const connectIndesign = vi.fn().mockResolvedValue(undefined);
-    useBridgeStore.setState({ connectIndesign });
-
+  it('renders available and coming-soon editor groups', () => {
     render(<Header />);
-    fireEvent.click(screen.getByTestId('connect-indesign-btn'));
 
-    await waitFor(() => {
-      expect(connectIndesign).toHaveBeenCalledOnce();
-    });
+    fireEvent.click(screen.getByTestId('editor-target-menu-button'));
+
+    expect(screen.getByText('연결 가능')).toBeInTheDocument();
+    expect(screen.getByTestId('editor-target-Word')).toBeEnabled();
+    expect(screen.getByTestId('editor-target-InDesign')).toBeEnabled();
+    expect(screen.getAllByText('준비 중')).not.toHaveLength(0);
+    expect(screen.getByTestId('editor-target-VSCode')).toBeDisabled();
+    expect(screen.getByTestId('editor-target-Antigravity')).toBeDisabled();
+    expect(screen.getByTestId('editor-target-PowerPoint')).toBeDisabled();
   });
 
-  it('shows the disconnect button only when an editor is connected and calls disconnectEditor', async () => {
+  it('switches directly from an unconnected state and shows Word waiting guidance', async () => {
     const bridge = new MockBridgeService();
-    const disconnectEditor = vi.fn().mockResolvedValue(true);
-    bridge.disconnectEditor = disconnectEditor;
+    const switchEditorTarget = vi.spyOn(bridge, 'switchEditorTarget');
     setBridgeService(bridge);
+
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('editor-target-menu-button'));
+    fireEvent.click(screen.getByTestId('editor-target-Word'));
+
+    await waitFor(() => expect(switchEditorTarget).toHaveBeenCalledWith('Word'));
+    await act(async () => {});
+    expect(screen.getByTestId('editor-connection-message')).toHaveTextContent('자동으로 연결');
+  });
+
+  it('asks for confirmation before changing an active editor and switches after confirmation', async () => {
+    const switchEditorTarget = vi.fn().mockResolvedValue(undefined);
+    useBridgeStore.setState({ switchEditorTarget });
     useBridgeStore.getState().setEditorStatus({ connected: true, editorType: 'Word' });
 
-    const { rerender } = render(<Header />);
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('editor-target-menu-button'));
+    fireEvent.click(screen.getByTestId('editor-target-InDesign'));
 
-    fireEvent.click(screen.getByTestId('disconnect-editor-btn'));
-    await waitFor(() => expect(disconnectEditor).toHaveBeenCalledOnce());
-    expect(screen.queryByTestId('connect-indesign-btn')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      '현재 Word 연결을 종료하고 Adobe InDesign으로 전환하시겠습니까?',
+    );
+    expect(switchEditorTarget).not.toHaveBeenCalled();
 
-    useBridgeStore.getState().setEditorStatus({ connected: false });
-    rerender(<Header />);
-    expect(screen.queryByTestId('disconnect-editor-btn')).not.toBeInTheDocument();
-    expect(screen.getByTestId('connect-indesign-btn')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('confirm-editor-switch'));
+    await waitFor(() => expect(switchEditorTarget).toHaveBeenCalledWith('InDesign'));
   });
 
-  it('disables the InDesign connect button while a connection is in progress', () => {
-    useBridgeStore.setState({ isConnectingIndesign: true });
+  it('does not invoke the dispatcher for a coming-soon target', () => {
+    const switchEditorTarget = vi.fn().mockResolvedValue(undefined);
+    useBridgeStore.setState({ switchEditorTarget });
 
     render(<Header />);
+    fireEvent.click(screen.getByTestId('editor-target-menu-button'));
+    fireEvent.click(screen.getByTestId('editor-target-VSCode'));
 
-    expect(screen.getByTestId('connect-indesign-btn')).toBeDisabled();
-    expect(screen.getByTestId('connect-indesign-btn')).toHaveTextContent('연결 중...');
+    expect(switchEditorTarget).not.toHaveBeenCalled();
   });
 
-  it('renders connected Word editor badge with active document', () => {
-    useBridgeStore.getState().setEditorStatus({
-      connected: true,
-      editorType: 'Word',
-      activeDocument: 'Chapter1_Manual.docx',
-    });
-
-    render(<Header />);
-
-    const editorBadge = screen.getByTestId('editor-status-badge');
-    expect(editorBadge).toHaveTextContent('Word 연결됨 (Chapter1_Manual.docx)');
-    expect(screen.getByText('W')).toBeInTheDocument();
-  });
-
-  it('renders connected InDesign editor badge', () => {
+  it('renders connected editor document status', () => {
     useBridgeStore.getState().setEditorStatus({
       connected: true,
       editorType: 'InDesign',
@@ -96,9 +99,9 @@ describe('Header Component', () => {
 
     render(<Header />);
 
-    const editorBadge = screen.getByTestId('editor-status-badge');
-    expect(editorBadge).toHaveTextContent('InDesign 연결됨 (Brochure_2026.indd)');
-    expect(screen.getByText('Id')).toBeInTheDocument();
+    expect(screen.getByTestId('editor-status-badge')).toHaveTextContent(
+      'InDesign 연결됨 (Brochure_2026.indd)',
+    );
   });
 
   it('renders online LLM with latency badge', () => {
@@ -207,8 +210,8 @@ describe('Header Component', () => {
   it('offers an explicit QA state reset that clears active and historical cards', () => {
     useQaStore.getState().addCard({ category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo' });
     useQaStore.setState({ appliedCards: [{
-      id: 'applied', paragraphId: 'old', paragraphHash: 'hash', paragraphText: 'old', category: 'Grammar',
-      originalSegment: 'old', suggestedSegment: 'new', reason: 'Done', severity: 'LOW', status: 'applied', createdAt: Date.now(),
+        id: 'applied', paragraphId: 'old', paragraphHash: 'hash', paragraphText: 'old', category: 'Grammar',
+        originalSegment: 'old', suggestedSegment: 'new', reason: 'Done', severity: 'LOW', status: 'applied', createdAt: Date.now(),
     }] });
     render(<Header />);
 

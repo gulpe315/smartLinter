@@ -8,7 +8,6 @@
 
 import React from 'react';
 import {
-  FileText,
   Sparkles,
   Database,
   BookOpen,
@@ -17,23 +16,17 @@ import {
   Radio,
   AlertCircle,
   RefreshCw,
-  Unplug,
   Settings,
 } from 'lucide-react';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
-import { getBridgeService } from '../../services/tauriBridge.ts';
 import { useConfigStore } from '../../stores/configStore.ts';
 import { useQaStore } from '../../stores/qaStore.ts';
 import { PinToggleButton } from './PinToggleButton.tsx';
 import { BatchProgressBar } from '../config/BatchProgressBar.tsx';
+import { EditorConnectionControl } from './EditorConnectionControl.tsx';
 
 export const Header: React.FC = () => {
   const {
-    editorConnected,
-    editorType,
-    activeDocument,
-    isConnectingIndesign,
-    connectIndesign,
     llmAlive,
     llmModel,
     llmLatency,
@@ -73,70 +66,7 @@ export const Header: React.FC = () => {
 
         {/* Center: Realtime Status Badges (Interactive triggers) */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Editor Connection Indicator */}
-          <div
-            data-testid="editor-status-badge"
-            className={`flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
-              editorConnected
-                ? 'bg-emerald-950/50 border-emerald-700/60 text-emerald-300 shadow-sm shadow-emerald-950'
-                : 'bg-slate-800/80 border-slate-700 text-slate-400'
-            }`}
-            title={activeDocument ? `활성 문서: ${activeDocument}` : '에디터 상태'}
-          >
-            {editorType === 'Word' ? (
-              <span className="flex items-center justify-center w-4 h-4 rounded bg-blue-600 text-[10px] font-bold text-white leading-none">
-                W
-              </span>
-            ) : editorType === 'InDesign' ? (
-              <span className="flex items-center justify-center w-4 h-4 rounded bg-pink-700 text-[10px] font-bold text-white leading-none">
-                Id
-              </span>
-            ) : (
-              <FileText className="w-3.5 h-3.5 text-slate-400" />
-            )}
-
-            <div className="flex items-center gap-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  editorConnected
-                    ? 'bg-emerald-400 animate-live-pulse'
-                    : 'bg-slate-500'
-                }`}
-              />
-              <span className="font-mono text-[11px]">
-                {editorConnected
-                  ? `${editorType || 'Editor'} 연결됨${activeDocument ? ` (${activeDocument})` : ''}`
-                  : '에디터 대기 중'}
-              </span>
-            </div>
-          </div>
-
-          {!editorConnected && (
-            <button
-              type="button"
-              data-testid="connect-indesign-btn"
-              onClick={connectIndesign}
-              disabled={isConnectingIndesign}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-pink-900/60 hover:bg-pink-800/70 disabled:bg-slate-800 disabled:text-slate-500 border border-pink-700/60 disabled:border-slate-700 text-pink-200 text-xs font-medium transition-colors disabled:cursor-not-allowed"
-              title="InDesign 연결"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isConnectingIndesign ? 'animate-spin' : ''}`} />
-              <span>{isConnectingIndesign ? '연결 중...' : 'InDesign 연결'}</span>
-            </button>
-          )}
-
-          {editorConnected && (
-            <button
-              type="button"
-              data-testid="disconnect-editor-btn"
-              onClick={() => { void getBridgeService().disconnectEditor(); }}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-rose-950/50 border border-slate-700 hover:border-rose-800 text-slate-300 hover:text-rose-200 text-xs font-medium transition-colors"
-              title="연결 해제"
-            >
-              <Unplug className="w-3.5 h-3.5" />
-              <span>연결 해제</span>
-            </button>
-          )}
+          <EditorConnectionControl />
 
           {/* LLM Status Indicator (Click to open Settings) */}
           <button

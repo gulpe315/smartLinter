@@ -132,7 +132,7 @@ describe('SmartLinter Bridge Zustand Store', () => {
 
   it('connects InDesign and refreshes the editor status', async () => {
     const { setBridgeService } = await import('../../services/tauriBridge.ts');
-    const connectIndesign = vi.spyOn(mockService, 'connectIndesign');
+    const switchEditorTarget = vi.spyOn(mockService, 'switchEditorTarget');
     vi.spyOn(mockService, 'fetchBridgeHealth').mockResolvedValue({
       connected: true,
       editorType: 'InDesign',
@@ -145,7 +145,7 @@ describe('SmartLinter Bridge Zustand Store', () => {
 
     await connecting;
 
-    expect(connectIndesign).toHaveBeenCalledOnce();
+    expect(switchEditorTarget).toHaveBeenCalledWith('InDesign');
     expect(useBridgeStore.getState().isConnectingIndesign).toBe(false);
     expect(useBridgeStore.getState().editorConnected).toBe(true);
     expect(useBridgeStore.getState().editorType).toBe('InDesign');
