@@ -420,6 +420,22 @@ pub async fn get_live_paragraph_snapshots(
         .map_err(|error| format!("InDesign batch live paragraph snapshot task failed: {error}"))?
 }
 
+/// Forcefully disconnects the currently active editor session at the user's request.
+#[tauri::command]
+pub async fn disconnect_editor_session(
+    server_handle: State<'_, ServerHandle>,
+) -> Result<bool, String> {
+    disconnect_active_editor_session(server_handle.session_manager()).await
+}
+
+async fn disconnect_active_editor_session(session_manager: Arc<SessionManager>) -> Result<bool, String> {
+    let had_active_session = session_manager.get_snapshot().await.is_some();
+    session_manager
+        .clear_session("User requested disconnect")
+        .await;
+    Ok(had_active_session)
+}
+
 async fn request_word_locate(
     session_manager: Arc<SessionManager>,
     paragraph_id: String,
@@ -771,6 +787,23 @@ mod tests {
     use tokio::sync::mpsc;
 
     #[tokio::test]
+    async fn disconnect_editor_session_clears_an_active_session() {
+        let manager = Arc::new(SessionManager::new(Arc::new(NoopEventSink)));
+        manager.acquire_session(EditorType::Word, None, None).await.unwrap();
+
+        assert!(disconnect_active_editor_session(manager.clone()).await.unwrap());
+        assert!(manager.get_snapshot().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn disconnect_editor_session_is_safe_when_no_session_is_active() {
+        let manager = Arc::new(SessionManager::new(Arc::new(NoopEventSink)));
+
+        assert!(!disconnect_active_editor_session(manager.clone()).await.unwrap());
+        assert!(manager.get_snapshot().await.is_none());
+    }
+
+    #[tokio::test]
     async fn word_snapshot_commands_dispatch_single_and_batch_through_session_manager() {
         let manager = Arc::new(SessionManager::new(Arc::new(NoopEventSink)));
         let (sender, mut receiver) = mpsc::unbounded_channel();
@@ -844,7 +877,13 @@ mod tests {
         let manager = Arc::new(SessionManager::new(Arc::new(NoopEventSink)));
         let (sender, mut receiver) = mpsc::unbounded_channel();
         let session_id = manager.acquire_session(EditorType::Word, None, Some(sender)).await.unwrap();
-        let task = tokio::spawn(request_word_locate(manager.clone(), "word-para-one".to_string(), Some("base-hash".to_string())));
+        let task = tokio::spawn(request_word_locate(
+            manager.clone(),
+            "word-para-one".to_string(),
+            Some("base-hash".to_string()),
+            None,
+            None,
+        ));
         let BridgeMessage::LocateRequest(request) = receiver.recv().await.expect("locate request") else { panic!("expected locate request"); };
         assert_eq!(request.paragraph_id, "word-para-one");
         assert_eq!(request.base_hash.as_deref(), Some("base-hash"));

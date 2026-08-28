@@ -17,9 +17,11 @@ import {
   Radio,
   AlertCircle,
   RefreshCw,
+  Unplug,
   Settings,
 } from 'lucide-react';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
+import { getBridgeService } from '../../services/tauriBridge.ts';
 import { useConfigStore } from '../../stores/configStore.ts';
 import { useQaStore } from '../../stores/qaStore.ts';
 import { PinToggleButton } from './PinToggleButton.tsx';
@@ -120,6 +122,19 @@ export const Header: React.FC = () => {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isConnectingIndesign ? 'animate-spin' : ''}`} />
               <span>{isConnectingIndesign ? '연결 중...' : 'InDesign 연결'}</span>
+            </button>
+          )}
+
+          {editorConnected && (
+            <button
+              type="button"
+              data-testid="disconnect-editor-btn"
+              onClick={() => { void getBridgeService().disconnectEditor(); }}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-rose-950/50 border border-slate-700 hover:border-rose-800 text-slate-300 hover:text-rose-200 text-xs font-medium transition-colors"
+              title="연결 해제"
+            >
+              <Unplug className="w-3.5 h-3.5" />
+              <span>연결 해제</span>
             </button>
           )}
 

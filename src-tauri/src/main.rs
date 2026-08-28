@@ -72,6 +72,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_bridge_status,
+            commands::disconnect_editor_session,
             commands::check_indesign_status,
             commands::connect_indesign,
             commands::set_always_on_top,

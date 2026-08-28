@@ -45,6 +45,25 @@ describe('Header Component', () => {
     });
   });
 
+  it('shows the disconnect button only when an editor is connected and calls disconnectEditor', async () => {
+    const bridge = new MockBridgeService();
+    const disconnectEditor = vi.fn().mockResolvedValue(true);
+    bridge.disconnectEditor = disconnectEditor;
+    setBridgeService(bridge);
+    useBridgeStore.getState().setEditorStatus({ connected: true, editorType: 'Word' });
+
+    const { rerender } = render(<Header />);
+
+    fireEvent.click(screen.getByTestId('disconnect-editor-btn'));
+    await waitFor(() => expect(disconnectEditor).toHaveBeenCalledOnce());
+    expect(screen.queryByTestId('connect-indesign-btn')).not.toBeInTheDocument();
+
+    useBridgeStore.getState().setEditorStatus({ connected: false });
+    rerender(<Header />);
+    expect(screen.queryByTestId('disconnect-editor-btn')).not.toBeInTheDocument();
+    expect(screen.getByTestId('connect-indesign-btn')).toBeInTheDocument();
+  });
+
   it('disables the InDesign connect button while a connection is in progress', () => {
     useBridgeStore.setState({ isConnectingIndesign: true });
 
