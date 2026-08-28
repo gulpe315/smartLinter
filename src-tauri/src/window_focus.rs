@@ -57,6 +57,14 @@ mod platform {
         window: Option<HWND>,
     }
 
+    fn record_word_window(search: &mut WindowSearch<'_>, class_name: &[u16], hwnd: HWND) {
+        if search.window.is_none()
+            && String::from_utf16_lossy(class_name) == WORD_WINDOW_CLASS
+        {
+            search.window = Some(hwnd);
+        }
+    }
+
     unsafe extern "system" fn find_word_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
         let search = unsafe { &mut *(lparam.0 as *mut WindowSearch<'_>) };
         if !unsafe { IsWindowVisible(hwnd).as_bool() } {
@@ -71,12 +79,12 @@ mod platform {
 
         let mut class_name = [0_u16; 256];
         let length = unsafe { GetClassNameW(hwnd, &mut class_name) };
-        if length > 0
-            && String::from_utf16_lossy(&class_name[..length as usize]) == WORD_WINDOW_CLASS
-        {
-            search.window = Some(hwnd);
-            return BOOL(0);
+        if length > 0 {
+            record_word_window(search, &class_name[..length as usize], hwnd);
         }
+
+        // Keep enumerating after a match. Returning FALSE makes EnumWindows report failure;
+        // its error conversion can then misinterpret stale thread-local last-error state.
         BOOL(1)
     }
 
@@ -129,6 +137,23 @@ mod platform {
         #[test]
         fn no_word_process_is_a_non_fatal_noop() {
             assert_eq!(focus_word_process_windows(&HashSet::new()), Ok(false));
+        }
+
+        #[test]
+        fn matching_window_is_recorded_without_replacing_the_first_match() {
+            let process_ids = HashSet::new();
+            let first = HWND(101_usize as *mut core::ffi::c_void);
+            let second = HWND(202_usize as *mut core::ffi::c_void);
+            let mut search = WindowSearch {
+                word_process_ids: &process_ids,
+                window: None,
+            };
+
+            let word_class: Vec<u16> = WORD_WINDOW_CLASS.encode_utf16().collect();
+            record_word_window(&mut search, &word_class, first);
+            record_word_window(&mut search, &word_class, second);
+
+            assert_eq!(search.window, Some(first));
         }
     }
 }
