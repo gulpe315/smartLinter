@@ -141,9 +141,12 @@ export const QACardItem: React.FC<QACardItemProps> = ({
         case 'SELECTION_FAILED':
           setLocateError('문단을 찾았지만 선택하지 못했습니다. 잠긴 프레임이거나 다른 작업이 진행 중일 수 있습니다. 다시 시도해 주세요.');
           break;
+        case 'BUSY':
+          setLocateError('편집기가 위치 보기를 제때 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+          break;
         case 'ERROR':
         default:
-          setLocateError('InDesign 연결 상태를 확인할 수 없습니다. 다시 시도해 주세요.');
+          setLocateError(result.message || '편집기에서 문단 위치를 확인할 수 없습니다. 다시 시도해 주세요.');
           break;
       }
     } catch (_error) {

@@ -158,6 +158,34 @@ pub struct LiveSnapshotResponse {
     pub results: Vec<LiveSnapshotItem>,
 }
 
+/// A dashboard request to reveal a paragraph in the active editor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocateRequest {
+    pub request_id: String,
+    pub paragraph_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_hash: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub start_offset: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_offset: Option<usize>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LocateStatus { Found, NotFound, Ambiguous, SelectionFailed, Busy, Error }
+
+/// Editor response to a correlated locate request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocateResponse {
+    pub request_id: String,
+    pub status: LocateStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
 /// Initial authentication handshake sent by an editor plugin on connect.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -213,5 +241,7 @@ pub enum BridgeMessage {
     ReplacementResult(ReplacementResult),
     LiveSnapshotRequest(LiveSnapshotRequest),
     LiveSnapshotResponse(LiveSnapshotResponse),
+    LocateRequest(LocateRequest),
+    LocateResponse(LocateResponse),
     Heartbeat(HeartbeatPayload),
 }

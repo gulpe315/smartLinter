@@ -31,6 +31,8 @@ import {
     isQaIssue,
     isLiveSnapshotRequest,
     isLiveSnapshotResponse,
+    isLocateRequest,
+    isLocateResponse,
 } from '../types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -210,6 +212,15 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
             assert.equal(isBridgeMessage({ type: 'LIVE_SNAPSHOT_RESPONSE', payload: response }), true);
             assert.equal(isLiveSnapshotRequest({ paragraphIds: [] }), false);
             assert.equal(isLiveSnapshotResponse({ requestId: 'x', results: [{ paragraphId: 'x', status: 'INVALID' }] }), false);
+        });
+        it('validates locate request and response envelopes', () => {
+            const request = { requestId: 'locate-1', paragraphId: 'word-para-123', baseHash: 'full-hash' };
+            const response = { requestId: 'locate-1', status: 'SELECTION_FAILED' as const, message: 'Unsupported' };
+            assert.equal(isLocateRequest(request), true);
+            assert.equal(isLocateResponse(response), true);
+            assert.equal(isBridgeMessage({ type: 'LOCATE_REQUEST', payload: request }), true);
+            assert.equal(isBridgeMessage({ type: 'LOCATE_RESPONSE', payload: response }), true);
+            assert.equal(isLocateRequest({ requestId: 'x', paragraphId: 'p', startOffset: 2, endOffset: 1 }), false);
         });
         it('should validate HeartbeatPayload structure', () => {
             const heartbeat = rawFixtures.heartbeatPayload as HeartbeatPayload;

@@ -11,6 +11,8 @@ import {
     type ReplacementResult,
     type LiveSnapshotRequest,
     type LiveSnapshotResponse,
+    type LocateRequest,
+    type LocateResponse,
     type AuthHandshake,
     type AuthResponse,
     type HeartbeatPayload,
@@ -51,6 +53,7 @@ export interface BridgeClientConfig {
 
 export type CommandHandler = (command: ReplacementCommand) => void | Promise<void>;
 export type SnapshotRequestHandler = (request: LiveSnapshotRequest) => void | Promise<void>;
+export type LocateRequestHandler = (request: LocateRequest) => void | Promise<void>;
 export type StatusChangeHandler = (status: BridgeConnectionStatus, message?: string) => void;
 
 export class WordBridgeClient {
@@ -74,6 +77,7 @@ export class WordBridgeClient {
 
     private readonly commandHandlers: Set<CommandHandler> = new Set();
     private readonly snapshotRequestHandlers: Set<SnapshotRequestHandler> = new Set();
+    private readonly locateRequestHandlers: Set<LocateRequestHandler> = new Set();
     private readonly statusHandlers: Set<StatusChangeHandler> = new Set();
 
     constructor(config: BridgeClientConfig = {}) {
@@ -124,6 +128,12 @@ export class WordBridgeClient {
     public onSnapshotRequest(handler: SnapshotRequestHandler): () => void {
         this.snapshotRequestHandlers.add(handler);
         return () => this.snapshotRequestHandlers.delete(handler);
+    }
+
+    /** Subscribes to locate requests received over the connected WebSocket. */
+    public onLocateRequest(handler: LocateRequestHandler): () => void {
+        this.locateRequestHandlers.add(handler);
+        return () => this.locateRequestHandlers.delete(handler);
     }
 
     /** Subscribes to status changes */
@@ -284,6 +294,15 @@ export class WordBridgeClient {
         } catch {
             return false;
         }
+    }
+
+    /** Sends a locate response. Locate RPC is WebSocket-only. */
+    public sendLocateResponse(response: LocateResponse): boolean {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'CONNECTED') return false;
+        try {
+            this.ws.send(JSON.stringify({ type: 'LOCATE_RESPONSE', payload: response } satisfies BridgeMessage));
+            return true;
+        } catch { return false; }
     }
 
     // --- Internal Connection Logic ---
@@ -452,10 +471,16 @@ export class WordBridgeClient {
                     }
                 }
                 break;
+            case 'LOCATE_REQUEST':
+                for (const handler of this.locateRequestHandlers) {
+                    try { void Promise.resolve(handler(message.payload)).catch(() => {}); } catch { /* isolated */ }
+                }
+                break;
             case 'AUTH_RESPONSE':
             case 'PARAGRAPH_PAYLOAD':
             case 'REPLACEMENT_RESULT':
             case 'LIVE_SNAPSHOT_RESPONSE':
+            case 'LOCATE_RESPONSE':
             case 'HEARTBEAT':
             case 'AUTH_HANDSHAKE':
                 break;

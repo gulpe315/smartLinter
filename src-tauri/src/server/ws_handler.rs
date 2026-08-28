@@ -178,12 +178,16 @@ async fn handle_websocket_connection(
                     Ok(BridgeMessage::LiveSnapshotResponse(response)) => {
                         session_mgr.complete_live_snapshot(&current_session_id, response).await;
                     }
+                    Ok(BridgeMessage::LocateResponse(response)) => {
+                        session_mgr.complete_locate(&current_session_id, response).await;
+                    }
                     Ok(BridgeMessage::AuthHandshake(_)) => {
                         // Handshake already processed
                     }
                     Ok(BridgeMessage::AuthResponse(_))
                     | Ok(BridgeMessage::ReplacementCommand(_))
-                    | Ok(BridgeMessage::LiveSnapshotRequest(_)) => {
+                    | Ok(BridgeMessage::LiveSnapshotRequest(_))
+                    | Ok(BridgeMessage::LocateRequest(_)) => {
                         // Unexpected incoming server-to-client message types
                     }
                     Err(e) => {

@@ -9,6 +9,7 @@
 import { WordBridgeClient, type BridgeClientConfig } from './bridge_client.ts';
 import { WordDocumentListener, type DocumentListenerConfig } from './document_listener.ts';
 import { queryLiveParagraphSnapshots } from './snapshot_provider.ts';
+import { locateWordParagraph } from './locate_provider.ts';
 
 export type VisibilityMode = 'Visible' | 'Hidden' | 'Uninitialized';
 
@@ -39,6 +40,7 @@ export class WordRuntimeManager {
     private isShuttingDown = false;
     private cachedDocumentTitle = 'ActiveWordDocument.docx';
     private snapshotRequestUnsubscribe: (() => void) | null = null;
+    private locateRequestUnsubscribe: (() => void) | null = null;
 
     private readonly visibilityChangeHandlers: Set<(mode: VisibilityMode) => void> = new Set();
 
@@ -202,6 +204,8 @@ export class WordRuntimeManager {
         if (this.bridgeClient) {
             this.snapshotRequestUnsubscribe?.();
             this.snapshotRequestUnsubscribe = null;
+            this.locateRequestUnsubscribe?.();
+            this.locateRequestUnsubscribe = null;
             this.bridgeClient.disconnect();
             this.bridgeClient = null;
         }
@@ -243,6 +247,16 @@ export class WordRuntimeManager {
                         })),
                     };
                 this.bridgeClient?.sendSnapshotResponse(response);
+            });
+        }
+
+        if (this.bridgeClient && !this.locateRequestUnsubscribe) {
+            this.locateRequestUnsubscribe = this.bridgeClient.onLocateRequest(async (request) => {
+                const wordRunner = (globalThis as any).Word?.run;
+                const response = wordRunner
+                    ? await locateWordParagraph(request, wordRunner)
+                    : { requestId: request.requestId, status: 'SELECTION_FAILED' as const, message: 'Office.js Word.run is unavailable' };
+                this.bridgeClient?.sendLocateResponse(response);
             });
         }
     }

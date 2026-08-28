@@ -10,7 +10,7 @@ use crate::ai::{
     CorrectionPreference, GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
     QaReport, QaStatus, QueueJobRequest, TmReference,
 };
-use crate::protocol::{EditorType, LiveSnapshotItem, LiveSnapshotStatus, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
+use crate::protocol::{EditorType, LiveSnapshotItem, LiveSnapshotStatus, LocateStatus, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
 use crate::server::{HealthResponse, ServerHandle, SessionError, SessionManager};
 use crate::tm::{parse_tm_content, GuidelineLoader, GuidelineSet, TmEntry};
 use tauri::{State, WebviewWindow};
@@ -340,7 +340,7 @@ pub async fn send_replacement_command(
     }
 }
 
-/// Selects a QA paragraph in an active InDesign document without editing it.
+/// Selects a QA paragraph in the active editor without editing it.
 #[tauri::command]
 pub async fn locate_paragraph_in_editor(
     paragraph_id: String,
@@ -353,10 +353,9 @@ pub async fn locate_paragraph_in_editor(
         .await
         .ok_or_else(|| "No active editor session".to_string())?;
 
-    if session.editor_type != EditorType::InDesign {
-        return Err("Locate paragraph is supported only for InDesign".to_string());
+    if session.editor_type == EditorType::Word {
+        return request_word_locate(server_handle.session_manager(), paragraph_id, base_hash).await;
     }
-
     tokio::task::spawn_blocking(move || indesign_com::locate_paragraph(paragraph_id, base_hash))
         .await
         .map_err(|error| format!("InDesign paragraph location task failed: {error}"))?
@@ -415,6 +414,38 @@ pub async fn get_live_paragraph_snapshots(
     tokio::task::spawn_blocking(move || indesign_com::get_live_paragraph_snapshots(paragraph_ids))
         .await
         .map_err(|error| format!("InDesign batch live paragraph snapshot task failed: {error}"))?
+}
+
+async fn request_word_locate(
+    session_manager: Arc<SessionManager>,
+    paragraph_id: String,
+    base_hash: Option<String>,
+) -> Result<crate::indesign_com::LocateParagraphResult, String> {
+    let command_id = format!("locate-{paragraph_id}");
+    match session_manager.request_locate(paragraph_id, base_hash).await {
+        Ok(response) => Ok(crate::indesign_com::LocateParagraphResult {
+            command_id,
+            status: locate_status_name(response.status).to_string(),
+            message: response.message.unwrap_or_default(),
+        }),
+        Err(SessionError::LocateTimeout | SessionError::LocateCancelled | SessionError::ChannelClosed) => Ok(crate::indesign_com::LocateParagraphResult {
+            command_id,
+            status: "BUSY".to_string(),
+            message: "Word did not complete the locate request in time".to_string(),
+        }),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn locate_status_name(status: LocateStatus) -> &'static str {
+    match status {
+        LocateStatus::Found => "FOUND",
+        LocateStatus::NotFound => "NOT_FOUND",
+        LocateStatus::Ambiguous => "AMBIGUOUS",
+        LocateStatus::SelectionFailed => "SELECTION_FAILED",
+        LocateStatus::Busy => "BUSY",
+        LocateStatus::Error => "ERROR",
+    }
 }
 
 /// Converts a Word bridge snapshot item to the legacy InDesign-compatible DTO.
@@ -728,7 +759,7 @@ fn strip_surrounding_quotes(text: &str) -> String {
 mod tests {
     use super::*;
     use crate::ai::LocalLlmProvider;
-    use crate::protocol::{BridgeMessage, LiveSnapshotResponse};
+    use crate::protocol::{BridgeMessage, LiveSnapshotResponse, LocateResponse, LocateStatus};
     use crate::server::NoopEventSink;
     use std::sync::Arc;
     use tokio::sync::mpsc;
@@ -800,6 +831,24 @@ mod tests {
         assert_eq!(batch.iter().map(|entry| entry.paragraph_id.as_str()).collect::<Vec<_>>(), ["word-para-one", "word-para-two"]);
         assert_eq!(batch[0].status, "FOUND");
         assert_eq!(batch[1].status, "BUSY");
+    }
+
+    #[tokio::test]
+    async fn word_locate_dispatches_correlated_request_and_returns_editor_status() {
+        let manager = Arc::new(SessionManager::new(Arc::new(NoopEventSink)));
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let session_id = manager.acquire_session(EditorType::Word, None, Some(sender)).await.unwrap();
+        let task = tokio::spawn(request_word_locate(manager.clone(), "word-para-one".to_string(), Some("base-hash".to_string())));
+        let BridgeMessage::LocateRequest(request) = receiver.recv().await.expect("locate request") else { panic!("expected locate request"); };
+        assert_eq!(request.paragraph_id, "word-para-one");
+        assert_eq!(request.base_hash.as_deref(), Some("base-hash"));
+        manager.complete_locate(&session_id, LocateResponse {
+            request_id: request.request_id,
+            status: LocateStatus::Found,
+            message: None,
+        }).await;
+        let result = task.await.unwrap().unwrap();
+        assert_eq!(result.status, "FOUND");
     }
 
     #[test]

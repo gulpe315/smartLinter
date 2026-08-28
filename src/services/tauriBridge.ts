@@ -119,7 +119,7 @@ export interface BridgeEventMap {
 
 export type BridgeEventName = keyof BridgeEventMap;
 export type BridgeEventHandler<K extends BridgeEventName> = (payload: BridgeEventMap[K]) => void;
-export type LocateParagraphStatus = 'FOUND' | 'NOT_FOUND' | 'AMBIGUOUS' | 'SELECTION_FAILED' | 'ERROR';
+export type LocateParagraphStatus = 'FOUND' | 'NOT_FOUND' | 'AMBIGUOUS' | 'SELECTION_FAILED' | 'BUSY' | 'ERROR';
 export interface LocateParagraphResult {
   status: LocateParagraphStatus;
   message?: string;

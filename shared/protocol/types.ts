@@ -97,6 +97,25 @@ export interface LiveSnapshotResponse {
     results: LiveSnapshotItem[];
 }
 
+/** Request to reveal a paragraph in the active editor. Offsets are reserved for future span selection. */
+export interface LocateRequest {
+    requestId: string;
+    paragraphId: string;
+    baseHash?: string;
+    startOffset?: number;
+    endOffset?: number;
+}
+
+/** Outcome of an editor locate request. */
+export type LocateStatus = 'FOUND' | 'NOT_FOUND' | 'AMBIGUOUS' | 'SELECTION_FAILED' | 'BUSY' | 'ERROR';
+
+/** Response to a correlated locate request. */
+export interface LocateResponse {
+    requestId: string;
+    status: LocateStatus;
+    message?: string;
+}
+
 /** Initial authentication handshake payload sent by an editor plugin on connect */
 export interface AuthHandshake {
     /** 32-byte secret pairing token */
@@ -140,6 +159,8 @@ export type BridgeMessage =
     | { type: 'REPLACEMENT_RESULT'; payload: ReplacementResult }
     | { type: 'LIVE_SNAPSHOT_REQUEST'; payload: LiveSnapshotRequest }
     | { type: 'LIVE_SNAPSHOT_RESPONSE'; payload: LiveSnapshotResponse }
+    | { type: 'LOCATE_REQUEST'; payload: LocateRequest }
+    | { type: 'LOCATE_RESPONSE'; payload: LocateResponse }
     | { type: 'HEARTBEAT'; payload: HeartbeatPayload };
 
 // --- Type Guard Functions ---
@@ -241,6 +262,30 @@ export function isLiveSnapshotResponse(val: unknown): val is LiveSnapshotRespons
         && obj.results.every(isLiveSnapshotItem);
 }
 
+export function isLocateStatus(val: unknown): val is LocateStatus {
+    return val === 'FOUND' || val === 'NOT_FOUND' || val === 'AMBIGUOUS' || val === 'SELECTION_FAILED' || val === 'BUSY' || val === 'ERROR';
+}
+
+export function isLocateRequest(val: unknown): val is LocateRequest {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    const validOffset = (value: unknown) => value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= 0);
+    return typeof obj.requestId === 'string'
+        && typeof obj.paragraphId === 'string'
+        && (obj.baseHash === undefined || typeof obj.baseHash === 'string')
+        && validOffset(obj.startOffset)
+        && validOffset(obj.endOffset)
+        && (obj.startOffset === undefined || obj.endOffset === undefined || (obj.startOffset as number) <= (obj.endOffset as number));
+}
+
+export function isLocateResponse(val: unknown): val is LocateResponse {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.requestId === 'string'
+        && isLocateStatus(obj.status)
+        && (obj.message === undefined || typeof obj.message === 'string');
+}
+
 export function isAuthHandshake(val: unknown): val is AuthHandshake {
     if (typeof val !== 'object' || val === null) return false;
     const obj = val as Record<string, unknown>;
@@ -293,6 +338,10 @@ export function isBridgeMessage(val: unknown): val is BridgeMessage {
             return isLiveSnapshotRequest(obj.payload);
         case 'LIVE_SNAPSHOT_RESPONSE':
             return isLiveSnapshotResponse(obj.payload);
+        case 'LOCATE_REQUEST':
+            return isLocateRequest(obj.payload);
+        case 'LOCATE_RESPONSE':
+            return isLocateResponse(obj.payload);
         case 'HEARTBEAT':
             return isHeartbeatPayload(obj.payload);
         default:

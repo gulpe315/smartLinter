@@ -234,6 +234,26 @@ fn test_live_snapshot_protocol_serialization_all_statuses() {
 }
 
 #[test]
+fn test_locate_protocol_serialization() {
+    let request = BridgeMessage::LocateRequest(LocateRequest {
+        request_id: "locate-1".to_string(),
+        paragraph_id: "word-para-abc".to_string(),
+        base_hash: Some("full-hash".to_string()),
+        start_offset: None,
+        end_offset: None,
+    });
+    let response = BridgeMessage::LocateResponse(LocateResponse {
+        request_id: "locate-1".to_string(),
+        status: LocateStatus::SelectionFailed,
+        message: Some("Word Range.select is unavailable".to_string()),
+    });
+    for message in [request, response] {
+        let json = serde_json::to_string(&message).unwrap();
+        assert_eq!(serde_json::from_str::<BridgeMessage>(&json).unwrap(), message);
+    }
+}
+
+#[test]
 fn test_cross_compatibility_with_shared_json_fixtures() {
     let fixture_path = get_fixture_path();
     assert!(
