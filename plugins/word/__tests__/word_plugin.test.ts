@@ -461,9 +461,9 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
     });
 
     // =========================================================================
-    // 4. Acceptance Criterion 4: onSelectionChanged & 1.5s Idle Debounce
+    // 4. Acceptance Criterion 4: Office Common API DocumentSelectionChanged & 1.5s Idle Debounce
     // =========================================================================
-    describe('Criterion (4): Word onSelectionChanged & 1.5s Idle Debounce', () => {
+    describe('Criterion (4): Office Common API DocumentSelectionChanged & 1.5s Idle Debounce', () => {
         let env: MockWordEnvironment;
         let mockClient: WordBridgeClient;
         let dispatchedPayloads: ParagraphPayload[] = [];
@@ -488,10 +488,12 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
                 bridgeClient: mockClient,
                 idleDebounceMs: 50,
                 wordRunner: env.createWordRunner(),
+                officeHost: env.office,
             });
 
             await listener.start();
             assert.equal(listener.isActive(), true);
+            assert.equal(dispatchedPayloads.length, 1, 'Initial capture is sent after handler registration');
 
             // Simulate rapid keystrokes/selection events (5 times in quick succession)
             env.triggerSelectionChanged();
@@ -501,22 +503,22 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
             env.triggerSelectionChanged();
 
             assert.equal(listener.isDebouncePending(), true);
-            assert.equal(dispatchedPayloads.length, 0, 'Should not dispatch while rapidly changing');
+            assert.equal(dispatchedPayloads.length, 1, 'Should not dispatch while rapidly changing');
 
             // Wait 20ms (< 50ms debounce)
             await new Promise((r) => setTimeout(r, 20));
-            assert.equal(dispatchedPayloads.length, 0, 'Still pending within debounce window');
+            assert.equal(dispatchedPayloads.length, 1, 'Still pending within debounce window');
 
             // Fire another event to reset the debounce timer
             env.triggerSelectionChanged();
 
             // Wait 30ms (< 50ms from reset)
             await new Promise((r) => setTimeout(r, 30));
-            assert.equal(dispatchedPayloads.length, 0, 'Timer was reset, still pending');
+            assert.equal(dispatchedPayloads.length, 1, 'Timer was reset, still pending');
 
             // Wait 60ms (> 50ms idle)
             await new Promise((r) => setTimeout(r, 60));
-            assert.equal(dispatchedPayloads.length, 1, 'Should dispatch once idle duration is satisfied');
+            assert.equal(dispatchedPayloads.length, 1, 'Identical paragraph is deduplicated after idle timeout');
 
             assert.equal(listener.isDebouncePending(), false);
             await listener.stop();
@@ -527,9 +529,11 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
                 bridgeClient: mockClient,
                 idleDebounceMs: 200,
                 wordRunner: env.createWordRunner(),
+                officeHost: env.office,
             });
 
             await listener.start();
+            assert.equal(dispatchedPayloads.length, 1);
 
             // Test cancelDebounce
             env.triggerSelectionChanged();
@@ -538,16 +542,52 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
             assert.equal(listener.isDebouncePending(), false);
 
             await new Promise((r) => setTimeout(r, 220));
-            assert.equal(dispatchedPayloads.length, 0, 'Cancelled timer must not fire');
+            assert.equal(dispatchedPayloads.length, 1, 'Cancelled timer must not fire');
 
             // Test flushDebounce
             env.triggerSelectionChanged();
             assert.equal(listener.isDebouncePending(), true);
             const flushed = await listener.flushDebounce();
             assert.ok(flushed);
-            assert.equal(dispatchedPayloads.length, 1, 'Flushed debounce must dispatch immediately');
+            assert.equal(dispatchedPayloads.length, 1, 'Identical flushed paragraph is deduplicated');
             assert.equal(listener.isDebouncePending(), false);
 
+            await listener.stop();
+        });
+
+        it('does not report readiness when Common API handler registration fails', async () => {
+            env.office.context.document.addHandlerAsync = (_eventType, _handler, callback) => {
+                callback?.({ status: env.office.AsyncResultStatus.Failed, error: { message: 'registration denied' } });
+            };
+            const listener = new WordDocumentListener({
+                bridgeClient: mockClient,
+                wordRunner: env.createWordRunner(),
+                officeHost: env.office,
+            });
+
+            assert.equal(await listener.start(), false);
+            assert.equal(listener.isActive(), false);
+        });
+
+        it('retries a failed payload and only records it for deduplication after success', async () => {
+            let attempts = 0;
+            mockClient.sendParagraphPayload = async (payload: ParagraphPayload) => {
+                dispatchedPayloads.push(payload);
+                return ++attempts > 1;
+            };
+            const listener = new WordDocumentListener({
+                bridgeClient: mockClient,
+                wordRunner: env.createWordRunner(),
+                officeHost: env.office,
+            });
+
+            await listener.start();
+            assert.equal(listener.getLastSentPayload(), null);
+            await new Promise((resolve) => setTimeout(resolve, 1050));
+            assert.equal(dispatchedPayloads.length, 2);
+            assert.ok(listener.getLastSentPayload());
+            await listener.captureAndDispatchActiveParagraph();
+            assert.equal(dispatchedPayloads.length, 2, 'successful retry updates deduplication state');
             await listener.stop();
         });
     });
@@ -582,6 +622,7 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
                 bridgeClient: mockClient,
                 idleDebounceMs: 10,
                 wordRunner: env.createWordRunner(),
+                officeHost: env.office,
             });
 
             await listener.start();
@@ -617,11 +658,14 @@ describe('Task 7: MS Word Plugin (Shared Runtime & Idle Monitor)', () => {
                 bridgeClient: mockClient,
                 idleDebounceMs: 10,
                 wordRunner: env.createWordRunner(),
+                officeHost: env.office,
             });
 
             await listener.start();
 
-            // First capture
+            // Initial capture occurs during start.
+            assert.equal(sentPayloads.length, 1);
+            // First explicit capture is deduplicated.
             await listener.captureAndDispatchActiveParagraph();
             assert.equal(sentPayloads.length, 1);
 

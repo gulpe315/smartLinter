@@ -2,7 +2,8 @@
  * Mock Office.js and Word API Environment for CI and Unit/Integration Testing
  *
  * Implements realistic mock objects for Office.addin (Shared Runtime, hide/show, visibilityMode),
- * Office.onReady, Word.run, Document onSelectionChanged events, and Selection paragraphs.
+ * Office.onReady, Word.run, and Office Common API DocumentSelectionChanged events.
+ * See https://learn.microsoft.com/en-us/javascript/api/office/office.documentselectionchangedeventargs
  */
 
 export interface MockDocumentState {
@@ -15,11 +16,6 @@ export class MockWordContext {
         properties: {
             title: string;
             load: (prop: string) => void;
-        };
-        onSelectionChanged: {
-            handlers: Array<(event?: any) => void>;
-            add: (fn: (event?: any) => void) => void;
-            remove: (fn: (event?: any) => void) => void;
         };
         getSelection: () => {
             paragraphs: {
@@ -35,22 +31,10 @@ export class MockWordContext {
 
     constructor(docState: MockDocumentState) {
         this.docState = docState;
-        const handlers: Array<(event?: any) => void> = [];
-
         this.document = {
             properties: {
                 title: docState.title,
                 load: (_prop: string) => {},
-            },
-            onSelectionChanged: {
-                handlers,
-                add: (fn) => {
-                    handlers.push(fn);
-                },
-                remove: (fn) => {
-                    const idx = handlers.indexOf(fn);
-                    if (idx >= 0) handlers.splice(idx, 1);
-                },
             },
             getSelection: () => {
                 return {
@@ -78,6 +62,31 @@ export class MockWordContext {
 export class MockOfficeHost {
     public HostType = { Word: 'Word', Excel: 'Excel', PowerPoint: 'PowerPoint' };
     public StartupBehavior = { load: 'Load', none: 'None' };
+    /** Office Common API 1.1 DocumentSelectionChanged contract used by production. */
+    public EventType = { DocumentSelectionChanged: 'documentSelectionChanged' };
+    public AsyncResultStatus = { Succeeded: 'succeeded', Failed: 'failed' };
+    public context = {
+        document: {
+            handlers: [] as Array<(event?: any) => void>,
+            addHandlerAsync: (eventType: string, handler: (event?: any) => void, callback?: (result: any) => void) => {
+                if (eventType !== this.EventType.DocumentSelectionChanged) {
+                    callback?.({ status: this.AsyncResultStatus.Failed, error: { message: 'Unsupported event type' } });
+                    return;
+                }
+                this.context.document.handlers.push(handler);
+                callback?.({ status: this.AsyncResultStatus.Succeeded });
+            },
+            removeHandlerAsync: (eventType: string, options: { handler: (event?: any) => void }, callback?: (result: any) => void) => {
+                const index = this.context.document.handlers.indexOf(options.handler);
+                if (eventType === this.EventType.DocumentSelectionChanged && index >= 0) {
+                    this.context.document.handlers.splice(index, 1);
+                    callback?.({ status: this.AsyncResultStatus.Succeeded });
+                    return;
+                }
+                callback?.({ status: this.AsyncResultStatus.Failed, error: { message: 'Handler not found' } });
+            },
+        },
+    };
 
     public addin = {
         startupBehavior: 'None',
@@ -143,7 +152,7 @@ export class MockWordEnvironment {
     }
 
     public triggerSelectionChanged(): void {
-        for (const handler of this.activeContext.document.onSelectionChanged.handlers) {
+        for (const handler of this.office.context.document.handlers) {
             handler({ source: 'user_typing' });
         }
     }

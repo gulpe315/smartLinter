@@ -1,7 +1,7 @@
 /**
  * SmartLinter MS Word Document Listener & Idle Debounce Monitor
  *
- * Subscribes to Word `context.document.onSelectionChanged` events, applies a 1.5-second
+ * Subscribes to the Office Common API `DocumentSelectionChanged` event, applies a 1.5-second
  * idle debounce timer, extracts cursor-active paragraph text, computes deterministic SHA-256
  * hashes via `computeParagraphHash`, and emits `ParagraphPayload` telemetry.
  */
@@ -21,6 +21,10 @@ export interface DocumentListenerConfig {
     targetLanguage?: string;
     /** Custom Word.run runner for dependency injection / testing */
     wordRunner?: (callback: (context: any) => Promise<any>) => Promise<any>;
+    /** Office Common API host for event registration (injected by tests/runtime). */
+    officeHost?: any;
+    /** Receives the latest title read during active paragraph extraction. */
+    onDocumentTitleUpdated?: (title: string) => void;
 }
 
 export type ParagraphCapturedHandler = (payload: ParagraphPayload) => void | Promise<void>;
@@ -31,6 +35,8 @@ export class WordDocumentListener {
     private readonly documentSource: string;
     private readonly targetLanguage?: string;
     private readonly wordRunner: (callback: (context: any) => Promise<any>) => Promise<any>;
+    private readonly officeHost: any;
+    private readonly onDocumentTitleUpdated?: (title: string) => void;
 
     private debounceTimer: ReturnType<typeof setTimeout> | null = null;
     private isRunning = false;
@@ -38,6 +44,9 @@ export class WordDocumentListener {
     private lastSentHash: string | null = null;
     private lastSentPayload: ParagraphPayload | null = null;
     private eventRegistrationHandler: any = null;
+    private retryTimer: ReturnType<typeof setTimeout> | null = null;
+    private retryAttempt = 0;
+    private pendingRetryPayload: ParagraphPayload | null = null;
 
     private readonly capturedHandlers: Set<ParagraphCapturedHandler> = new Set();
 
@@ -46,6 +55,8 @@ export class WordDocumentListener {
         this.idleDebounceMs = config.idleDebounceMs ?? 1500;
         this.documentSource = config.documentSource || 'ActiveWordDocument.docx';
         this.targetLanguage = config.targetLanguage;
+        this.officeHost = config.officeHost || (typeof (globalThis as any).Office !== 'undefined' ? (globalThis as any).Office : null);
+        this.onDocumentTitleUpdated = config.onDocumentTitleUpdated;
         this.wordRunner =
             config.wordRunner ||
             ((callback) => {
@@ -78,58 +89,75 @@ export class WordDocumentListener {
             return true;
         }
 
-        try {
-            await this.wordRunner(async (context: any) => {
-                const doc = context.document;
-                if (doc && doc.onSelectionChanged) {
-                    this.eventRegistrationHandler = () => {
-                        this.handleSelectionChanged();
-                    };
-                    doc.onSelectionChanged.add(this.eventRegistrationHandler);
-                    await context.sync();
-                }
-            });
-
-            this.isRunning = true;
-            return true;
-        } catch (err) {
-            // In standalone test or non-Office environment, running flag can still be enabled
-            this.isRunning = true;
+        const office = this.officeHost;
+        if (!office?.context?.document?.addHandlerAsync || !office?.EventType?.DocumentSelectionChanged) {
+            console.warn('[WordDocumentListener] Office Common API is unavailable; listener was not registered.');
             return false;
         }
+
+        return new Promise<boolean>((resolve) => {
+            this.eventRegistrationHandler = () => this.triggerDebouncedCapture();
+            office.context.document.addHandlerAsync(
+                office.EventType.DocumentSelectionChanged,
+                this.eventRegistrationHandler,
+                async (result: any) => {
+                    const succeeded = result?.status === office.AsyncResultStatus?.Succeeded || result?.status === 'succeeded';
+                    if (!succeeded) {
+                        console.error('[WordDocumentListener] Failed to register DocumentSelectionChanged:', result?.error);
+                        this.eventRegistrationHandler = null;
+                        this.isRunning = false;
+                        resolve(false);
+                        return;
+                    }
+                    this.isRunning = true;
+                    await this.captureAndDispatchActiveParagraph();
+                    resolve(true);
+                }
+            );
+        });
     }
 
     /** Stops listening and clears any pending debounce timers */
     public async stop(): Promise<void> {
         this.isRunning = false;
         this.cancelDebounce();
+        this.cancelRetry();
 
         if (this.eventRegistrationHandler) {
-            try {
-                await this.wordRunner(async (context: any) => {
-                    const doc = context.document;
-                    if (doc && doc.onSelectionChanged && doc.onSelectionChanged.remove) {
-                        doc.onSelectionChanged.remove(this.eventRegistrationHandler);
-                        await context.sync();
-                    }
+            const office = this.officeHost;
+            if (office?.context?.document?.removeHandlerAsync && office?.EventType?.DocumentSelectionChanged) {
+                await new Promise<void>((resolve) => {
+                    office.context.document.removeHandlerAsync(
+                        office.EventType.DocumentSelectionChanged,
+                        { handler: this.eventRegistrationHandler },
+                        (result: any) => {
+                            const succeeded = result?.status === office.AsyncResultStatus?.Succeeded || result?.status === 'succeeded';
+                            if (!succeeded) console.error('[WordDocumentListener] Failed to remove DocumentSelectionChanged:', result?.error);
+                            resolve();
+                        }
+                    );
                 });
-            } catch {
-                // Ignore removal errors on teardown
             }
             this.eventRegistrationHandler = null;
         }
     }
 
     /**
-     * Called whenever `Word.document.onSelectionChanged` fires.
+     * Called whenever the Office Common API selection event fires.
      * Resets the 1.5s idle debounce timer.
      */
     public handleSelectionChanged(): void {
+        this.triggerDebouncedCapture();
+    }
+
+    /** Schedules a capture after the idle period, replacing stale work and retries. */
+    public triggerDebouncedCapture(): void {
         if (!this.isRunning) {
             return;
         }
 
         this.cancelDebounce();
+        this.cancelRetry();
 
         this.debounceTimer = setTimeout(async () => {
             this.debounceTimer = null;
@@ -143,6 +171,27 @@ export class WordDocumentListener {
             clearTimeout(this.debounceTimer);
             this.debounceTimer = null;
         }
+    }
+
+    private cancelRetry(): void {
+        if (this.retryTimer) clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+        this.retryAttempt = 0;
+        this.pendingRetryPayload = null;
+    }
+
+    private scheduleRetry(payload: ParagraphPayload): void {
+        this.pendingRetryPayload = payload;
+        if (this.retryAttempt >= 3 || !this.isRunning) {
+            return;
+        }
+        const delayMs = 1000 * (2 ** this.retryAttempt++);
+        this.retryTimer = setTimeout(async () => {
+            this.retryTimer = null;
+            const retryPayload = this.pendingRetryPayload;
+            if (!retryPayload || !this.isRunning) return;
+            await this.dispatchPayload(retryPayload);
+        }, delayMs);
     }
 
     /** Immediately flushes the pending debounce timer and captures paragraph */
@@ -179,25 +228,40 @@ export class WordDocumentListener {
                 editorType: 'Word',
             };
 
-            this.lastSentParagraphId = paragraphId;
-            this.lastSentHash = hash;
-            this.lastSentPayload = payload;
-
-            // Send to Bridge Server
-            await this.bridgeClient.sendParagraphPayload(payload);
-
-            // Notify local subscribers
-            for (const handler of this.capturedHandlers) {
-                try {
-                    await handler(payload);
-                } catch {
-                    // Handler error isolated
-                }
-            }
+            await this.dispatchPayload(payload);
 
             return payload;
         } catch (err) {
+            console.error('[WordDocumentListener] Capture/dispatch error:', err);
             return null;
+        }
+    }
+
+    private async dispatchPayload(payload: ParagraphPayload): Promise<boolean> {
+        try {
+            const sendSuccess = await this.bridgeClient.sendParagraphPayload(payload);
+            if (!sendSuccess) {
+                console.warn('[WordDocumentListener] Telemetry dispatch failed; dedup cache was not updated.');
+                this.scheduleRetry(payload);
+                return false;
+            }
+            this.lastSentParagraphId = payload.paragraphId;
+            this.lastSentHash = payload.hash;
+            this.lastSentPayload = payload;
+            this.retryAttempt = 0;
+            this.pendingRetryPayload = null;
+            for (const handler of this.capturedHandlers) {
+                try {
+                    await handler(payload);
+                } catch (err) {
+                    console.error('[WordDocumentListener] Paragraph captured handler failed:', err);
+                }
+            }
+            return true;
+        } catch (err) {
+            console.error('[WordDocumentListener] Telemetry dispatch error:', err);
+            this.scheduleRetry(payload);
+            return false;
         }
     }
 
@@ -231,6 +295,7 @@ export class WordDocumentListener {
 
             if (context.document.properties && context.document.properties.title) {
                 sourceName = context.document.properties.title;
+                this.onDocumentTitleUpdated?.(sourceName);
             }
 
             // Derive stable paragraph identifier

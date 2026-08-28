@@ -37,6 +37,7 @@ export class WordRuntimeManager {
     private visibility: VisibilityMode = 'Uninitialized';
     private isInitialized = false;
     private isShuttingDown = false;
+    private cachedDocumentTitle = 'ActiveWordDocument.docx';
     private snapshotRequestUnsubscribe: (() => void) | null = null;
 
     private readonly visibilityChangeHandlers: Set<(mode: VisibilityMode) => void> = new Set();
@@ -137,7 +138,8 @@ export class WordRuntimeManager {
                         this.bridgeClient.connect().catch(() => {});
                     }
                     if (this.documentListener) {
-                        await this.documentListener.start();
+                        const listenerOk = await this.documentListener.start();
+                        if (!listenerOk) console.warn('[WordRuntimeManager] DocumentListener failed to start properly.');
                     }
 
                     this.isInitialized = true;
@@ -210,12 +212,19 @@ export class WordRuntimeManager {
 
     private setupComponents(): void {
         if (!this.bridgeClient) {
-            this.bridgeClient = new WordBridgeClient(this.bridgeConfig);
+            this.bridgeClient = new WordBridgeClient({
+                getDocumentName: () => this.cachedDocumentTitle,
+                ...this.bridgeConfig,
+            });
         }
 
         if (!this.documentListener && this.bridgeClient) {
             this.documentListener = new WordDocumentListener({
                 bridgeClient: this.bridgeClient,
+                officeHost: this.officeHost,
+                onDocumentTitleUpdated: (title) => {
+                    this.cachedDocumentTitle = title;
+                },
                 ...this.listenerConfig,
             });
         }
