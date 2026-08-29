@@ -1,13 +1,93 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션 후속, 트랙 C T3b
-(InDesign 전체 문서 스캔) 설계 자문·재조율·T3b-1(왕복 배선)·T3b-2
-(옵트인 UI)까지 전부 완료 — 트랙 C의 T3(문서 전체 스캔) 전체가 이번에
-Word/InDesign 양쪽 다 끝났다. 이 PC엔 Word/InDesign이 설치돼 있지
-않아 전부 목(mock) 기반으로 구현·검증했다(이 프로젝트의 오랜 관례).
-아래 이 절을 먼저 읽을 것.**
+**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션 후속, 트랙 C T5
+(XLIFF import/merge) 설계 자문·재조율·T5-1(파싱/매칭/병합)·T5-2
+(가져오기 UI+충돌 모달)까지 전부 완료. 사용자가 "차례대로 진행해줘"로
+지시해 T3b 완료 직후 바로 이어서 진행함(중간에 Codex 샌드박스
+인코딩 문제·5분 간격 중간보고 습관화 등 사용자 재지적 2건 반영).
+다음은 T4(인라인 태그 보존)로 진행 중이거나 이 문서 상단의 더 최신
+절을 확인할 것. 아래 이 절을 먼저 읽을 것.**
 
-## 이번 세션 완료(10차 후속) — 트랙 C T3b: InDesign 전체 문서 스캔 (T3 전체 완료)
+## 이번 세션 완료(11차 후속) — 트랙 C T5: XLIFF import/merge (T5 전체 완료)
+
+**커밋 7개(`dbe771e` 설계 자문+재조율, `1c5bd34` T5-1 지시서,
+`29624b4` T5-1 구현, `071ffd6` T5-2 지시서, `0c56a66` T5-2 구현 —
+그 사이 `572abd9` T3b 완료 핸드오프도 포함, 아직 원격 push 안 함).**
+사용자가 "차례대로 진행해줘"로 지시해 T3b 완료 직후 자동으로 T5
+(Word/InDesign 설치 여부와 무관한 순수 대시보드 로직이라 우선순위가
+높았음, T4보다 먼저 착수)를 이어서 진행했다.
+
+- **설계**: `DESIGN_REQUEST_TRANSLATION_MODE_T5.md`로 자문 — 매칭
+  전략(`segmentId` 완전 일치만), state 역매핑(`translated`/`signed-off`
+  도 `needs-validation` 강등 없이 `draft`로 신뢰 수용), fail-closed
+  부분 성공 원칙은 즉시 수렴. 3개 쟁점(tool-id 헤더 필수 여부, import
+  직전 재스캔 필수 여부, 사용자 편집본+외부 빈 target 처리)은 갈려
+  `RECONCILE_TRANSLATION_MODE_T5.md`로 재조율 →
+  - **tool-id**: Codex가 최초 "필수"로 제안했으나, agy가 실제
+    Trados/memoQ/Phrase의 헤더 재작성 관행을 구체적으로 조사해
+    "필수화하면 T5가 정작 필요한 진짜 CAT 왕복 시나리오를 거부하는
+    자기모순"이라고 반박 → Codex가 승복, 정보성 표시로 완화(실제
+    보안 경계는 `segmentId`+`<source>` 이중 검증이 담당).
+  - **재스캔 필수화**: agy 원안엔 없던 요구사항을 Codex가 제기
+    (저장된 세션의 `sourceHash`는 과거 스냅샷일 뿐 라이브 문서와의
+    일치를 보장 못 함) → agy가 전면 수용.
+  - **빈 target 처리**: agy는 "자동으로 로컬값 유지"를 제안했으나
+    Codex가 "외부 검토자의 의도적 삭제/재작업 요청을 사용자가 못
+    보게 될 위험"을 지적 → agy가 전면 수용해 충돌로 분류, 단
+    "target 요소 자체 없음"과 "명시적 빈 target"을 구분해야 한다는
+    정밀화까지 반영. 최종 스펙은 `RECONCILED_TRANSLATION_MODE_T5.md`.
+- **T5-1(파싱/매칭/병합 핵심 로직) — 1차 구현 결함 없음**: 신규
+  `src/utils/xliffImport.ts`(`parseXliffImport`/`analyzeXliffImport`/
+  `applyXliffImport`, 순수 함수)가 스펙의 7단계 판정 순서를 정확히
+  구현(중복ID→미발견→source불일치→target없음→동일텍스트/미편집
+  자동반영→편집됨 충돌). `importXliff` 스토어 액션이 에디터 연결 시
+  `scanFullDocument()` 필수 선행, 실패 시 세그먼트 완전 무변경.
+  충돌 해결은 콜백으로 주입(UI 없이도 핵심 로직 테스트 가능하도록).
+  Claude diff 검토(+ `applyXliffImport`의 `incoming` 필드가 공개
+  타입엔 없는데 스토어가 `analysis.conflicts`에서 조회해 내부적으로
+  채워 넘기는 방식임을 확인, 버그 아님) + agy 병렬 리뷰(결함 없음,
+  통계 정합성 사소한 개선 제안 1건만) + `npm test`(209/209)·
+  `npx vitest run`(446/446)·`npm run build` 독립 재검증.
+- **T5-2(가져오기 UI+충돌 모달) — 구현 중 Codex 자신의 PowerShell
+  콘솔 인코딩 문제로 `Header.tsx` patch가 1차 실패**(한글이 깨져서
+  읽혀 `apply_patch` 컨텍스트 매칭 실패 — 실제 디스크 파일은 UTF-8로
+  멀쩡했음, Codex가 스스로 재시도해 해결). 완료 후: 신규
+  `XliffConflictModal.tsx`(전체화면 `fixed inset-0` 오버레이로 배경
+  상호작용 차단 — Claude가 이걸로 "모달 열린 채 파일 재선택" 레이스
+  컨디션이 실제로 막혀 있음을 직접 확인), `Header.tsx`에 숨은
+  파일 input+가져오기 버튼+결과/오류 배너(우선순위:
+  `importError`>`scanError`>`lastImportSummary`>기존 export 경고).
+  agy 병렬 리뷰(결함 없음, 레이스 컨디션·배너 우선순위·일괄 선택
+  갱신·파일 재선택 전부 안전 확인) + `npm test`(209/209)·
+  `npx vitest run`(456/456, 1회 실패는 세션 내내 반복된 플레이크 —
+  격리 재실행 즉시 통과 확인) 독립 재검증.
+- **이번 세션에 사용자가 명시적으로 재확인한 협업 원칙 2건(메모리
+  반영함)**: ① Codex가 자기 샌드박스 제약(vitest/cargo 60~120초
+  타임아웃)으로 못 끝냈을 때, Claude가 네이티브로 대신 검증하는 것
+  자체는 괜찮지만 **그게 끝나길 기다렸다가 순차로 agy 리뷰를
+  시작하지 말 것 — agy 리뷰는 Claude의 독립 검증과 병렬로 바로
+  시작할 것**(T3b-2부터 적용, T5 전체에서 계속 유지). ②
+  **설계/구현 지시를 Codex나 agy에게 보낸 뒤엔 완료 알림만 기다리지
+  말고 약 5분 간격으로 먼저 중간보고할 것** — `Monitor` 도구로
+  로그 파일을 폴링하는 방식으로 구현, T5-2부터 적용.
+  `consult-agy-codex-when-stuck`/`periodic-progress-updates`
+  메모리에 반영함.
+- **T5로 트랙 C의 T0~T3(T3a+T3b)~T5가 전부 끝났다.** 아직 인라인
+  태그 보존(T4)과 새 문서 생성(T6)이 남음 — T4는 "번역 세션 데이터
+  모델이 이미 정해진 상태에서의 확장"이라 T5보다 뒤에 하는 게
+  순서상 자연스럽다는 게 이전 세션 판단이었다(사용자가 이미
+  "차례대로" 순서를 T5→T4→T6→CAT정합성Phase0→Kiwi로 확정함).
+- **다음 세션이 참고할 것**: T4(인라인 태그 보존 XLIFF) 착수 —
+  로드맵 표현 "raw tagged IR과 코드 정합성, 실제 TMX/Word/InDesign
+  fixture round-trip 검증, 태그 정합 불명 시 plain-text 모드로만
+  제한"을 구체적으로 어떻게 다룰지 설계 자문부터 시작할 것. T4는
+  이 PC에 Word/InDesign이 없어도 fixture 기반으로 대부분 진행
+  가능하나, "실제 fixture round-trip 검증"의 마지막 확인은 실제
+  앱이 필요할 수 있다는 점을 설계 단계에서 미리 인지시킬 것.
+
+---
+
+## 이전 세션 완료(10차 후속) — 트랙 C T3b: InDesign 전체 문서 스캔 (T3 전체 완료)
 
 **커밋 6개(`940acc3` T3b 설계 자문+재조율, `50d129d` T3b-1 지시서,
 `7f44da6` T3b-1 구현, `36f7557` T3b-2 지시서, `2d1fcbc` T3b-2 구현
