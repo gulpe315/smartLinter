@@ -54,6 +54,40 @@ export interface TmSentenceMatch {
   candidates: TmMatchCandidate[];
 }
 
+export type TmAutoApplyOrigin = 'imported' | 'user-overlay' | 'mixed';
+
+export interface TmAutoApplyEligible {
+  kind: 'eligible';
+  segmentIndex: number;
+  sourceText: string;
+  /** JavaScript UTF-16 offset, inclusive. */
+  startOffset: number;
+  /** JavaScript UTF-16 offset, exclusive. */
+  endOffset: number;
+  candidate: TmMatchCandidate;
+  origin: TmAutoApplyOrigin;
+}
+
+export interface TmAutoApplyConflict {
+  kind: 'conflict';
+  segmentIndex: number;
+  sourceText: string;
+  /** JavaScript UTF-16 offset, inclusive. */
+  startOffset: number;
+  /** JavaScript UTF-16 offset, exclusive. */
+  endOffset: number;
+  exactTargetCount: number;
+}
+
+export type TmAutoApplyObservation = TmAutoApplyEligible | TmAutoApplyConflict;
+
+export interface TmAutoApplyPlan {
+  paragraphId: string;
+  baseHash: string;
+  paragraphText: string;
+  observations: TmAutoApplyObservation[];
+}
+
 /**
  * Derives visual grade from normalized score (0.0 to 1.0 or 0 to 100).
  */

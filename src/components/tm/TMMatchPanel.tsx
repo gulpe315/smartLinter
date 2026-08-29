@@ -6,7 +6,7 @@
  * and seamless fallback handling when no TM is loaded.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Database,
   Search,
@@ -26,6 +26,8 @@ import { useConfigStore } from '../../stores/configStore.ts';
 import { useTmStore } from '../../stores/tmStore.ts';
 import { TMMatchCard } from './TMMatchCard.tsx';
 import { type TmMatchCandidate } from '../../types/tm.ts';
+import { getGlobalTmMatcher } from '../../utils/tmMatcher.ts';
+import { deriveTmAutoApplyPlan } from '../../utils/tmAutoApplyObservation.ts';
 
 export interface TMMatchPanelProps {
   className?: string;
@@ -33,7 +35,7 @@ export interface TMMatchPanelProps {
 
 export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) => {
   const { tmLoaded, tmEntriesCount, tmFileName, activeParagraph } = useBridgeStore();
-  const { tmEntries, openSettingsModal } = useConfigStore();
+  const { tmEntries, userTmOverlayEntries, openSettingsModal } = useConfigStore();
   const {
     candidates,
     sentenceMatches,
@@ -63,6 +65,15 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
     (total, group) => total + group.candidates.length,
     0,
   );
+  const observationParagraph = currentParagraph || activeParagraph;
+  const autoApplyPlan = useMemo(() => deriveTmAutoApplyPlan(
+    observationParagraph,
+    sentenceMatches,
+    getGlobalTmMatcher(),
+    userTmOverlayEntries,
+  ), [observationParagraph, sentenceMatches, userTmOverlayEntries]);
+  const eligibleCount = autoApplyPlan?.observations.filter((item) => item.kind === 'eligible').length || 0;
+  const conflictCount = autoApplyPlan?.observations.filter((item) => item.kind === 'conflict').length || 0;
 
   useEffect(() => {
     if (searchMode !== 'keyword') return;
@@ -333,10 +344,20 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             data-testid="tm-match-candidates-list"
             className="space-y-3"
           >
-            {sentenceMatches.length > 0 ? sentenceMatches.map((group) => (
+            {sentenceMatches.length > 0 ? sentenceMatches.map((group) => {
+              const observation = autoApplyPlan?.observations.find(
+                (item) => item.segmentIndex === group.segmentIndex,
+              );
+              return (
               <section key={`${currentParagraph?.paragraphId || activeParagraph?.paragraphId || 'no-paragraph'}-${group.segmentIndex}`} className="space-y-2">
                 <div data-testid={`tm-sentence-group-${group.segmentIndex}`} className="px-2 py-1 border-l-2 border-cyan-700/70 text-[10px] text-slate-400 bg-slate-900/50 rounded-r">
                   <span className="font-semibold text-cyan-300">문장 {group.segmentIndex + 1}</span><span className="ml-1.5 font-mono">{group.sourceText}</span>
+                  {observation?.kind === 'eligible' && (
+                    <span data-testid={`tm-auto-apply-eligible-${group.segmentIndex}`} className="ml-2 inline-flex rounded border border-emerald-700/80 bg-emerald-950/80 px-1.5 py-0.5 font-semibold text-emerald-300">exact-유일</span>
+                  )}
+                  {observation?.kind === 'conflict' && (
+                    <span data-testid={`tm-auto-apply-conflict-${group.segmentIndex}`} className="ml-2 inline-flex rounded border border-amber-700/80 bg-amber-950/80 px-1.5 py-0.5 font-semibold text-amber-300">exact 충돌</span>
+                  )}
                 </div>
                 <div className="space-y-3">{group.candidates.map((cand) => (
                   <TMMatchCard
@@ -347,7 +368,8 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
                   />
                 ))}</div>
               </section>
-            )) : candidates.map((cand) => (
+              );
+            }) : candidates.map((cand) => (
               <TMMatchCard
                 key={`${currentParagraph?.paragraphId || activeParagraph?.paragraphId || 'no-paragraph'}-${cand.tuId || `${cand.source}-${cand.target}-${cand.scorePercent}`}`}
                 candidate={cand}
@@ -366,10 +388,16 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             <Database className="w-3 h-3 text-cyan-400 flex-none" />
             <span className="truncate text-slate-300">{tmFileName || '인메모리 TM 로드됨'}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-slate-500">
+          <div className="flex items-center gap-3">
+            <span data-testid="tm-candidate-count" className="text-[10px] font-mono text-slate-500">
               후보: <strong className="text-cyan-400">{candidateCount}</strong>건
             </span>
+            <div data-testid="tm-auto-apply-observation-summary" className="flex flex-col items-end gap-0.5">
+              <span className="text-[10px] font-mono text-slate-400">
+                현재 문단: exact-유일 <strong className="text-emerald-400">{eligibleCount}</strong>건 · 충돌 <strong className="text-amber-400">{conflictCount}</strong>건
+              </span>
+              <span className="text-[10px] text-slate-500">관찰 전용 · 문서는 변경되지 않습니다</span>
+            </div>
           </div>
         </div>
       )}

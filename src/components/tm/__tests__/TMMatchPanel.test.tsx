@@ -10,6 +10,7 @@ import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { useConfigStore } from '../../../stores/configStore.ts';
 import { useTmStore } from '../../../stores/tmStore.ts';
 import { MockBridgeService } from '../../../services/tauriBridge.ts';
+import { getGlobalTmMatcher } from '../../../utils/tmMatcher.ts';
 import { type ParagraphPayload } from '../../../../shared/protocol/types.ts';
 
 describe('TMMatchPanel Component', () => {
@@ -110,6 +111,38 @@ describe('TMMatchPanel Component', () => {
 
     expect(screen.getByTestId('tm-sentence-group-0')).toHaveTextContent('문장 1');
     expect(screen.getByTestId('tm-sentence-group-1')).toHaveTextContent('문장 2');
+  });
+
+  it('summarizes exact observations and badges only their matching sentence groups', () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'observation-panel', text: 'First source sentence. Second source sentence.', hash: 'observation-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const entries = [
+      { id: 'first', source: 'First source sentence.', target: 'First target.' },
+      { id: 'second-a', source: 'Second source sentence.', target: 'Second target A.' },
+      { id: 'second-b', source: 'Second source sentence.', target: 'Second target B.' },
+    ];
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: entries.length, activeParagraph: paragraph });
+    useConfigStore.setState({ tmEntries: entries });
+    getGlobalTmMatcher().loadEntries(entries);
+    useTmStore.setState({
+      currentParagraph: paragraph,
+      candidates: [],
+      sentenceMatches: [
+        { segmentIndex: 0, sourceText: 'First source sentence.', startOffset: 0, endOffset: 22, candidates: [{ source: 'First source sentence.', target: 'First target.', score: 1, scorePercent: 100, grade: 'EXACT' }] },
+        { segmentIndex: 1, sourceText: 'Second source sentence.', startOffset: 23, endOffset: 46, candidates: [{ source: 'Second source sentence.', target: 'Second target A.', score: 1, scorePercent: 100, grade: 'EXACT' }] },
+      ],
+    });
+
+    render(<TMMatchPanel />);
+
+    expect(screen.getByTestId('tm-candidate-count')).toHaveTextContent('후보: 2건');
+    expect(screen.getByTestId('tm-auto-apply-observation-summary')).toHaveTextContent('exact-유일 1건 · 충돌 1건');
+    expect(screen.getByTestId('tm-auto-apply-eligible-0')).toBeInTheDocument();
+    expect(screen.getByTestId('tm-auto-apply-conflict-1')).toBeInTheDocument();
+    expect(screen.queryByTestId('tm-auto-apply-conflict-0')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tm-auto-apply-eligible-1')).not.toBeInTheDocument();
   });
 
   it('shows the no-matches state when every automatic sentence group has zero candidates', () => {

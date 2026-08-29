@@ -84,6 +84,23 @@ describe('SmartLinter TS Fuzzy Matcher Engine', () => {
       ];
     });
 
+    it('returns all distinct exact targets beyond the normal top-N limit', () => {
+      const source = 'An exact source with duplicate translation units.';
+      const entries: TmEntry[] = Array.from({ length: 7 }, (_, index) => ({
+        id: `exact-${index}`,
+        source,
+        target: index < 5 ? 'Target A' : 'Target B',
+      }));
+      const matcher = new TsFuzzyMatcher(entries);
+
+      expect(matcher.search(source, 5)).toHaveLength(5);
+      expect(matcher.searchExactAll(source)).toMatchObject([
+        { target: 'Target A', score: 1, grade: 'EXACT' },
+        { target: 'Target B', score: 1, grade: 'EXACT' },
+      ]);
+      expect(matcher.searchExactAll(source)).toHaveLength(2);
+    });
+
     it('should correctly index and return 100% exact match', () => {
       const matcher = new TsFuzzyMatcher(sampleEntries);
       expect(matcher.count).toBe(5);

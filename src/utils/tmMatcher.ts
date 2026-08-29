@@ -213,6 +213,45 @@ export class TsFuzzyMatcher {
   }
 
   /**
+   * Returns every distinct exact source/target pair without applying the normal
+   * search top-N limit. This is intentionally separate from search() so its
+   * existing fuzzy-search behavior remains unchanged.
+   */
+  public searchExactAll(query: string): TmMatchCandidate[] {
+    if (!query || this.entries.length === 0) return [];
+
+    const normQuery = normalizeText(query);
+    if (!normQuery) return [];
+
+    const exactMatches = this.exactIndex.get(normQuery);
+    if (!exactMatches || exactMatches.length === 0) return [];
+
+    const seen = new Set<string>();
+    const results: TmMatchCandidate[] = [];
+
+    for (const idx of exactMatches) {
+      const entry = this.entries[idx];
+      const key = `${entry.source}:::${entry.target}`;
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+      results.push({
+        tuId: entry.id,
+        source: entry.source,
+        target: entry.target,
+        score: 1.0,
+        scorePercent: 100.0,
+        grade: 'EXACT',
+        sourceLang: entry.sourceLang,
+        targetLang: entry.targetLang,
+        status: 'idle',
+      });
+    }
+
+    return results;
+  }
+
+  /**
    * Performs high-speed fuzzy search for given query string.
    */
   public search(
