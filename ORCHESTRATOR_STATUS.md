@@ -1,11 +1,64 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션 후속 — 트랙 C
-T4(인라인 태그 보존) 전체 완료(T4-1/T4-2/T4-3 전부). 다음 세션은
-T6(새 번역 문서 생성) 착수부터 시작할 것.** 로컬이 원격보다 20개
-커밋 앞섬(아직 push 안 함, `smartlinter-defer-remote-push` 메모리
-참고 — 전체 작업 마무리 선언 전엔 push하지 말 것). 아래 이 절을
-먼저 읽을 것.
+**⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션 후속 —
+트랙 C T4 전체 완료 + T6(새 번역 문서 생성) 설계 라운드 완료
+(`RECONCILED_TRANSLATION_MODE_T6.md` 확정). 다음은 T6a(Word
+파이프라인) 구현 지시서를 Codex에게 전달하는 것부터 시작.** 로컬이
+원격보다 24개 커밋 앞섬(아직 push 안 함,
+`smartlinter-defer-remote-push` 메모리 참고 — 전체 작업 마무리
+선언 전엔 push하지 말 것). 아래 이 절을 먼저 읽을 것.
+
+## 이번 세션 완료 — T6(새 번역 문서 생성) 설계 라운드 전체
+
+**커밋 4개(`9a6a5e2` 설계 자문 요청, `d2282de` 재조율, `e878af2`
+확정 스펙 — 아직 원격 push 안 함).** T4 완료 직후 사용자가 이미
+확정한 순서(T5→T4→T6→...)에 따라 자동으로 T6 착수. T6는 이전 라운드
+전부와 달리 **완전히 새 기능**이라 설계 자문부터 시작했다.
+
+- **사전 조사**: Explore 에이전트로 기존 코드를 먼저 읽어 핵심
+  제약을 확인 — Word 교체 인프라(`replacement_executor.ts`)가
+  `context.document`(활성 문서)에 완전히 종속돼 있어 "다른 문서에
+  쓰기"가 구조적으로 불가능해 보였음, InDesign은 `doc`을 파라미터로
+  받아 더 유연함, 파일 복제/저장 인프라가 프로젝트 전체에 전혀 없음,
+  서식 재적용 코드도 전무.
+- **설계 자문 1라운드에서 Codex와 agy가 핵심 질문(Q1: Word에서 새
+  문서를 실제로 어떻게 만드는가)에서 정면으로 갈림**: agy는 "그런
+  API가 없다"고 보고 파일 복제+사용자 수동 재오픈을 제안, Codex는
+  실제 Microsoft 문서를 검색해 `Word.Application.createDocument()`/
+  `Word.DocumentCreated`(`WordApiHiddenDocument` 요구사항 세트)라는
+  완전 자동 "숨은 복제 문서" API를 찾아 제안.
+- **Claude가 Microsoft 공식 문서(learn.microsoft.com)를 직접
+  fetch해 Codex의 주장을 검증** — `createDocument()`, `DocumentCreated.open()`,
+  `DocumentCreated.save()`(단, 임의 절대 경로는 못 받고 파일명만
+  가능 — Codex가 이미 인지하고 있던 제약과 일치) 전부 실재하는
+  API임을 확인, `WordApiHiddenDocument`가 Windows/Mac 데스크톱
+  전용(웹/iPad는 미지원 가능)이라는 것도 공식 문서로 재확인.
+- **재조율**: 이 검증 결과를 `RECONCILE_TRANSLATION_MODE_T6.md`로
+  agy에게 다시 보냄 → agy가 Codex 안(숨은 복제 문서, 안 C)에
+  전적으로 동의로 전환, 나머지 Q2~Q7도 추가 수정 없이 유지 확인.
+  이번에도(T4처럼) "한쪽이 사실관계를 몰라서 원안을 낸 경우, 그
+  사실관계를 직접 검증해 알려주면 스스로 원안을 철회"하는 패턴이
+  재현됐다.
+- **최종 확정 스펙**(`RECONCILED_TRANSLATION_MODE_T6.md`): Word는
+  숨은 복제 문서(`getFileAsync` → `createDocument` → 치환 →
+  `.open()`, 저장은 Word 자체 Save As에 위임) + 기존
+  `replacement_executor.ts`를 `WordDocumentPort` 추상화로 리팩터링해
+  재사용(agy가 회귀 위험 없다고 확인). InDesign은 `Document.duplicate()`
+  기반 완전 자동 흐름(Tauri dialog로 저장 경로 선택). 서식(굵게/
+  기울임/밑줄) 재적용은 기존 hunk 교체 경로를 확장하지 않고 T6
+  전용 materializer를 새로 만듦(공통 `RenderedRun` 계약 + 호스트별
+  writer). 표/머리말/바닥글/각주는 문서 전체 복제 방식 덕분에
+  자동으로 유실 없이 보존되지만 번역은 안 됨(v1 의도된 제한, UI
+  고지). `needs-validation`은 생성 차단, `untranslated`는 원문 유지.
+  생성 직전 전체 재스캔 + fingerprint 이중 대조 필수(T5의 "재스캔
+  필수" 선례 재사용).
+- **구현 범위 분할**: T6a(Word 파이프라인+공통 인프라, plain-text만)
+  → T6b(InDesign 파이프라인) → T6c(서식 Materializer, 양쪽 공통)
+  → T6d(백로그 — 표/머리말/각주 번역, 대용량 진행률, T7 경계). Word
+  선행 이유는 T3/T5와 동일(이 PC에 실제 Word/InDesign이 없어 mock
+  기반 검증만 가능한데 Word mock 인프라가 더 성숙해 있고, 이번
+  라운드의 가장 큰 구조 변경인 `WordDocumentPort` 리팩터링을 먼저
+  검증하는 게 안전).
 
 ## 이번 세션 완료 — 트랙 C T4-3: XLIFF 인라인 태그 직렬화/역직렬화 (T4 전체 완료)
 
@@ -60,34 +113,46 @@ T6(새 번역 문서 생성) 착수부터 시작할 것.** 로컬이 원격보�
 
 ## ⭐ 다음 세션 시작 시 즉시 할 일
 
-1. **T6(새 번역 문서 생성) 착수** — 사용자가 이미 확정한 순서
-   "T5→T4→T6→문장단위 CAT 정합성 Phase 0→Kiwi VM 확인"을 그대로
-   따를 것(자동 결정 아님, 이미 사용자가 정해준 순서이므로 다시 물을
-   필요 없음). T6는 이전 세션들과 달리 아직 설계 자문 라운드가 전혀
-   없었던 새 기능이므로 `DESIGN_REQUEST_TRANSLATION_MODE_T6.md`부터
-   시작해야 한다. 시작 전에 로드맵 원문(T6가 정확히 뭘 의미하는지 —
-   "새 번역 문서 생성"이 원본 문서를 그대로 복제해 타깃 텍스트로
-   치환한 새 파일을 만드는 것인지, 아니면 T4가 범위 밖으로 미룬
-   "서식 재적용"까지 포함하는지)을 프로젝트의 로드맵/기획 문서에서
-   먼저 확인해 설계 자문 프롬프트에 명시할 것.
+1. **T6a(Word 파이프라인 + 공통 인프라) 구현 지시서 작성 → Codex
+   전달**. 설계는 이미 전부 확정됐다(`RECONCILED_TRANSLATION_MODE_T6.md`
+   §1/§3~§6) — 새로 설계 자문할 필요 없음. `TASK_REQUEST_TRANSLATION_MODE_T6A.md`
+   를 작성해 커밋한 뒤 Codex에게 그대로 전달. 지시서에 반드시 포함할
+   것: (a) `replacement_executor.ts`의 `WordDocumentPort`
+   리팩터링(§1-4, 기존 Task 8 테스트 100% 통과 유지가 최우선
+   제약), (b) 숨은 복제 문서 파이프라인(§1-1~§1-7), (c)
+   `WordApiHiddenDocument` 미지원 시(웹 Word 등) T6 비활성화 처리,
+   (d) 생성 전제조건 검증(§5 — 재스캔+fingerprint 이중 대조,
+   `needs-validation` 차단, `untranslated` 원문 유지), (e) UI
+   버튼/확인 모달(§4 고지 배너 + §5 카운트 요약), (f)
+   `mock_office_word.ts` 확장해 숨은 문서 생성 mock 추가 및 원본
+   문서 불변성(원본에 쓰기 API 호출 안 됨) 검증 테스트. **서식
+   재적용(§3)은 이번 라운드 범위 밖 — plain-text 치환만.**
 2. 구현 완료 후: Claude가 diff 직접 검토 → **agy 리뷰와 Claude의
    독립 `npm test`/`npx vitest run` 재검증을 병렬로**(순차 아님 —
    `consult-agy-codex-when-stuck` 메모리 참고) → 결함 있으면 Codex에게
    후속 지시서로 되돌려 수정(Claude가 직접 고치지 않음) → 전부
-   통과하면 커밋. 이번 T4-3 라운드에서 Claude와 agy가 같은 결함을
-   각자 독립적으로 찾아 교차검증된 사례가 있었다 — 이 병행 검증
-   방식이 실제로 효과적이었으니 계속 유지할 것.
-3. **설계·구현 지시를 Codex/agy에게 보낸 직후엔 완료 알림만 기다리지
+   통과하면 커밋. T4-3 라운드에서 Claude와 agy가 같은 결함을 각자
+   독립적으로 찾아 교차검증된 사례가 있었다 — 이 병행 검증 방식이
+   실제로 효과적이었으니 계속 유지할 것.
+3. **자문 결과가 갈리면 임의로 편들지 말고, 가능하면 공식 문서/코드로
+   직접 검증한 뒤 재조율 라운드로 넘길 것** — 이번 T6 Q1처럼 한쪽이
+   실제로 존재하는 API를 몰라서 원안을 낸 경우가 있다. Claude가
+   WebFetch로 Microsoft 공식 문서를 직접 확인해 결정적 근거를
+   agy에게 제시했더니 agy가 스스로 원안을 철회하고 수렴했다 — 이
+   방식이 T6에서도 효과적이었다.
+4. **설계·구현 지시를 Codex/agy에게 보낸 직후엔 완료 알림만 기다리지
    말고 `Monitor` 도구로 5분 간격 중간보고를 걸 것**
    (`periodic-progress-updates` 메모리 참고). 완료 판정은 항상
    background task-notification으로만 확인할 것, 로그 문자열 매칭
    금지, Monitor는 진행 상황 보고 용도로만 쓸 것.
-4. **agy에게 진행 상황이나 diff를 파일로 넘길 때는 agy가 직접
+5. **agy에게 진행 상황이나 diff를 파일로 넘길 때는 agy가 직접
    `git diff`를 실행하게 하지 말고(명령 실행 금지 제약, `jetski:
    no output produced`로 실패함), Claude가 `git diff`를 텍스트
-   파일로 저장한 뒤 그 파일 경로를 agy에게 읽게 할 것** — 이번
-   세션에도 이 패턴을 그대로 써서 문제없이 진행됐다
+   파일로 저장한 뒤 그 파일 경로를 agy에게 읽게 할 것**
    (`agy-codex-cli-quirks` 메모리 참고).
+6. T6a 완료 후 T6b(InDesign 파이프라인) → T6c(서식 Materializer) →
+   T6d(백로그) 순서로 진행, 그 다음 문장단위 CAT 정합성 Phase 0 →
+   Kiwi VM 확인(사용자가 이미 확정한 순서, 다시 물을 필요 없음).
 
 ## 이번 세션(같은 날 여러 차례 후속) 완료 요약 — T3a-2 완료부터 T4-2까지
 
