@@ -41,6 +41,7 @@ export const Header: React.FC = () => {
     toggleSplitMode,
     layoutPreset,
     setLayoutPreset,
+    activeDocument,
   } = useBridgeStore();
 
   const { openSettingsModal, openGuidelineViewer, sourceLang, targetLang } = useConfigStore();
@@ -57,7 +58,11 @@ export const Header: React.FC = () => {
   }, [needsValidationCount]);
 
   const handleTranslationExport = () => {
-    const result = buildXliffDocument(segments, { sourceLang, targetLang });
+    const result = buildXliffDocument(segments, {
+      sourceLang,
+      targetLang,
+      originalFileName: activeDocument || undefined,
+    });
     if (!result.ok) {
       setTranslationExportMessage(`검증 필요 세그먼트 ${result.needsValidationCount}개가 있습니다. 해당 문단을 다시 수신한 뒤 내보내십시오.`);
       return;

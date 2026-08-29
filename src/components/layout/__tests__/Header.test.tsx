@@ -55,6 +55,9 @@ describe('Header Component', () => {
     render(<Header />);
     fireEvent.click(screen.getByTestId('translation-export-btn'));
 
+    expect(buildXliffDocument).toHaveBeenCalledWith([segment], {
+      sourceLang: 'en', targetLang: 'ko', originalFileName: undefined,
+    });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     expect(click).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).not.toHaveBeenCalled();
@@ -63,6 +66,44 @@ describe('Header Component', () => {
     act(() => vi.advanceTimersByTime(1));
     expect(revokeObjectURL).toHaveBeenCalledOnce();
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:translation');
+  });
+
+  it('passes the active document name to the XLIFF export', () => {
+    const segment: TranslationSessionSegment = {
+      segmentId: 'paragraph_0_hash', paragraphId: 'paragraph', segmentIndex: 0,
+      sourceText: 'Source', sourceHash: 'hash', startOffset: 0, endOffset: 6,
+      targetDraft: '', origin: 'empty', isUserEdited: false, status: 'untranslated', detectedAt: 1, updatedAt: 1,
+    };
+    useBridgeStore.getState().setEditorStatus({ activeDocument: 'Brochure_2026.indd' });
+    useTranslationSessionStore.setState({ segments: [segment] });
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:translation'), revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('translation-export-btn'));
+
+    expect(buildXliffDocument).toHaveBeenCalledWith([segment], {
+      sourceLang: 'en', targetLang: 'ko', originalFileName: 'Brochure_2026.indd',
+    });
+  });
+
+  it('passes the configured source language to the XLIFF export', () => {
+    const segment: TranslationSessionSegment = {
+      segmentId: 'paragraph_0_hash', paragraphId: 'paragraph', segmentIndex: 0,
+      sourceText: 'Source', sourceHash: 'hash', startOffset: 0, endOffset: 6,
+      targetDraft: '', origin: 'empty', isUserEdited: false, status: 'untranslated', detectedAt: 1, updatedAt: 1,
+    };
+    useConfigStore.getState().setSourceLang('ja');
+    useTranslationSessionStore.setState({ segments: [segment] });
+    vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:translation'), revokeObjectURL: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('translation-export-btn'));
+
+    expect(buildXliffDocument).toHaveBeenCalledWith([segment], {
+      sourceLang: 'ja', targetLang: 'ko', originalFileName: undefined,
+    });
   });
 
   it('clears an export validation message once all segments are valid', () => {

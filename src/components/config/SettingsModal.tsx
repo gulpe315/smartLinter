@@ -52,8 +52,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     guidelines,
     tmEntries,
     startBatchScan,
+    sourceLang,
     targetLang,
     explanationLang,
+    setSourceLang,
     setTargetLang,
     setExplanationLang,
   } = useConfigStore();
@@ -92,6 +94,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleTargetLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setTargetLang(e.target.value as 'ko' | 'en' | 'ja' | 'zh');
+  };
+
+  const handleSourceLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSourceLang(e.target.value as 'ko' | 'en' | 'ja' | 'zh');
   };
 
   const handleExplanationLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -357,6 +363,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     data-testid="explanation-language-select"
                     value={explanationLang}
                     onChange={handleExplanationLanguageChange}
+                    className="w-full pl-3 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 appearance-none focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
+                  >
+                    <option value="ko">한국어</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                    <option value="zh">中文</option>
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="source-language-select"
+                  className="text-xs font-semibold text-slate-300 flex items-center justify-between gap-2"
+                >
+                  <span>번역 원문 언어</span>
+                </label>
+                <div className="relative">
+                  <select
+                    id="source-language-select"
+                    data-testid="source-language-select"
+                    value={sourceLang}
+                    onChange={handleSourceLanguageChange}
                     className="w-full pl-3 pr-10 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 appearance-none focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="ko">한국어</option>
