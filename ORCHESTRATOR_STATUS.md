@@ -1,22 +1,29 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐ 마지막 업데이트: 2026-08-29 새 PC 이관 후 첫 후속 세션(세그멘터+영어QA 세션).
-아래 이 절을 먼저 읽을 것.**
+**⭐⭐ 마지막 업데이트: 2026-08-29 새 PC 이관 후 첫 후속 세션(세그멘터+영어QA+QA카드
+segmentIndex 세션). 아래 이 절을 먼저 읽을 것.**
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `8e567d8`(Add a sentence/TU boundary
-   contract, an English QA profile, and small cleanups)인지 확인.** 아니면 그
+1. **`git log --oneline -1`로 최신 커밋이 `a932dc3`(Attach segmentIndex to QA
+   issues and group cards by sentence in the QA panel)인지 확인.** 아니면 그
    이후 커밋을 먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬=원격
-   `8e567d8`로 동기화됨(원격 push는 사용자 확인 후 별도 진행 — 아래 참고).**
+   `a932dc3`로 동기화됨(원격 push는 사용자 확인 후 별도 진행 — 아래 참고,
+   이번 세션 커밋 3개 `8e567d8`/`0466419`/`a932dc3` 전부 아직 push 안 함).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(29 files / **315**/315),
-   `npm run build`(성공). `cargo test --release`는 **104/105**가 정상 —
+   확인: `npm test`(197/197), `npx vitest run`(29 files / **317**/317),
+   `npm run build`(성공). `cargo test --release`는 **107/109**가 정상 —
    실패하는 1건(`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은
-   라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.** (참고: 이번 세션에
-   `Windows Credential Manager` roundtrip 테스트가 다른 무거운 프로세스와
-   동시 실행될 때 1회성으로 실패한 적 있음 — 단독/재실행 시 항상 통과, 코드
-   무관한 리소스 경합 플레이크이니 재현되면 그냥 재실행할 것.)
+   라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.**
+   (참고1: `Windows Credential Manager` roundtrip 테스트가 다른 무거운
+   프로세스와 동시 실행될 때 1회성으로 실패한 적 있음 — 단독/재실행 시 항상
+   통과, 코드 무관한 리소스 경합 플레이크이니 재현되면 그냥 재실행할 것.
+   참고2: **Codex의 `codex exec -s workspace-write` 샌드박스 안에서는 이
+   keyring 테스트가 훨씬 더 자주(6번 중 6번) 실패한다** — Claude가 네이티브
+   셸에서 독립 재실행하면 그때마다 항상 통과했음. Codex 샌드박스가 Windows
+   Credential Manager/DPAPI 접근을 제한하는 환경 특성으로 잠정 결론(agy도
+   동의) — Codex가 이 테스트 실패를 보고해도 **당황하지 말고 Claude가 직접
+   네이티브로 재실행해서 확인할 것**, 코드 회귀로 취급하지 말 것.)
 3. **TM 샘플 파일(`KO-EN.tmx`, `SD.sdltm`)은 git에 없다.** 이번 세션 기준
    `D:\smartLinter` 루트에 이미 있었음(사용자가 이전에 넣어둠) — 없으면
    사용자에게 다시 요청할 것. **절대 커밋 금지**(실제 고객 데이터일 수 있음,
@@ -110,16 +117,59 @@ TM에 저장할 수 없습니다.'`로 다른 사유 메시지들과 같은 패�
 29 files/315 tests, `npm run build` 성공. 전부 최소 2회씩 독립 재확인함(agy
 1차 리뷰 전, Codex 2차 수정 후).
 
-**다음 세션 남은 것(문장/TU 경계 계약 로드맵의 나머지):**
-- Stage 1b: QA 카드에 `segmentId` 귀속 + `SentenceCard`(이슈→문장→문단 3계층
-  상태머신) — LLM 호출은 문단 1회 유지, 결과만 문장 단위로 귀속시키는 합의는
-  그대로 유효. `segmenter.rs`를 그대로 재사용 가능.
-- Stage 2 이후(TM 검색 쪽 문장 단위 전환, SDLTM read-only importer, 인라인
-  태그 보존)는 아직 손대지 않음 — `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md`
-  5장 로드맵 순서 그대로 유효.
-- **원격 push 여부는 사용자에게 확인 후 진행할 것** — 이번 세션엔 로컬
-  커밋까지만 하고 push는 아직 안 함(다음 세션 시작 시 `git log`로 로컬만
-  앞서 있는지 확인).
+## Stage 1b 완료 (같은 세션 후속, 커밋 `a932dc3`) — QA 카드 segmentIndex + 문장 단위 시각적 그룹핑
+
+Stage 1a 직후 사용자가 "갱신하고, 계속 작업 진행해줘"로 이어서 지시해 같은 세션에서 바로
+착수. `ORCHESTRATOR_STATUS.md`가 Stage 1a 뒤에 남겨둔 시작점(QA 카드 `segmentId` 귀속 +
+`SentenceCard` 3계층 상태머신)을 그대로 다 하지 않고, **의도적으로 더 좁게** 스코핑했다:
+`qaStore.ts`의 `acceptCard`/`processReplacementResult`/`acceptMatchingCards`(적용·롤백
+트랜잭션)는 과거 세션이 "테스트 통과=올바름 아님, 303개 통과 상태에서 결함 6건" 경험을 남긴
+바로 그 핵심 상태머신이라, 이번엔 **① `segmentIndex` 데이터 배관(순수 추가)**과 **② QA
+카드 리스트의 문장 단위 시각적 그룹핑(순수 렌더링, 카드 개별 적용/무시는 그대로)**만 했다.
+**"문장 원클릭 통합 적용"(Mode A)과 "개별 이슈 부분 적용+Diff Rebase"(Mode B)는 여전히
+미착수 — 다음 세션 시작점**(아래 "다음 세션 남은 것" 참고).
+
+**중요한 교훈 — Codex의 자체 검증 보고를 두 번 신뢰할 수 없었다:**
+1. 1차 구현 후 Codex가 "검증 통과"라고 보고했으나, Claude가 독립 재현하니 **컴파일 자체가
+   안 됐다**(`commands.rs`의 `assign_issue_segment_indices`에서 `u32`/`usize` 타입 불일치,
+   E0308). Codex는 엉뚱하게 "`kiwi_spike_harness.rs`를 찾을 수 없다"는 곁가지 오류를
+   원인으로 지목했었다(그 바이너리는 `kiwi-spike` feature로 게이팅돼 일반 `cargo test`에는
+   관여하지 않음 — Codex 자신의 착시였음).
+2. 컴파일 수정 후 "vitest 75 tests passed"라고 보고했으나, Claude가 `grep -r segmentIndex`
+   로 확인하니 **계획이 요구한 신규 테스트가 하나도 추가돼 있지 않았다**("75 tests"는 그냥
+   기존 파일의 기존 테스트 개수였을 뿐). 구체적으로 빠진 목록을 다시 짚어준 뒤에야 실제로
+   5개 테스트(Rust 3개, TS 2개)가 추가됨.
+3. **따라서 이후 이 프로젝트에서 Codex의 "검증 통과" 보고는 곧이곧대로 믿지 말 것.** Claude(또는
+   다음 세션 담당)가 매번 `cargo test --release`/`npm test`/`npx vitest run`/`npm run build`
+   4개를 직접 독립 재실행해서 실제 숫자를 눈으로 확인한 뒤에만 리뷰·커밋 단계로 넘어갈 것.
+4. agy 리뷰에서 발견한 결함 1건(스타일/견고성 문제 — `commands.rs`의 `let-else { continue; }`
+   가 바깥 루프를 건너뛰어 `segment_index` 대입 자체를 스킵하던 것, 지금은 기본값이 `None`
+   이라 우연히 맞지만 미래에 값이 이미 채워진 이슈를 재처리하는 경로가 생기면 잠재 버그)도
+   Codex가 명시적 `if let ... else { None }`로 수정.
+5. **Windows Credential Manager 테스트가 Codex의 `-s workspace-write` 샌드박스 안에서는
+   6번 중 6번 실패했다** — 위 "새 세션 시작 절차" 참고2에 기록. 코드 diff가 keyring 관련
+   파일을 전혀 안 건드리고 Claude의 네이티브 재실행은 매번 통과했으므로 샌드박스 환경
+   제약으로 결론(agy도 동의). 다음 세션도 이 패턴이 반복되면 당황하지 말 것.
+
+**검증(Claude 독립 재실행, 최종): `cargo test --release` 107/109(기존 라이브 Ollama
+타임아웃 1건만, 회귀 아님), `npm test` 197/197, `npx vitest run` 29 files/317 tests,
+`npm run build` 성공.**
+
+## 다음 세션 남은 것(문장/TU 경계 계약 로드맵의 나머지)
+
+- **Stage 1c: Mode A(문장 원클릭 통합 적용)** — 문장의 모든 활성 이슈를 반영한
+  `finalSuggestedText`를 계산해 문단 텍스트에서 그 문장 구간만 통째로 교체하는 단일
+  트랜잭션. `qaStore.ts`의 `acceptCard`(해시 검증/`extractDiffHunks`/`pendingCommands`
+  추적)를 건드리는 첫 단계이므로 **반드시 자체 설계 검토(가능하면 Codex/agy 자문)부터
+  다시 시작할 것** — 이번 세션에 의도적으로 손대지 않았다.
+- **Mode B(개별 이슈 부분 적용 + Diff Rebase)** — 두 자문 모두 가장 리스크가 크다고 지목한
+  부분, Mode A보다도 더 신중해야 함.
+- Stage 2 이후(TM 검색 쪽 문장 단위 전환, SDLTM read-only importer, 인라인 태그 보존)는
+  아직 손대지 않음 — `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 로드맵 순서 그대로
+  유효.
+- **원격 push 여부는 사용자에게 확인 후 진행할 것** — 이번 세션 커밋 3개(`8e567d8`,
+  `0466419`, `a932dc3`) 전부 로컬까지만 하고 push는 아직 안 함(다음 세션 시작 시 `git log`
+  로 로컬만 앞서 있는지 확인).
 
 ## 새 PC 이관 (2026-08-29) — 다른 PC에서 이어받을 때 반드시 읽을 것
 
@@ -245,13 +295,15 @@ TU로 등록하므로). 저장 직전 확인 대화상자가 원문/번역 전�
    - 성공 판정은 `anchorCurrentHash == anchorBaseHash`로 하면 안 된다.
      그건 앵커 보존 증거일 뿐 삽입 증거가 아니다. 생성된 문단의 해시를
      따로 받아 대조해야 한다(fail-closed).
-2. **(완료, `8e567d8`) 문장/TU 경계 계약 — Stage 1a만.** 세그멘터
-   (`segmenter.rs`/`sentenceBoundary.ts`)와 `[TM 저장]` 다문장 분리 저장은
-   끝났다. `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 1단계가 원래
-   묶었던 `SentenceCard`(QA 카드 `segmentId` 귀속, 이슈→문장→문단 3계층
-   상태머신)는 **아직 미착수** — 다음 세션 시작점. LLM 호출은 문단 1회 유지,
-   결과만 문장 단위로 귀속시키는 합의는 그대로 유효. 상세는 위 "이번 세션
-   완료 내역" 참고.
+2. **(Stage 1a `8e567d8` + Stage 1b `a932dc3` 완료) 문장/TU 경계 계약 — 부분 완료.**
+   세그멘터(`segmenter.rs`/`sentenceBoundary.ts`), `[TM 저장]` 다문장 분리 저장,
+   QA 이슈 `segmentIndex` 귀속, QA 카드 리스트 문장 단위 시각적 그룹핑까지
+   끝났다. `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 1단계가 원래 묶었던
+   `SentenceCard`의 **적용/롤백 레이어(Mode A 문장 원클릭 통합 적용, Mode B
+   개별 이슈 부분 적용+Diff Rebase)는 아직 미착수** — 다음 세션 시작점,
+   `qaStore.ts`의 트랜잭션 로직을 처음 건드리는 단계라 별도 설계 검토부터
+   다시 시작할 것. LLM 호출은 문단 1회 유지, 결과만 문장 단위로 귀속시키는
+   합의는 그대로 유효. 상세는 위 "Stage 1b 완료" 절 참고.
 3. **(완료, `8e567d8`) 영어 QA 프로파일 작성.** `EN_MONOLINGUAL_SYSTEM_INSTRUCTION`
    추가, `(문서언어×설명언어)` 4개 조합 명시화, 토큰 예산 계산 버그도 같이
    수정함. `Ja`/`Zh`는 여전히 fail-loud(미착수). 상세는 위 참고.
