@@ -24,6 +24,7 @@ describe('useConfigStore', () => {
   it('should initialize with default state and guidelines', () => {
     const state = useConfigStore.getState();
     expect(state.selectedModel).toBe('qwen2.5:7b');
+    expect(state.sourceLang).toBe('en');
     expect(state.targetLang).toBe('ko');
     expect(state.explanationLang).toBe('ko');
     expect(state.guidelines.rules.length).toBe(DEFAULT_GUIDELINES.rules.length);
@@ -40,6 +41,13 @@ describe('useConfigStore', () => {
     expect(useConfigStore.getState().explanationLang).toBe('en');
     expect(localStorage.getItem('smartlinter_target_lang')).toBe('ja');
     expect(localStorage.getItem('smartlinter_explanation_lang')).toBe('en');
+  });
+
+  it('persists the translation source language independently with an English default', () => {
+    useConfigStore.getState().setSourceLang('ja');
+
+    expect(useConfigStore.getState().sourceLang).toBe('ja');
+    expect(localStorage.getItem('smartlinter_source_lang')).toBe('ja');
   });
 
   it('clears the QA analysis error when either QA language setting changes', () => {

@@ -6,7 +6,7 @@
  * layout switcher buttons, and triggers for settings & guideline panels.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Sparkles,
   Database,
@@ -24,8 +24,11 @@ import { useQaStore } from '../../stores/qaStore.ts';
 import { PinToggleButton } from './PinToggleButton.tsx';
 import { BatchProgressBar } from '../config/BatchProgressBar.tsx';
 import { EditorConnectionControl } from './EditorConnectionControl.tsx';
+import { useTranslationSessionStore } from '../../stores/translationSessionStore.ts';
+import { buildXliffDocument } from '../../utils/xliffExport.ts';
 
 export const Header: React.FC = () => {
+  const [translationExportMessage, setTranslationExportMessage] = useState<string | null>(null);
   const {
     llmAlive,
     llmModel,
@@ -40,8 +43,37 @@ export const Header: React.FC = () => {
     setLayoutPreset,
   } = useBridgeStore();
 
-  const { openSettingsModal, openGuidelineViewer } = useConfigStore();
+  const { openSettingsModal, openGuidelineViewer, sourceLang, targetLang } = useConfigStore();
   const resetQaCards = useQaStore((state) => state.resetQaCards);
+  const { isTranslationModeActive, segments } = useTranslationSessionStore();
+  const exportableSegmentCount = segments.filter((segment) => segment.status !== 'needs-validation').length;
+  const needsValidationCount = segments.length - exportableSegmentCount;
+  const isTranslationExportDisabled = segments.length === 0 || needsValidationCount > 0;
+
+  useEffect(() => {
+    if (needsValidationCount === 0) {
+      setTranslationExportMessage(null);
+    }
+  }, [needsValidationCount]);
+
+  const handleTranslationExport = () => {
+    const result = buildXliffDocument(segments, { sourceLang, targetLang });
+    if (!result.ok) {
+      setTranslationExportMessage(`검증 필요 세그먼트 ${result.needsValidationCount}개가 있습니다. 해당 문단을 다시 수신한 뒤 내보내십시오.`);
+      return;
+    }
+
+    const url = URL.createObjectURL(new Blob([result.xml], { type: 'application/xliff+xml' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `smartlinter-translation-${Date.now()}.xlf`;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTranslationExportMessage(null);
+  };
 
   return (
     <header className="flex-none bg-slate-900 border-b border-slate-800 text-slate-100 select-none shadow-md z-30">
@@ -67,6 +99,21 @@ export const Header: React.FC = () => {
         {/* Center: Realtime Status Badges (Interactive triggers) */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <EditorConnectionControl />
+
+          <button
+            type="button"
+            data-testid="translation-mode-toggle"
+            aria-pressed={isTranslationModeActive}
+            onClick={() => useTranslationSessionStore.getState().setTranslationMode(!isTranslationModeActive)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+              isTranslationModeActive
+                ? 'bg-emerald-950/50 border-emerald-700/60 text-emerald-300'
+                : 'bg-slate-800/70 border-slate-700 text-slate-400'
+            }`}
+            title="번역 모드 전환"
+          >
+            번역 모드 {isTranslationModeActive ? 'ON' : 'OFF'}
+          </button>
 
           {/* LLM Status Indicator (Click to open Settings) */}
           <button
@@ -134,6 +181,20 @@ export const Header: React.FC = () => {
 
         {/* Right: Layout Switcher, Pin Toggle & Settings Action Controls */}
         <div className="flex items-center gap-2">
+          <div className="flex flex-col text-[10px] leading-tight text-slate-400" data-testid="translation-export-status">
+            <span>{exportableSegmentCount}개 수집됨</span>
+            {needsValidationCount > 0 && <span className="text-amber-400">검증 필요 {needsValidationCount}개</span>}
+          </div>
+          <button
+            type="button"
+            data-testid="translation-export-btn"
+            disabled={isTranslationExportDisabled}
+            onClick={handleTranslationExport}
+            className="px-2.5 py-1 rounded-md bg-emerald-900/50 hover:bg-emerald-800/60 disabled:bg-slate-800 disabled:text-slate-500 disabled:border-slate-700 border border-emerald-700/70 text-emerald-200 text-xs font-medium transition-colors"
+            title={isTranslationExportDisabled ? '검증이 필요한 세그먼트를 해결한 뒤 내보낼 수 있습니다' : 'XLIFF 파일로 내보내기'}
+          >
+            XLIFF 내보내기 ({exportableSegmentCount})
+          </button>
           <button
             type="button"
             data-testid="qa-reset-btn"
@@ -214,6 +275,7 @@ export const Header: React.FC = () => {
 
       {/* Top Real-time Batch Progress Bar */}
       <BatchProgressBar />
+      {translationExportMessage && <p role="status" className="px-4 pb-2 text-xs text-amber-300">{translationExportMessage}</p>}
     </header>
   );
 };

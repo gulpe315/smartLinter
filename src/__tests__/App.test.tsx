@@ -4,14 +4,26 @@ import { render, screen, act, waitFor } from '@testing-library/react';
 import App, { isRefreshShortcut } from '../App.tsx';
 import { useBridgeStore } from '../stores/bridgeStore.ts';
 import { setBridgeService, MockBridgeService } from '../services/tauriBridge.ts';
+import { useTranslationSessionStore } from '../stores/translationSessionStore.ts';
 
 describe('SmartLinter Dashboard App Full Integration', () => {
   let mockBridge: MockBridgeService;
 
   beforeEach(() => {
     useBridgeStore.getState().reset();
+    useTranslationSessionStore.getState().reset();
     mockBridge = new MockBridgeService();
     setBridgeService(mockBridge);
+  });
+
+  it('registers and cleans up the translation-session bridge listener', () => {
+    const cleanup = vi.fn();
+    const listener = vi.spyOn(useTranslationSessionStore.getState(), 'initEventListener').mockReturnValue(cleanup);
+    const { unmount } = render(<App />);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
   it('renders all 3 main zones: Header, MainLayout, and StatusBar', () => {

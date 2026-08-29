@@ -1,16 +1,106 @@
 import React from 'react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Header } from '../Header.tsx';
 import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { MockBridgeService, setBridgeService } from '../../../services/tauriBridge.ts';
 import { useQaStore } from '../../../stores/qaStore.ts';
+import { useConfigStore } from '../../../stores/configStore.ts';
+import { useTranslationSessionStore, type TranslationSessionSegment } from '../../../stores/translationSessionStore.ts';
+import { buildXliffDocument } from '../../../utils/xliffExport.ts';
+
+vi.mock('../../../utils/xliffExport.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../utils/xliffExport.ts')>();
+  return { ...actual, buildXliffDocument: vi.fn(actual.buildXliffDocument) };
+});
 
 describe('Header Component', () => {
   beforeEach(() => {
     useBridgeStore.getState().reset();
     useQaStore.getState().reset();
+    useConfigStore.getState().reset();
+    useTranslationSessionStore.getState().reset();
     setBridgeService(new MockBridgeService());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('toggles translation mode from the header', () => {
+    render(<Header />);
+
+    const toggle = screen.getByTestId('translation-mode-toggle');
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggle);
+    expect(useTranslationSessionStore.getState().isTranslationModeActive).toBe(true);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('exports session segments through a Blob download', () => {
+    const segment: TranslationSessionSegment = {
+      segmentId: 'paragraph_0_hash', paragraphId: 'paragraph', segmentIndex: 0,
+      sourceText: 'Source', sourceHash: 'hash', startOffset: 0, endOffset: 6,
+      targetDraft: '', origin: 'empty', isUserEdited: false, status: 'untranslated', detectedAt: 1, updatedAt: 1,
+    };
+    useTranslationSessionStore.setState({ segments: [segment] });
+    const createObjectURL = vi.fn(() => 'blob:translation');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    vi.useFakeTimers();
+
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('translation-export-btn'));
+
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(999));
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(revokeObjectURL).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:translation');
+  });
+
+  it('clears an export validation message once all segments are valid', () => {
+    const segment: TranslationSessionSegment = {
+      segmentId: 'paragraph_0_hash', paragraphId: 'paragraph', segmentIndex: 0,
+      sourceText: 'Source', sourceHash: 'hash', startOffset: 0, endOffset: 6,
+      targetDraft: '', origin: 'empty', isUserEdited: false, status: 'untranslated', detectedAt: 1, updatedAt: 1,
+    };
+    vi.mocked(buildXliffDocument).mockReturnValueOnce({
+      ok: false, reason: 'NEEDS_VALIDATION_PRESENT', needsValidationCount: 1,
+    });
+    useTranslationSessionStore.setState({ segments: [segment] });
+
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('translation-export-btn'));
+    expect(screen.getByRole('status')).toHaveTextContent('검증 필요 세그먼트 1개');
+
+    act(() => {
+      useTranslationSessionStore.setState({ segments: [{ ...segment, status: 'needs-validation' }] });
+    });
+    act(() => {
+      useTranslationSessionStore.setState({ segments: [{ ...segment, status: 'untranslated' }] });
+    });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('disables export and reports the validation count when validation is required', () => {
+    useTranslationSessionStore.setState({ segments: [{
+      segmentId: 'invalid', paragraphId: 'paragraph', segmentIndex: 0,
+      sourceText: 'Source', sourceHash: 'hash', startOffset: 0, endOffset: 6,
+      targetDraft: '', origin: 'empty', isUserEdited: false, status: 'needs-validation', detectedAt: 1, updatedAt: 1,
+    }] });
+
+    render(<Header />);
+
+    expect(screen.getByTestId('translation-export-btn')).toBeDisabled();
+    expect(screen.getByTestId('translation-export-status')).toHaveTextContent('검증 필요 1개');
   });
 
   it('renders branding and default standby badges', () => {

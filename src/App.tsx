@@ -12,6 +12,7 @@ import { useBridgeStore } from './stores/bridgeStore.ts';
 import { useConfigStore } from './stores/configStore.ts';
 import { persistQaStoreSnapshot, useQaStore } from './stores/qaStore.ts';
 import { useTmStore } from './stores/tmStore.ts';
+import { useTranslationSessionStore } from './stores/translationSessionStore.ts';
 import { getBridgeService } from './services/tauriBridge.ts';
 
 export function isRefreshShortcut(event: KeyboardEvent): boolean {
@@ -35,6 +36,7 @@ export const App: React.FC = () => {
     const cleanupBridge = initEventListener();
     const cleanupQa = initQaListener();
     const cleanupTm = initTmListener();
+    const cleanupTranslation = useTranslationSessionStore.getState().initEventListener();
     getBridgeService()
       .fetchBridgeHealth()
       .then((status) => useBridgeStore.getState().setEditorStatus(status))
@@ -47,6 +49,7 @@ export const App: React.FC = () => {
       cleanupBridge();
       cleanupQa();
       cleanupTm();
+      cleanupTranslation();
     };
   }, [initEventListener, initQaListener, initTmListener, syncSelectedModel]);
 

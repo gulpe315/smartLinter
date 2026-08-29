@@ -24,6 +24,7 @@ const STORAGE_KEYS = {
   OLLAMA_HOST: 'smartlinter_ollama_host',
   CUSTOM_GUIDELINE_RAW: 'smartlinter_custom_guideline_raw',
   CUSTOM_GUIDELINE_NAME: 'smartlinter_custom_guideline_name',
+  SOURCE_LANG: 'smartlinter_source_lang',
   TARGET_LANG: 'smartlinter_target_lang',
   EXPLANATION_LANG: 'smartlinter_explanation_lang',
   USER_TM_OVERLAY: 'smartlinter_user_tm_overlay',
@@ -33,6 +34,7 @@ let llmHealthRequestVersion = 0;
 
 export interface ConfigState {
   // --- QA Language Configuration ---
+  sourceLang: LanguageTag;
   targetLang: LanguageTag;
   explanationLang: LanguageTag;
   // --- Ollama Model Configuration ---
@@ -72,6 +74,7 @@ export interface ConfigState {
   refreshLlmHealth: () => Promise<void>;
   setSelectedModel: (modelName: string) => Promise<void>;
   syncSelectedModel: () => Promise<void>;
+  setSourceLang: (language: LanguageTag) => void;
   setTargetLang: (language: LanguageTag) => void;
   setExplanationLang: (language: LanguageTag) => void;
 
@@ -114,9 +117,9 @@ const getInitialOllamaHost = (): string => {
   return 'http://127.0.0.1:11434';
 };
 
-const getInitialLanguage = (key: string): LanguageTag => {
+const getInitialLanguage = (key: string, fallback: LanguageTag = 'ko'): LanguageTag => {
   const saved = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(key) : null;
-  return saved === 'ko' || saved === 'en' || saved === 'ja' || saved === 'zh' ? saved : 'ko';
+  return saved === 'ko' || saved === 'en' || saved === 'ja' || saved === 'zh' ? saved : fallback;
 };
 
 const getInitialUserTmOverlayEntries = (): TmEntry[] => {
@@ -136,6 +139,7 @@ const getInitialUserTmOverlayEntries = (): TmEntry[] => {
 const normalizeTmSource = (source: string) => source.trim().toLowerCase().replace(/\s+/g, ' ');
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
+  sourceLang: getInitialLanguage(STORAGE_KEYS.SOURCE_LANG, 'en'),
   targetLang: getInitialLanguage(STORAGE_KEYS.TARGET_LANG),
   explanationLang: getInitialLanguage(STORAGE_KEYS.EXPLANATION_LANG),
   ollamaHost: getInitialOllamaHost(),
@@ -143,6 +147,11 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   selectedModel: getInitialSelectedModel(),
   isLoadingModels: false,
   modelError: null,
+
+  setSourceLang: (language) => {
+    set({ sourceLang: language });
+    if (typeof window !== 'undefined' && window.localStorage) localStorage.setItem(STORAGE_KEYS.SOURCE_LANG, language);
+  },
 
   setTargetLang: (language) => {
     set({ targetLang: language });
@@ -449,6 +458,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   reset: () => {
     set({
       installedModels: [],
+      sourceLang: 'en',
       targetLang: 'ko',
       explanationLang: 'ko',
       isLoadingModels: false,
