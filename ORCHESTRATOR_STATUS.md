@@ -1,17 +1,20 @@
 # SmartLinter — 오케스트레이터 현황판
 
 **⭐⭐ 마지막 업데이트: 2026-08-29 새 PC 이관 후 첫 후속 세션(세그멘터+영어QA+QA카드
-segmentIndex 세션). 아래 이 절을 먼저 읽을 것.**
+segmentIndex+TM 문장단위 검색/적용+자동번역/번역모드 설계자문 세션). 아래 이 절을 먼저
+읽을 것.**
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `a932dc3`(Attach segmentIndex to QA
-   issues and group cards by sentence in the QA panel)인지 확인.** 아니면 그
-   이후 커밋을 먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬=원격
-   `a932dc3`로 동기화됨(원격 push는 사용자 확인 후 별도 진행 — 아래 참고,
-   이번 세션 커밋 3개 `8e567d8`/`0466419`/`a932dc3` 전부 아직 push 안 함).**
+1. **`git log --oneline -1`로 최신 커밋이 `f996060`(Search and apply TM matches
+   per sentence instead of per paragraph)인지 확인.** 아니면 그 이후 커밋을
+   먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이 원격보다 7개
+   커밋 앞섬(`8e567d8`~`f996060`) — 전부 push 안 함, 사용자가 "로컬 커밋만
+   계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고 명시적으로 정함
+   (다음 세션에서도 매번 push 여부를 다시 묻지 말 것, 사용자가 먼저 요청할
+   때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(29 files / **317**/317),
+   확인: `npm test`(197/197), `npx vitest run`(29 files / **323**/323),
    `npm run build`(성공). `cargo test --release`는 **107/109**가 정상 —
    실패하는 1건(`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은
    라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.**
@@ -19,11 +22,17 @@ segmentIndex 세션). 아래 이 절을 먼저 읽을 것.**
    프로세스와 동시 실행될 때 1회성으로 실패한 적 있음 — 단독/재실행 시 항상
    통과, 코드 무관한 리소스 경합 플레이크이니 재현되면 그냥 재실행할 것.
    참고2: **Codex의 `codex exec -s workspace-write` 샌드박스 안에서는 이
-   keyring 테스트가 훨씬 더 자주(6번 중 6번) 실패한다** — Claude가 네이티브
-   셸에서 독립 재실행하면 그때마다 항상 통과했음. Codex 샌드박스가 Windows
-   Credential Manager/DPAPI 접근을 제한하는 환경 특성으로 잠정 결론(agy도
-   동의) — Codex가 이 테스트 실패를 보고해도 **당황하지 말고 Claude가 직접
-   네이티브로 재실행해서 확인할 것**, 코드 회귀로 취급하지 말 것.)
+   keyring 테스트가 훨씬 더 자주(이번 세션 누적 8번 중 8번) 실패한다** —
+   Claude가 네이티브 셸에서 독립 재실행하면 그때마다 항상 통과했음. Codex
+   샌드박스가 Windows Credential Manager/DPAPI 접근을 제한하는 환경 특성으로
+   결론(agy도 동의) — Codex가 이 테스트 실패를 보고해도 **당황하지 말고
+   Claude가 직접 네이티브로 재실행해서 확인할 것**, 코드 회귀로 취급하지 말 것.
+   참고3: **Codex가 작업 시작 전 `git status`로 작업 트리가 깨끗한지 스스로
+   확인하고, 안 깨끗하면(예: 순수 줄바꿈 LF/CRLF 잡음만 있어도) 시작을
+   보류한다** — 이번 세션에 실제로 발생함(Stage 1c 1차 시도). `git diff
+   --stat`로 실제 내용 변경이 없는 걸 확인한 뒤 `git restore`로 정리하고
+   나서야 진행됐다. 다음 Codex 호출 전에 항상 `git status`/`git diff --stat`
+   로 작업 트리를 먼저 확인할 것.)
 3. **TM 샘플 파일(`KO-EN.tmx`, `SD.sdltm`)은 git에 없다.** 이번 세션 기준
    `D:\smartLinter` 루트에 이미 있었음(사용자가 이전에 넣어둠) — 없으면
    사용자에게 다시 요청할 것. **절대 커밋 금지**(실제 고객 데이터일 수 있음,
@@ -155,21 +164,75 @@ Stage 1a 직후 사용자가 "갱신하고, 계속 작업 진행해줘"로 이�
 타임아웃 1건만, 회귀 아님), `npm test` 197/197, `npx vitest run` 29 files/317 tests,
 `npm run build` 성공.**
 
-## 다음 세션 남은 것(문장/TU 경계 계약 로드맵의 나머지)
+## 같은 세션 후속 — TM 검색/적용 문장단위 전환 완료 + 자동번역/번역모드 설계자문 (커밋 `f996060`, `e9d0011`)
 
-- **Stage 1c: Mode A(문장 원클릭 통합 적용)** — 문장의 모든 활성 이슈를 반영한
+**중요: "Stage 1c"라는 이름이 이 문서에 두 가지 다른 뜻으로 쓰였던 걸 여기서 정리한다.**
+바로 위 절의 "Stage 1c: Mode A(문장 원클릭 통합 적용)"는 QA 카드 쪽(`CODEX_ANSWER_
+SENTENCE_UNIT_CAT_PARITY.md` 로드맵)의 다음 단계 이름이었다. 이번 세션 후속에서 사용자가
+새 기능 2개(TM 자동 치환, [번역 모드]+XLIFF)를 제안했고, 그 설계 자문(아래)에서 "Stage 1c"
+라는 이름이 **TM 검색/적용의 문장단위 전환**을 가리키는 것으로 다시 쓰였다 — 그리고 이게
+실제로 이번 세션에 구현·완료됐다. **앞으로 "Stage 1c"는 이 TM 문장단위 전환(완료됨)을
+가리키고, QA 카드의 문장 원클릭 적용은 그냥 "Mode A"(QA 트랙, 미착수)로 부를 것** —
+두 트랙은 서로 다른 로드맵에 속하며 혼동하지 말 것.
+
+**1. 사용자가 새로 제안한 두 기능을 Codex+agy에 독립 설계자문 (`e9d0011`).**
+`DESIGN_REQUEST_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md` → `CODEX_ANSWER_...md` /
+`AGY_ANSWER_...md`. 재조율 라운드 없이 강하게 수렴:
+- **TM 자동 치환**: 100% Exact Match 문장 단위만, opt-in, 실시간 타이핑 중엔 절대 금지
+  (IME 조합 깨짐). 폐기된 [붙여넣기] 기능이 남긴 텔레메트리 피드백 루프 문제가 그대로
+  재적용됨 — `commandId`/`baseHash`/`expectedHash` 기반 echo 억제가 필수.
+- **[번역 모드]+XLIFF**: Phase 0 결정(에디터 문서=원문, QA=monolingual)과 **완전히 공존
+  가능** — 단, XLIFF는 내부 데이터 계약을 bilingual로 되돌리는 게 아니라 **번역 세션에서
+  사후 생성하는 사이드카 파생 산출물**로만 다뤄야 함. "원문+번역을 에디터 문서에 직접
+  병기했다가 클린업"(사용자가 원래 언급한 세 번째 해석)은 **둘 다 강하게 반대** — 폐기된
+  붙여넣기보다 훨씬 위험(대량 문서 편집, 서식 손상, 복구 실패 시 원본 손상).
+- **두 기능 모두 지금의 "TM 매칭이 문단 단위"로는 안전하게 시작 못 함** — 문장 단위
+  TM 검색+적용(Stage 1c)이 공통 선행 과제라는 게 핵심 결론. 사용자가 이 순서를 확정.
+
+**2. Stage 1c 구현: TM 검색/적용을 문단 단위 → 문장 단위로 전환 (`f996060`).**
+- `src/stores/tmStore.ts`: `new-paragraph-detected`발 자동 검색에서만(수동/키워드 검색은
+  기존 그대로) 문단에 문장이 2개 이상이면 `splitIntoSentences`로 나눠 문장별로
+  `TsFuzzyMatcher.search()`를 호출, `sentenceMatches` 상태에 저장. 단일 문장이면 기존
+  평평한 `candidates` 그대로(그룹 헤더 없음, 완전한 하위호환).
+- `applyMatch`에 선택적 `sentenceRange` 매개변수 추가 — 있으면 문단 텍스트에서 그 구간만
+  치환(`substring` 스플라이스 후 `extractDiffHunks`), 없으면 기존처럼 문단 전체 치환.
+  같은 해시검증/`sendReplacementCommand` 경로를 그대로 재사용(새 트랜잭션 메커니즘
+  안 만듦).
+- `TMMatchPanel.tsx`: `QACardList.tsx`(Stage 1b)와 같은 스타일로 문장별 그룹 헤더 렌더링.
+- **agy 리뷰에서 실질 결함 1건 발견·수정**: 다문장 문단에서 모든 문장의 후보가 0건이면
+  "일치 없음" 안내 대신 빈 문장 헤더들만 뜨던 버그 — `candidateCount`(flat+grouped 합산)
+  기준으로 empty state 판정하도록 수정.
+- **이번에도 Codex가 첫 시도에서 "작업 트리가 안 깨끗하다"며 시작을 보류함** — 원인은
+  Claude가 그 직전에 만든 설계 문서 3개(미커밋)와 이전부터 있던 순수 줄바꿈 잡음
+  파일들. `git diff --stat`으로 실제 내용 변경 없음을 확인 후 `git restore`로 정리하고
+  설계 문서만 별도 커밋한 뒤 재실행해서 해결함 — 위 "새 세션 시작 절차" 참고3에 교훈
+  기록.
+- **검증(Claude 독립 재실행, 최종)**: `cargo test --release` 107/109, `npm test` 197/197,
+  `npx vitest run` 29 files/323 tests, `npm run build` 성공.
+
+## 다음 세션 남은 것
+
+세 개의 독립적인 트랙이 남아 있다(서로 선후 관계 없음, 사용자가 우선순위를 정할 것):
+
+- **트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)** — 문장의 모든 활성 이슈를 반영한
   `finalSuggestedText`를 계산해 문단 텍스트에서 그 문장 구간만 통째로 교체하는 단일
   트랜잭션. `qaStore.ts`의 `acceptCard`(해시 검증/`extractDiffHunks`/`pendingCommands`
   추적)를 건드리는 첫 단계이므로 **반드시 자체 설계 검토(가능하면 Codex/agy 자문)부터
-  다시 시작할 것** — 이번 세션에 의도적으로 손대지 않았다.
-- **Mode B(개별 이슈 부분 적용 + Diff Rebase)** — 두 자문 모두 가장 리스크가 크다고 지목한
-  부분, Mode A보다도 더 신중해야 함.
-- Stage 2 이후(TM 검색 쪽 문장 단위 전환, SDLTM read-only importer, 인라인 태그 보존)는
-  아직 손대지 않음 — `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md` 5장 로드맵 순서 그대로
-  유효.
-- **원격 push 여부는 사용자에게 확인 후 진행할 것** — 이번 세션 커밋 3개(`8e567d8`,
-  `0466419`, `a932dc3`) 전부 로컬까지만 하고 push는 아직 안 함(다음 세션 시작 시 `git log`
-  로 로컬만 앞서 있는지 확인).
+  다시 시작할 것** — 아직 손대지 않았다. `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md`
+  1장 참고.
+- **트랙 B: TM 자동 치환** — `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
+  "1. 자동 치환" 절의 단계별 권고(A. 관찰 스파이크 → B. 수동 일괄 적용 → C. 세션
+  로그·되돌리기 → D. 명시적 자동 모드 → E. 문단 이탈 자동화)를 그대로 따를 것. Stage 1c가
+  끝났으니 이제 착수 가능. 실시간 키스트로크 자동 치환은 **절대 금지**(두 자문 공통).
+- **트랙 C: [번역 모드]+XLIFF** — 같은 문서 "2. 번역 모드와 XLIFF" 절의 T0~T7 단계.
+  T0(요구사항 고정: sidecar vs 새 문서 생성 vs bilingual 편집 중 확정)부터 시작할 것.
+  XLIFF는 항상 사이드카로, 에디터 원본 문서에 직접 쓰는 방식(T7)은 최후순위·기본
+  비활성.
+- 인라인 태그 보존, SDLTM read-only importer는 트랙 C의 선행 조건(T4)이라 그때 자연히
+  다뤄짐 — 별도로 먼저 착수할 필요 없음.
+- **원격 push는 사용자가 전체 작업 마무리를 선언할 때만** — 매 세션/커밋마다 다시 묻지
+  말 것(사용자가 명시적으로 확정, `smartlinter-defer-remote-push` 메모리 참고). 지금
+  로컬이 원격보다 7개 커밋 앞서 있음.
 
 ## 새 PC 이관 (2026-08-29) — 다른 PC에서 이어받을 때 반드시 읽을 것
 
