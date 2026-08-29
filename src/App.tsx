@@ -5,6 +5,7 @@ import { MainLayout } from './components/layout/MainLayout.tsx';
 import { StatusBar } from './components/layout/StatusBar.tsx';
 import { QACardList } from './components/qa/QACardList.tsx';
 import { TMMatchPanel } from './components/tm/TMMatchPanel.tsx';
+import { TmAutoApplySessionBanner } from './components/tm/TmAutoApplySessionBanner.tsx';
 import { SettingsModal } from './components/config/SettingsModal.tsx';
 import { GuidelineViewer } from './components/config/GuidelineViewer.tsx';
 import { useBridgeStore } from './stores/bridgeStore.ts';
@@ -81,6 +82,7 @@ export const App: React.FC = () => {
 
       {/* Reconnecting Alert Banner (Yellow / Amber) */}
       <ConnectionBanner />
+      <TmAutoApplySessionBanner />
 
       {/* Main Responsive Split QA & TM Viewport with real-time QA Card List and TM Match Panel */}
       <MainLayout qaSlot={<QACardList />} tmSlot={<TMMatchPanel />} />

@@ -6,7 +6,7 @@
  * and instant [TM 적용] one-click replacement action button.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Check,
   ArrowRight,
@@ -34,6 +34,7 @@ import { useConfigStore } from '../../stores/configStore.ts';
 import { useTmStore } from '../../stores/tmStore.ts';
 import { sentenceCount } from '../../utils/sentenceBoundary.ts';
 import { getBridgeService } from '../../services/tauriBridge.ts';
+import { useTmAutoApplyHistoryStore } from '../../stores/tmAutoApplyHistoryStore.ts';
 
 export interface TMMatchCardProps {
   candidate: TmMatchCandidate;
@@ -41,6 +42,8 @@ export interface TMMatchCardProps {
   onApply?: (candidate: TmMatchCandidate, overrideTarget?: string) => void;
   isApplying?: boolean;
   className?: string;
+  paragraphId?: string;
+  segmentIndex?: number;
 }
 
 const renderHighlightedText = (text: string, keyword?: string) => {
@@ -57,6 +60,8 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
   onApply,
   isApplying: propIsApplying,
   className = '',
+  paragraphId,
+  segmentIndex,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showDiff, setShowDiff] = useState(true);
@@ -68,6 +73,14 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
   const searchMode = useTmStore((state) => state.searchMode);
   const searchQuery = useTmStore((state) => state.searchQuery);
   const activeParagraph = useBridgeStore((state) => state.activeParagraph);
+  const batches = useTmAutoApplyHistoryStore((state) => state.batches);
+  const historyItem = useMemo(
+    () => batches.flatMap((batch) => batch.items.map((item) => ({ batch, item }))).find(({ batch, item }) => batch.paragraphId === paragraphId
+      && (segmentIndex === undefined || item.segmentIndex === segmentIndex)
+      && item.sourceText === candidate.source && item.appliedTarget === candidate.target),
+    [batches, paragraphId, segmentIndex, candidate.source, candidate.target],
+  );
+  const revertItem = useTmAutoApplyHistoryStore((state) => state.revertItem);
 
   const isApplying = propIsApplying || candidate.status === 'applying';
   const isApplied = candidate.status === 'applied';
@@ -339,6 +352,7 @@ export const TMMatchCard: React.FC<TMMatchCardProps> = ({
           <button type="button" data-testid="tm-save-btn" onClick={saveToTm} disabled={!canSaveToTm || isSavingToTm} title={isTmSaved ? 'TM에 저장됨' : saveDisabledReason || '현재 문단과 번역을 TM에 저장'} className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 text-violet-200 bg-violet-950/70 border border-violet-800 hover:bg-violet-900 disabled:opacity-50 disabled:cursor-not-allowed">
             {isTmSaved ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Database className="w-3.5 h-3.5" />}<span>{isTmSaved ? 'TM 저장됨' : 'TM 저장'}</span>
           </button>
+          {isApplied && historyItem?.item.status === 'applied' && <button type="button" data-testid="tm-revert-item-btn" onClick={() => void revertItem(historyItem.batch.batchId, historyItem.item.itemId)} className="rounded border border-amber-700 px-2 py-1 text-[11px] text-amber-200">되돌리기</button>}
           {/* [TM 적용] Button */}
           <button
             type="button"

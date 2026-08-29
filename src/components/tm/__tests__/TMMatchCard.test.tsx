@@ -11,6 +11,7 @@ import { useBridgeStore } from '../../../stores/bridgeStore.ts';
 import { useConfigStore } from '../../../stores/configStore.ts';
 import { useTmStore } from '../../../stores/tmStore.ts';
 import { getBridgeService } from '../../../services/tauriBridge.ts';
+import { useTmAutoApplyHistoryStore } from '../../../stores/tmAutoApplyHistoryStore.ts';
 
 describe('TMMatchCard Component', () => {
   const exactCandidate: TmMatchCandidate = {
@@ -54,6 +55,7 @@ describe('TMMatchCard Component', () => {
     useBridgeStore.getState().reset();
     useConfigStore.getState().reset();
     useTmStore.getState().reset();
+    useTmAutoApplyHistoryStore.getState().clear();
   });
 
   it('should render 100% Exact match with green badge (Condition 2)', () => {
@@ -165,6 +167,60 @@ describe('TMMatchCard Component', () => {
     expect(screen.getAllByText('Bridge', { selector: 'mark' })).toHaveLength(2);
     expect(screen.queryByText(/current.*difference/i)).not.toBeInTheDocument();
     expect(screen.getByText('키워드 검색 결과 — 현재 문단에 적용')).toBeInTheDocument();
+  });
+
+  it('shows a revert action only when the applied card has a matching history item', () => {
+    const revertItem = vi.spyOn(useTmAutoApplyHistoryStore.getState(), 'revertItem').mockResolvedValue(null);
+    const paragraphId = 'history-paragraph';
+    const batchId = useTmAutoApplyHistoryStore.getState().recordBatch({
+      paragraphId,
+      beforeText: exactCandidate.source,
+      beforeHash: 'before',
+      afterText: exactCandidate.target,
+      afterHash: 'after',
+      items: [{ segmentIndex: 0, sourceText: exactCandidate.source, appliedTarget: exactCandidate.target, startOffset: 0, endOffset: exactCandidate.source.length }],
+    });
+    const itemId = useTmAutoApplyHistoryStore.getState().batches[0].items[0].itemId;
+
+    render(<TMMatchCard candidate={{ ...exactCandidate, status: 'applied' }} paragraphId={paragraphId} segmentIndex={0} />);
+
+    fireEvent.click(screen.getByTestId('tm-revert-item-btn'));
+    expect(revertItem).toHaveBeenCalledWith(batchId, itemId);
+  });
+
+  it('matches a paragraph-level preview to its history item when segment identity is unavailable', () => {
+    const paragraphId = 'flat-history-paragraph';
+    useTmAutoApplyHistoryStore.getState().recordBatch({
+      paragraphId,
+      beforeText: exactCandidate.source,
+      beforeHash: 'before',
+      afterText: exactCandidate.target,
+      afterHash: 'after',
+      items: [{ segmentIndex: 0, sourceText: exactCandidate.source, appliedTarget: exactCandidate.target, startOffset: 0, endOffset: exactCandidate.source.length }],
+    });
+
+    render(<TMMatchCard candidate={{ ...exactCandidate, status: 'applied' }} paragraphId={paragraphId} />);
+
+    expect(screen.getByTestId('tm-revert-item-btn')).toBeInTheDocument();
+  });
+
+  it('hides the revert action once its history item is no longer applied', () => {
+    const paragraphId = 'reverted-history-paragraph';
+    useTmAutoApplyHistoryStore.getState().recordBatch({
+      paragraphId,
+      beforeText: exactCandidate.source,
+      beforeHash: 'before',
+      afterText: exactCandidate.target,
+      afterHash: 'after',
+      items: [{ segmentIndex: 0, sourceText: exactCandidate.source, appliedTarget: exactCandidate.target, startOffset: 0, endOffset: exactCandidate.source.length }],
+    });
+    useTmAutoApplyHistoryStore.setState((state) => ({
+      batches: state.batches.map((batch) => ({ ...batch, items: batch.items.map((item) => ({ ...item, status: 'reverted' as const })) })),
+    }));
+
+    render(<TMMatchCard candidate={{ ...exactCandidate, status: 'applied' }} paragraphId={paragraphId} segmentIndex={0} />);
+
+    expect(screen.queryByTestId('tm-revert-item-btn')).not.toBeInTheDocument();
   });
 
   it('applies the edited target while retaining the original candidate identity', () => {

@@ -381,6 +381,8 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
                     key={`${group.segmentIndex}-${cand.tuId || `${cand.source}-${cand.target}-${cand.scorePercent}`}`}
                     candidate={cand}
                     currentText={group.sourceText}
+                    paragraphId={currentParagraph?.paragraphId || activeParagraph?.paragraphId}
+                    segmentIndex={group.segmentIndex}
                     onApply={(candidate, overrideTarget) => handleApply(candidate, overrideTarget, group)}
                   />
                 ))}</div>
@@ -391,6 +393,7 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
                 key={`${currentParagraph?.paragraphId || activeParagraph?.paragraphId || 'no-paragraph'}-${cand.tuId || `${cand.source}-${cand.target}-${cand.scorePercent}`}`}
                 candidate={cand}
                 currentText={currentParagraphText || searchQuery}
+                paragraphId={currentParagraph?.paragraphId || activeParagraph?.paragraphId}
                 onApply={handleApply}
               />
             ))}
@@ -404,6 +407,7 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
           {batchMessage && (
             <div data-testid="tm-batch-apply-message" className="mb-2 text-[10px] text-slate-300">{batchMessage}</div>
           )}
+          <div data-testid="tm-session-history-hint" className="mb-1 text-[10px] text-slate-500">세션 복구 내역은 상단 배너에서 볼 수 있습니다.</div>
           <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 truncate max-w-[220px]">
             <Database className="w-3 h-3 text-cyan-400 flex-none" />

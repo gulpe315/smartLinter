@@ -39,6 +39,7 @@ import {
   DEFAULT_TM_TOP_N,
 } from '../utils/tmMatcher.ts';
 import { planTmAutoApplyReplacement } from '../utils/tmAutoApplyReplacement.ts';
+import { useTmAutoApplyHistoryStore } from './tmAutoApplyHistoryStore.ts';
 
 export interface TMState {
   // --- Match Candidates & Search State ---
@@ -369,6 +370,15 @@ export const useTmStore = create<TMState>((set, get) => ({
       };
       const result = await bridgeService.sendReplacementCommand(command);
       if (result.status !== 'SUCCESS') return finishFailure(result);
+
+      useTmAutoApplyHistoryStore.getState().recordBatch({
+        paragraphId: plan.paragraphId,
+        beforeText: snapshot.currentText,
+        beforeHash: plan.baseHash,
+        afterText: replacement.expectedFullText,
+        afterHash: command.expectedHash,
+        items: eligible.map((item) => ({ segmentIndex: item.segmentIndex, sourceText: item.sourceText, appliedTarget: item.candidate.target, startOffset: item.startOffset, endOffset: item.endOffset })),
+      });
 
       set((state) => ({
         isApplyingBatch: false,

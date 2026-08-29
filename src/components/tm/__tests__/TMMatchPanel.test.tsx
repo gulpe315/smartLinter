@@ -11,6 +11,7 @@ import { useConfigStore } from '../../../stores/configStore.ts';
 import { useTmStore } from '../../../stores/tmStore.ts';
 import { MockBridgeService } from '../../../services/tauriBridge.ts';
 import { getGlobalTmMatcher } from '../../../utils/tmMatcher.ts';
+import { useTmAutoApplyHistoryStore } from '../../../stores/tmAutoApplyHistoryStore.ts';
 import { type ParagraphPayload } from '../../../../shared/protocol/types.ts';
 
 describe('TMMatchPanel Component', () => {
@@ -34,6 +35,7 @@ describe('TMMatchPanel Component', () => {
     useBridgeStore.getState().reset();
     useConfigStore.getState().reset();
     useTmStore.getState().reset();
+    useTmAutoApplyHistoryStore.getState().clear();
   });
 
   afterEach(() => {
@@ -111,6 +113,29 @@ describe('TMMatchPanel Component', () => {
 
     expect(screen.getByTestId('tm-sentence-group-0')).toHaveTextContent('문장 1');
     expect(screen.getByTestId('tm-sentence-group-1')).toHaveTextContent('문장 2');
+  });
+
+  it('forwards paragraph and segment identity so an applied card can revert its history item', () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'revert-panel', text: 'Source sentence.', hash: 'before', source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const candidate = { source: paragraph.text, target: 'Applied target.', score: 1, scorePercent: 100, grade: 'EXACT' as const, status: 'applied' as const };
+    const revertItem = vi.spyOn(useTmAutoApplyHistoryStore.getState(), 'revertItem').mockResolvedValue(null);
+    const batchId = useTmAutoApplyHistoryStore.getState().recordBatch({
+      paragraphId: paragraph.paragraphId, beforeText: paragraph.text, beforeHash: 'before', afterText: candidate.target, afterHash: 'after',
+      items: [{ segmentIndex: 0, sourceText: candidate.source, appliedTarget: candidate.target, startOffset: 0, endOffset: paragraph.text.length }],
+    });
+    const itemId = useTmAutoApplyHistoryStore.getState().batches[0].items[0].itemId;
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 1, activeParagraph: paragraph });
+    useTmStore.setState({
+      currentParagraph: paragraph,
+      candidates: [],
+      sentenceMatches: [{ segmentIndex: 0, sourceText: paragraph.text, startOffset: 0, endOffset: paragraph.text.length, candidates: [candidate] }],
+    });
+
+    render(<TMMatchPanel />);
+    fireEvent.click(screen.getByTestId('tm-revert-item-btn'));
+    expect(revertItem).toHaveBeenCalledWith(batchId, itemId);
   });
 
   it('summarizes exact observations and badges only their matching sentence groups', () => {
