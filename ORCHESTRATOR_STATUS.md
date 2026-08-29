@@ -1,9 +1,77 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 B Stage B(TM 자동 치환
-수동 일괄 적용) 착수·완료. 아래 이 절을 먼저 읽을 것.**
+**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 B Stage C(세션
+로그·되돌리기 UI) 착수·완료 — 트랙 B(TM 자동 치환) 전체 완료. 아래 이
+절을 먼저 읽을 것.**
 
-## 이번 세션 완료(3차 후속) — 트랙 B Stage B: TM 자동 치환 수동 일괄 적용
+## 이번 세션 완료(4차 후속) — 트랙 B Stage C: TM 자동 치환 세션 로그·되돌리기 UI
+
+**커밋 4개(`420a03b` 설계 자문 문서, `399b844` 구현 지시서, `ae1ed38`
+구현, `4012bc0` 후속 지시서 3건 기록 — 아직 원격 push 안 함, 로컬이
+원격보다 19개 커밋 앞섬).** Stage B 완료 직후 사용자에게 "Stage C(세션
+로그·되돌리기) vs 트랙 C(번역 모드+XLIFF)" 중 어느 쪽을 먼저 할지 물었고
+Stage C를 선택받아 착수했다. Stage B가 만든 배치를 세션 로그에 기록하고,
+개별/일괄 되돌리기를 제공하는 단계다.
+
+- **설계**: `DESIGN_REQUEST_TM_AUTO_APPLY_STAGE_C.md`로 자문 — 5개 질문
+  중 4개(저장 위치/수명, 개별·일괄 되돌리기 동시 지원, 상태 머신, UI
+  배치)는 Codex/agy가 처음부터 수렴했으나, "일괄 되돌리기 hunk를 어떻게
+  만들 것인가"에서 갈렸다. agy 원안(`revertHunk_i.start = h_i.start`,
+  즉 원본 forward hunk 좌표를 그대로 재사용)은 **Claude가 직접 좌표
+  수학을 검증해 agy 자신의 개별 되돌리기 답변(`postStart(i) = start_i +
+  Σ delta_j`)과 내적으로 모순됨을 발견** — 여러 hunk 길이가 다르면
+  post-apply 텍스트에서 실제 위치가 드리프트하는데 agy의 일괄 되돌리기
+  안만 이걸 반영 안 했다. `RECONCILE_TM_AUTO_APPLY_STAGE_C.md`로
+  재조율 요청 → agy가 자신의 결함을 인정하고 Codex 안("전체 텍스트를
+  통째로 다시 diff" — `extractDiffHunks(currentExpectedText,
+  beforeText)`)으로 완전 수렴. 최종 스펙은
+  `RECONCILED_TM_AUTO_APPLY_STAGE_C.md`.
+- **구현 — 3라운드 리뷰로 결함 6건 발견·수정**(전부 Claude가 직접
+  고치지 않고 Codex에게 후속 지시서로 되돌려 수정시킴, 매 라운드 후
+  Claude가 `npm test`/`npx vitest run`/`npm run build` 독립 재실행):
+  1. **1차 구현 후 Claude diff 검토**: `TMMatchCard.tsx`의 Zustand
+     셀렉터가 `flatMap`+`find`로 매 렌더링마다 새 객체를 반환해
+     `useSyncExternalStore` 불안정성 위험(→ `useMemo`로 안정화), 세션
+     배너의 표시 조건이 `batch.status === 'applied'`를 요구해
+     `partially_reverted` 배치의 잔여 항목이 있어도 배너가 사라지는
+     버그. 지시서가 요구한 스토어/UI 테스트가 1차 구현에 전혀 없었던 것도
+     함께 지적.
+  2. **agy 독립 코드 리뷰(2차 후속)**: High 1건(`TMMatchPanel.tsx`의
+     flat 후보 목록이 `segmentIndex`를 안 넘겨 되돌리기 버튼이 전혀 안
+     뜸), Medium 2건(배너에서 개별 되돌리기 후 카드에 죽은 되돌리기
+     버튼 잔류, 비동기 처리 중 `reverting` 상태 전이가 없어 더블클릭
+     시 중복 명령 전송 가능) — Claude가 코드로 전부 재확인 후 후속
+     지시.
+  3. **3차 후속**: `revertBatch`와 `revertItem`의 호스트 실패 응답
+     처리 분기를 나란히 비교하던 중 Claude가 직접 발견 — `revertItem`은
+     호스트 `FAILED` 시 항목을 무조건 `revert_failed`로 전이시키는데
+     `revertBatch`는 `&& stale` 조건이 있어 순수 `FAILED`(해시 불일치
+     없는 단순 실패) 응답 시 항목이 `reverting`에 영구히 멈추는 비대칭
+     결함.
+- **핵심 알고리즘 검증**: 일괄 되돌리기(`planBatchRevert`)는 원본
+  forward hunk 좌표를 재사용하지 않고 checkpoint 텍스트 전체를
+  `beforeText`와 다시 diff — 이 방식은 `partially_reverted` 배치(일부
+  항목이 이미 개별로 되돌려진 상태)에서도 별도 분기 없이 자연히 올바르게
+  동작한다(이미 되돌려진 구간은 diff에서 아예 안 잡힘). 개별 되돌리기
+  (`planItemRevert`)는 대상보다 왼쪽에 있고 아직 `applied`인 항목들의
+  길이 변화만 누적해 실제 post-apply 위치를 재계산 — 스토어 레벨 통합
+  테스트로 "항목 하나 개별 되돌리기 → 남은 항목 일괄 되돌리기"가 정확한
+  결과를 내는지 검증됨(가장 틀리기 쉬운 지점이라 명시적으로 요구한
+  회귀 테스트).
+- **검증**: Claude가 매 라운드 `npm test`(197/197)·`npx vitest
+  run`(최종 35 files/**386**/386)·`npm run build` 독립 재실행. 매
+  라운드 `git status`/`diff`로 지시 범위 밖 파일 변경 없음 확인(
+  `qaStore.ts`/`rollback_guard.ts`/`stale_conflict_resolver.ts`/에디터
+  플러그인/Rust 전부 무변경).
+- **다음 세션이 참고할 것**: 트랙 B(TM 자동 치환) A/B/C 전 단계 완료 —
+  Codex 로드맵의 Stage D(명시적 자동 모드)/E(문단 이탈 자동화)는 라이브
+  Word/InDesign 검증 전엔 착수하지 않는 게 원 설계 자문의 결론이므로
+  보류. 다음은 트랙 C(번역 모드+XLIFF) 착수가 유력하나 **사용자에게
+  먼저 물어볼 것**(자동 결정 금지 원칙).
+
+---
+
+## 이전 세션 완료(3차 후속) — 트랙 B Stage B: TM 자동 치환 수동 일괄 적용
 
 **커밋 2개(`541dcfb` 설계 자문 문서, `0f3cae3` 구현 — 아직 원격 push 안 함,
 로컬이 원격보다 15개 커밋 앞섬).** Stage A 완료 직후 사용자가 "계속 진행"
@@ -149,15 +217,15 @@ exact TM 후보를 관찰만")를 완료했다.
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `0f3cae3`(Add TM auto-apply Stage B:
-   manual batch apply for the current paragraph)인지 확인.** 아니면 그
+1. **`git log --oneline -1`로 최신 커밋이 `4012bc0`(Add Stage C follow-up
+   task requests documenting the 3 review rounds)인지 확인.** 아니면 그
    이후 커밋을 먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이
-   원격보다 15개 커밋 앞섬(`8e567d8`~`0f3cae3`) — 전부 push 안 함, 사용자가
+   원격보다 19개 커밋 앞섬(`8e567d8`~`4012bc0`) — 전부 push 안 함, 사용자가
    "로컬 커밋만 계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고
    명시적으로 정함(다음 세션에서도 매번 push 여부를 다시 묻지 말 것,
    사용자가 먼저 요청할 때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(32 files / **366**/366 —
+   확인: `npm test`(197/197), `npx vitest run`(35 files / **386**/386 —
    `tmMatcher.test.ts`의 "10,000 TU 벤치마크 <50ms" 벤치마크 테스트는
    시스템 부하 시 타이밍 플레이크가 날 수 있음, 재현 안 되면 무시하고
    재실행할 것, 코드 무관), `npm run build`(성공). `cargo test --release`는
@@ -228,21 +296,19 @@ exact TM 후보를 관찰만")를 완료했다.
 ## 다음 세션 남은 것
 
 사용자가 "위 ABC 차례대로 진행"으로 순서를 확정했다. **트랙 A 완료
-(`923d62d`/`5543aca`). 트랙 B는 Stage A(`9bd818f`/`16e95ab`)와 Stage
-B(`541dcfb`/`0f3cae3`)까지 완료** — Codex 로드맵 기준 "A와 B만으로도 상당한
-사용성 가치" 지점에 도달했다.
+(`923d62d`/`5543aca`). 트랙 B는 Stage A(`9bd818f`/`16e95ab`), Stage
+B(`541dcfb`/`0f3cae3`), Stage C(`420a03b`/`399b844`/`ae1ed38`/`4012bc0`)
+까지 전부 완료** — 트랙 B(TM 자동 치환)는 사용자가 정한 범위(Stage
+D/E 제외) 내에서 완결됐다.
 
 - ~~트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)~~ — **완료.**
-- **트랙 B: TM 자동 치환 — Stage A/B 완료.** 다음 세션 시작 시 **Stage
-  C(세션 로그·개별/일괄 되돌리기 UI) 또는 트랙 C(번역 모드+XLIFF) 중
-  어느 쪽을 먼저 할지 사용자에게 물어볼 것**(자동 결정 금지 원칙 유지 —
-  세 트랙째 이 원칙을 지켜왔고 매번 효과가 있었다). Stage C를 하게 되면
-  `RECONCILED_TM_AUTO_APPLY_STAGE_B.md`의 `lastAppliedBatchResult`/
-  `applyAutoApplyPlan`이 이미 영속 로그의 원장 후보로 쓰일 수 있게
-  설계돼 있다. Stage D(명시적 자동 모드)/E(문단 이탈 자동화)는 라이브
-  Word/InDesign 검증 전엔 착수하지 않는 게 원 설계 자문의 결론이었다.
-  실시간 키스트로크 자동 치환은 **절대 금지**(두 자문 공통, 앞으로도
-  유효).
+- ~~트랙 B: TM 자동 치환 — Stage A/B/C~~ — **완료.** Stage D(명시적
+  자동 모드)/E(문단 이탈 자동화)는 라이브 Word/InDesign 검증 전엔
+  착수하지 않는 게 원 설계 자문의 결론이었으므로 보류 상태 유지. 실시간
+  키스트로크 자동 치환은 **절대 금지**(두 자문 공통, 앞으로도 유효).
+- **다음 세션 시작 시 트랙 C(번역 모드+XLIFF) 착수를 사용자에게 확인할
+  것**(자동 결정 금지 원칙 유지 — 네 트랙째 이 원칙을 지켜왔고 매번
+  효과가 있었다). 트랙 C 외에 사용자가 다른 우선순위를 줄 수도 있음.
 - **트랙 C: [번역 모드]+XLIFF** — 같은 문서 "2. 번역 모드와 XLIFF" 절의 T0~T7 단계.
   T0(요구사항 고정: sidecar vs 새 문서 생성 vs bilingual 편집 중 확정)부터 시작할 것.
   XLIFF는 항상 사이드카로, 에디터 원본 문서에 직접 쓰는 방식(T7)은 최후순위·기본
