@@ -15,6 +15,8 @@ import { useConfigStore } from './configStore.ts';
 import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
 import { deriveTmAutoApplyPlan } from '../utils/tmAutoApplyObservation.ts';
 import { getGlobalTmMatcher } from '../utils/tmMatcher.ts';
+import { analyzeXliffImport, applyXliffImport, parseXliffImport, type XliffConflictResolution, type XliffImportAnalysis } from '../utils/xliffImport.ts';
+import { useBridgeStore } from './bridgeStore.ts';
 
 const TRANSLATION_SESSION_STORAGE_KEY = 'smartlinter_translation_session';
 let scanRequestToken = 0;
@@ -34,7 +36,7 @@ export interface TranslationSessionSegment {
   startOffset: number;
   endOffset: number;
   targetDraft: string;
-  origin: 'tm-exact' | 'empty';
+  origin: 'tm-exact' | 'empty' | 'external-cat';
   isUserEdited: boolean;
   status: TranslationSegmentStatus;
   detectedAt: number;
@@ -196,10 +198,22 @@ export interface TranslationSessionState {
     scannedAt: number;
     includeUnplacedStories: boolean;
   }) | null;
+  lastImportSummary: {
+    appliedCount: number;
+    conflictCount: number;
+    skippedSourceMismatchCount: number;
+    skippedNotFoundCount: number;
+    skippedDuplicateIdCount: number;
+    notProvidedCount: number;
+    toolId: string | null;
+    importedAt: number;
+  } | null;
+  importError: string | null;
   setTranslationMode: (active: boolean) => void;
   upsertParagraphSegments: (paragraph: ParagraphPayload) => void;
   scanFullDocument: (options?: { includeUnplacedStories?: boolean }, service?: IBridgeService) => Promise<void>;
   cancelScan: () => void;
+  importXliff: (xmlContent: string, resolveConflicts?: (analysis: XliffImportAnalysis) => Promise<XliffConflictResolution[]>, service?: IBridgeService) => Promise<void>;
   updateSegmentTarget: (segmentId: string, text: string) => void;
   removeSegment: (segmentId: string) => void;
   clearSession: () => void;
@@ -213,6 +227,8 @@ const initialState = {
   isScanning: false,
   scanError: null as string | null,
   lastScanSummary: null as TranslationSessionState['lastScanSummary'],
+  lastImportSummary: null as TranslationSessionState['lastImportSummary'],
+  importError: null as string | null,
 };
 
 export const useTranslationSessionStore = create<TranslationSessionState>()(persist((set, get) => ({
@@ -316,6 +332,46 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
   cancelScan: () => {
     scanRequestToken += 1;
     set({ isScanning: false, scanError: null });
+  },
+
+  importXliff: async (xmlContent, resolveConflicts, service) => {
+    if (get().isScanning) return;
+    set({ importError: null });
+    const parsed = parseXliffImport(xmlContent);
+    if (!parsed.ok) {
+      set({ importError: parsed.message });
+      return;
+    }
+    if (useBridgeStore.getState().editorConnected) {
+      await get().scanFullDocument(undefined, service);
+      if (get().scanError) {
+        set({ importError: `문서 상태를 검증할 수 없어 XLIFF를 안전하게 가져올 수 없습니다: ${get().scanError}` });
+        return;
+      }
+    }
+    const analysis = analyzeXliffImport(parsed.units, get().segments);
+    const selectedResolutions = analysis.conflicts.length > 0 && resolveConflicts
+      ? await resolveConflicts(analysis)
+      : [];
+    const incomingBySegmentId = new Map(analysis.conflicts.map((item) => [item.segment.segmentId, item.incoming]));
+    const resolvedConflicts = selectedResolutions.map((resolution) => ({
+      ...resolution,
+      incoming: incomingBySegmentId.get(resolution.segmentId),
+    }));
+    const now = Date.now();
+    set({
+      segments: applyXliffImport(get().segments, analysis.autoApply, resolvedConflicts, now),
+      lastImportSummary: {
+        appliedCount: analysis.autoApply.length + resolvedConflicts.filter((resolution) => resolution.resolution === 'use-incoming').length,
+        conflictCount: analysis.conflicts.length,
+        skippedSourceMismatchCount: analysis.skippedSourceMismatch.length,
+        skippedNotFoundCount: analysis.skippedNotFound.length,
+        skippedDuplicateIdCount: analysis.skippedDuplicateId.length,
+        notProvidedCount: analysis.notProvided.length,
+        toolId: parsed.toolId,
+        importedAt: now,
+      },
+    });
   },
 
   updateSegmentTarget: (segmentId, text) => set((state) => {

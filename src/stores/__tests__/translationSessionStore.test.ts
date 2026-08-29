@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ParagraphPayload, type ScannedParagraphEntry } from '../../../shared/protocol/types.ts';
 import { MockBridgeService } from '../../services/tauriBridge.ts';
 import { useConfigStore } from '../configStore.ts';
+import { useBridgeStore } from '../bridgeStore.ts';
 import { mergeScannedParagraphs, type TranslationSessionSegment, useTranslationSessionStore } from '../translationSessionStore.ts';
 import { getGlobalTmMatcher } from '../../utils/tmMatcher.ts';
 
@@ -47,6 +48,7 @@ describe('translationSessionStore', () => {
     localStorage.clear();
     useTranslationSessionStore.getState().reset();
     useConfigStore.getState().reset();
+    useBridgeStore.getState().reset();
   });
 
   it('does not collect paragraphs while translation mode is off', () => {
@@ -336,5 +338,73 @@ describe('translationSessionStore', () => {
       unplacedParagraphsPendingChoice: 3,
       includeUnplacedStories: true,
     });
+  });
+
+  it('rescans before importing when an editor is connected', async () => {
+    const service = new MockBridgeService();
+    const enumerate = vi.spyOn(service, 'enumerateDocumentParagraphs').mockResolvedValue({
+      requestId: 'scan', sourceDocumentName: 'Document.docx', paragraphs: [scanned('paragraph-1', 'hash', 0, 'Source text')],
+    });
+    useTranslationSessionStore.setState({ isTranslationModeActive: true, segments: [existing('paragraph-1', 'hash', {
+      segmentId: 'segment-1', sourceText: 'Source text', targetDraft: '', isUserEdited: false, status: 'untranslated',
+    })] });
+    useBridgeStore.setState({ editorConnected: true });
+
+    await useTranslationSessionStore.getState().importXliff(
+      '<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2"><file><body><trans-unit id="segment-1"><source>Source text</source><target>Imported</target></trans-unit></body></file></xliff>',
+      undefined, service,
+    );
+
+    expect(enumerate).toHaveBeenCalledWith(undefined);
+    expect(useTranslationSessionStore.getState().segments[0].targetDraft).toBe('Imported');
+  });
+
+  it('imports without a rescan while offline', async () => {
+    useTranslationSessionStore.setState({ segments: [existing('paragraph-1', 'hash', {
+      segmentId: 'segment-1', sourceText: 'Source text', targetDraft: '', isUserEdited: false, status: 'untranslated',
+    })] });
+    const scan = vi.spyOn(useTranslationSessionStore.getState(), 'scanFullDocument');
+    await useTranslationSessionStore.getState().importXliff(
+      '<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2"><file><body><trans-unit id="segment-1"><source>Source text</source><target>Imported</target></trans-unit></body></file></xliff>',
+    );
+    expect(scan).not.toHaveBeenCalled();
+    expect(useTranslationSessionStore.getState().segments[0].targetDraft).toBe('Imported');
+    scan.mockRestore();
+  });
+
+  it('leaves segments unchanged and reports an error when the required rescan fails', async () => {
+    const original = existing('paragraph-1', 'hash', { segmentId: 'segment-1', sourceText: 'Source text' });
+    const service = new MockBridgeService();
+    vi.spyOn(service, 'enumerateDocumentParagraphs').mockResolvedValue({ requestId: 'failed', sourceDocumentName: 'Document.docx', paragraphs: [], error: 'bridge failed' });
+    useTranslationSessionStore.setState({ isTranslationModeActive: true, segments: [original] });
+    useBridgeStore.setState({ editorConnected: true });
+    await useTranslationSessionStore.getState().importXliff(
+      '<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2"><file><body><trans-unit id="segment-1"><source>Source text</source><target>Imported</target></trans-unit></body></file></xliff>',
+      undefined, service,
+    );
+    expect(useTranslationSessionStore.getState().importError).toContain('bridge failed');
+    expect(useTranslationSessionStore.getState().segments[0]).toBe(original);
+  });
+
+  it('keeps conflicts without a resolver and records their count', async () => {
+    useTranslationSessionStore.setState({ segments: [existing('paragraph-1', 'hash', {
+      segmentId: 'segment-1', sourceText: 'Source text', targetDraft: 'Current', isUserEdited: true,
+    })] });
+    await useTranslationSessionStore.getState().importXliff(
+      '<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2"><file><body><trans-unit id="segment-1"><source>Source text</source><target>Incoming</target></trans-unit></body></file></xliff>',
+    );
+    expect(useTranslationSessionStore.getState().segments[0].targetDraft).toBe('Current');
+    expect(useTranslationSessionStore.getState().lastImportSummary?.conflictCount).toBe(1);
+  });
+
+  it('applies incoming targets selected by the conflict resolver', async () => {
+    useTranslationSessionStore.setState({ segments: [existing('paragraph-1', 'hash', {
+      segmentId: 'segment-1', sourceText: 'Source text', targetDraft: 'Current', isUserEdited: true,
+    })] });
+    await useTranslationSessionStore.getState().importXliff(
+      '<xliff version="1.2" xmlns="urn:oasis:names:tc:xliff:document:1.2"><file><body><trans-unit id="segment-1"><source>Source text</source><target>Incoming</target></trans-unit></body></file></xliff>',
+      async () => [{ segmentId: 'segment-1', resolution: 'use-incoming' }],
+    );
+    expect(useTranslationSessionStore.getState().segments[0]).toMatchObject({ targetDraft: 'Incoming', origin: 'external-cat', isUserEdited: false });
   });
 });
