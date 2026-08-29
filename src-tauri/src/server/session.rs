@@ -506,7 +506,7 @@ impl SessionManager {
         let session = session_guard.as_ref().ok_or(SessionError::NotFound)?;
         let sender = session.command_sender.as_ref().ok_or(SessionError::ChannelClosed)?;
         let request_id = super::auth_manager::generate_session_token();
-        let request = EnumerateDocumentRequest { request_id: request_id.clone() };
+        let request = EnumerateDocumentRequest { request_id: request_id.clone(), options: None };
         let (response_tx, response_rx) = oneshot::channel();
         self.pending_document_scans.lock().await.insert(request_id.clone(), PendingDocumentScan {
             session_id: session.session_id.clone(), sender: response_tx,
@@ -781,6 +781,7 @@ mod tests {
             request_id: request.request_id,
             source_document_name: "test.docx".to_string(),
             paragraphs: vec![],
+            summary: None,
             error: None,
         }).await;
         assert_eq!(request_task.await.unwrap().unwrap().source_document_name, "test.docx");
@@ -800,11 +801,11 @@ mod tests {
         let request_task = tokio::spawn({ let manager = manager.clone(); async move { manager.request_document_scan().await } });
         let BridgeMessage::EnumerateDocumentRequest(request) = receiver.recv().await.unwrap() else { panic!("expected document scan request"); };
         manager.complete_document_scan("other-session", EnumerateDocumentResponse {
-            request_id: request.request_id.clone(), source_document_name: "wrong.docx".to_string(), paragraphs: vec![], error: None,
+            request_id: request.request_id.clone(), source_document_name: "wrong.docx".to_string(), paragraphs: vec![], summary: None, error: None,
         }).await;
         assert!(!request_task.is_finished());
         manager.complete_document_scan(&session_id, EnumerateDocumentResponse {
-            request_id: request.request_id, source_document_name: "right.docx".to_string(), paragraphs: vec![], error: None,
+            request_id: request.request_id, source_document_name: "right.docx".to_string(), paragraphs: vec![], summary: None, error: None,
         }).await;
         assert_eq!(request_task.await.unwrap().unwrap().source_document_name, "right.docx");
     }

@@ -390,6 +390,7 @@ pub async fn locate_paragraph_in_editor(
 /// Enumerates all body paragraphs in the active Word document.
 #[tauri::command]
 pub async fn enumerate_document_paragraphs(
+    include_unplaced_stories: Option<bool>,
     server_handle: State<'_, ServerHandle>,
 ) -> Result<EnumerateDocumentResponse, String> {
     let session = server_handle
@@ -398,11 +399,14 @@ pub async fn enumerate_document_paragraphs(
         .await
         .ok_or_else(|| "No active editor session".to_string())?;
 
-    if session.editor_type != EditorType::Word {
-        return Err("Document scan is currently supported only for Word (InDesign support planned for T3b)".to_string());
+    if session.editor_type == EditorType::Word {
+        return server_handle.session_manager().request_document_scan().await.map_err(|error| error.to_string());
     }
-
-    server_handle.session_manager().request_document_scan().await.map_err(|error| error.to_string())
+    tokio::task::spawn_blocking(move || {
+        indesign_com::enumerate_document_paragraphs(include_unplaced_stories.unwrap_or(false))
+    })
+    .await
+    .map_err(|error| format!("InDesign document scan task failed: {error}"))?
 }
 
 /// Gets current QA paragraph contents in InDesign without changing selection or focus.

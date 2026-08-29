@@ -17,6 +17,7 @@
 #include "text_observer.jsx"
 #include "transaction_runner.jsx"
 #include "atomic_replacer.jsx"
+#include "document_scanner.jsx"
 
 (function(global) {
     'use strict';
@@ -449,6 +450,20 @@
         }
         return this.replacer.locateParagraph(command, {
             appInstance: options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null)
+        });
+    };
+
+    SmartLinterDaemon.prototype.enumerateDocumentParagraphs = function(command, options) {
+        options = options || {};
+        var scanner = (typeof SmartLinterDocumentScanner !== 'undefined')
+            ? SmartLinterDocumentScanner : (global.SmartLinterDocumentScanner || null);
+        if (!scanner || typeof scanner.enumerateAllDocumentParagraphs !== 'function') {
+            return { requestId: command ? (command.requestId || 'unknown') : 'unknown', sourceDocumentName: '', paragraphs: [], error: 'DocumentScanner not initialized in daemon' };
+        }
+        var appInstance = options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null);
+        return scanner.enumerateAllDocumentParagraphs(appInstance ? appInstance.activeDocument : null, {
+            requestId: command ? command.requestId : undefined,
+            includeUnplacedStories: command ? command.includeUnplacedStories : false
         });
     };
 

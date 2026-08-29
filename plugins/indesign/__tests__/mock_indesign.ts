@@ -43,6 +43,8 @@ export interface MockCharacterRange {
 
 export interface MockParagraph {
     contents: string;
+    typename?: 'Paragraph';
+    parent?: { typename: string; parent?: any };
     parentStory?: { id: string };
     parentTextFrames?: Array<{ isValid?: boolean; locked?: boolean; itemLayer?: { locked?: boolean } }>;
     /** Matches InDesign Paragraph.index: the paragraph's text position in its parent story. */
@@ -60,14 +62,28 @@ export interface MockParagraph {
 }
 
 export interface MockTextFrame {
+    typename: 'TextFrame';
     paragraphs: MockParagraph[];
     texts?: Array<{ paragraphs: MockParagraph[] }>;
     parentStory?: { id: string };
+    overflows?: boolean;
+    isValid?: boolean;
+}
+
+export interface MockStory {
+    id: string;
+    typename: 'Story';
+    index: number;
+    paragraphs: MockParagraph[];
+    textContainers: MockTextFrame[];
+    overflows: boolean;
+    isValid: boolean;
 }
 
 export interface MockDocument {
     id: string;
     name: string;
+    stories?: MockStory[] & { itemByID?: (id: string) => MockStory | null };
 }
 
 export interface MockIdleTask {
@@ -166,6 +182,7 @@ export class MockInDesignEnvironment {
     public idleTaskList: Map<string, MockIdleTask> = new Map();
     public appListeners: Map<string, Array<(event: any) => void>> = new Map();
     public doScriptHistory: DoScriptCallRecord[] = [];
+    public stories: MockStory[] = [];
 
     public socketInstances: MockSocket[] = [];
     public socketHandler?: (req: string) => string;
@@ -174,6 +191,7 @@ export class MockInDesignEnvironment {
         const doc: MockDocument = { id: 'doc-id-001', name: docName };
         this.documents = [doc];
         this.activeDocument = doc;
+        this.syncStories();
         this.setSelectionText(initialText, docName);
     }
 
@@ -196,6 +214,8 @@ export class MockInDesignEnvironment {
 
         const paragraph: MockParagraph = {
             contents: text,
+            typename: 'Paragraph',
+            parent: { typename: 'Story' },
             parentStory: { id: storyId },
             index: 0,
             appliedParagraphStyle: paraStyle,
@@ -302,6 +322,61 @@ export class MockInDesignEnvironment {
         return paragraph;
     }
 
+    private syncStories(): void {
+        const collection = this.stories as MockStory[] & { itemByID?: (id: string) => MockStory | null };
+        collection.itemByID = (id: string) => collection.find((story) => story.id === String(id)) || null;
+        if (this.activeDocument) this.activeDocument.stories = collection;
+    }
+
+    public createStory(
+        paragraphsText: string[],
+        options: { id?: string; placed?: boolean; overflows?: boolean } = {}
+    ): MockStory {
+        const storyId = options.id || `story-${100 + this.stories.length}`;
+        const story: MockStory = {
+            id: storyId, typename: 'Story', index: this.stories.length,
+            paragraphs: [], textContainers: [], overflows: options.overflows === true, isValid: true
+        };
+        for (let index = 0; index < paragraphsText.length; index++) {
+            const paragraph = this.createParagraph(paragraphsText[index], storyId);
+            paragraph.index = index;
+            paragraph.parent = { typename: 'Story' };
+            story.paragraphs.push(paragraph);
+        }
+        if (options.placed !== false) {
+            const frame: MockTextFrame = { typename: 'TextFrame', paragraphs: story.paragraphs, texts: [{ paragraphs: story.paragraphs }], parentStory: { id: storyId } };
+            frame.overflows = options.overflows === true;
+            frame.isValid = true;
+            story.textContainers.push(frame);
+        }
+        this.stories.push(story);
+        this.syncStories();
+        return story;
+    }
+
+    private addContainerParagraph(storyId: string, text: string, parent: { typename: string; parent?: any }): MockParagraph {
+        const story = this.stories.find((candidate) => candidate.id === storyId);
+        if (!story) throw new Error(`Story not found: ${storyId}`);
+        const paragraph = this.createParagraph(text, storyId);
+        paragraph.index = story.paragraphs.length;
+        paragraph.parent = parent;
+        story.paragraphs.push(paragraph);
+        for (const frame of story.textContainers) frame.paragraphs = story.paragraphs;
+        return paragraph;
+    }
+
+    public addTableParagraph(storyId: string, text: string): MockParagraph {
+        return this.addContainerParagraph(storyId, text, { typename: 'Cell', parent: { typename: 'Story' } });
+    }
+
+    public addFootnoteParagraph(storyId: string, text: string): MockParagraph {
+        return this.addContainerParagraph(storyId, text, { typename: 'Footnote' });
+    }
+
+    public addEndnoteParagraph(storyId: string, text: string): MockParagraph {
+        return this.addContainerParagraph(storyId, text, { typename: 'Endnote' });
+    }
+
     public setSelectionText(
         text: string,
         docName?: string,
@@ -329,12 +404,24 @@ export class MockInDesignEnvironment {
 
         const paragraph = this.createParagraph(text, storyId, options);
         const frame: MockTextFrame = {
+            typename: 'TextFrame',
             paragraphs: [paragraph],
             texts: [{ paragraphs: [paragraph] }],
             parentStory: { id: storyId }
         };
 
         this.selection = [frame];
+        let story = this.stories.find((candidate) => candidate.id === storyId);
+        if (!story) {
+            story = this.createStory([], { id: storyId });
+        }
+        if (story.paragraphs.indexOf(paragraph) === -1) {
+            paragraph.index = story.paragraphs.length;
+            paragraph.parent = { typename: 'Story' };
+            story.paragraphs.push(paragraph);
+            story.textContainers = [frame];
+            this.syncStories();
+        }
         return paragraph;
     }
 

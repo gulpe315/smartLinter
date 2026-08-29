@@ -165,6 +165,15 @@ pub struct LiveSnapshotResponse {
 #[serde(rename_all = "camelCase")]
 pub struct EnumerateDocumentRequest {
     pub request_id: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub options: Option<EnumerateDocumentOptions>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnumerateDocumentOptions {
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub include_unplaced_stories: Option<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -174,6 +183,25 @@ pub struct ScannedParagraphEntry {
     pub text: String,
     pub hash: String,
     pub document_order_index: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub story_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub is_overset: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub coverage_state: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EnumerateDocumentSummary {
+    pub total_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)] pub scanned_paragraphs: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)] pub overset_paragraphs_included: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)] pub unplaced_stories: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)] pub unplaced_paragraphs_pending_choice: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)] pub skipped_tables_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)] pub skipped_footnotes_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)] pub skipped_unsupported_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -182,6 +210,8 @@ pub struct EnumerateDocumentResponse {
     pub request_id: String,
     pub source_document_name: String,
     pub paragraphs: Vec<ScannedParagraphEntry>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub summary: Option<EnumerateDocumentSummary>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub error: Option<String>,
 }

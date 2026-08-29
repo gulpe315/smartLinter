@@ -73,6 +73,7 @@ fn test_enumerate_document_response_optional_error_serialization() {
         request_id: "scan-1".to_string(),
         source_document_name: "document.docx".to_string(),
         paragraphs: vec![],
+        summary: None,
         error: None,
     };
     let without_error = serde_json::to_value(&response).expect("Serialization failed");
@@ -83,6 +84,28 @@ fn test_enumerate_document_response_optional_error_serialization() {
     let serialized = serde_json::to_value(&with_error).expect("Serialization failed");
     assert_eq!(serialized["error"], "Office.js document scan error: busy");
     assert_eq!(serde_json::from_value::<EnumerateDocumentResponse>(serialized).unwrap(), with_error);
+}
+
+#[test]
+fn test_enumerate_document_indesign_fields_roundtrip_and_word_compatibility() {
+    let legacy = r#"{"requestId":"word-scan","sourceDocumentName":"document.docx","paragraphs":[{"paragraphId":"word-para-1","text":"Legacy","hash":"hash","documentOrderIndex":0}]}"#;
+    let parsed: EnumerateDocumentResponse = serde_json::from_str(legacy).unwrap();
+    assert_eq!(parsed.summary, None);
+    assert_eq!(parsed.paragraphs[0].story_id, None);
+
+    let response = EnumerateDocumentResponse {
+        request_id: "indesign-scan-1".to_string(), source_document_name: "Book.indd".to_string(),
+        paragraphs: vec![ScannedParagraphEntry {
+            paragraph_id: "indesign-para-42-0".to_string(), text: "Body".to_string(), hash: "hash".to_string(), document_order_index: 0,
+            story_id: Some("42".to_string()), is_overset: Some(true), coverage_state: Some("included".to_string()),
+        }],
+        summary: Some(EnumerateDocumentSummary { total_count: 1, scanned_paragraphs: Some(1), overset_paragraphs_included: Some(1), unplaced_stories: Some(0), unplaced_paragraphs_pending_choice: Some(0), skipped_tables_count: Some(2), skipped_footnotes_count: Some(3), skipped_unsupported_count: Some(4) }),
+        error: None,
+    };
+    let json = serde_json::to_value(&response).unwrap();
+    assert_eq!(json["paragraphs"][0]["coverageState"], "included");
+    assert_eq!(json["summary"]["skippedUnsupportedCount"], 4);
+    assert_eq!(serde_json::from_value::<EnumerateDocumentResponse>(json).unwrap(), response);
 }
 
 #[test]

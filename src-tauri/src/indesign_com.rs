@@ -51,10 +51,10 @@ mod platform {
     use std::ffi::c_void;
     use std::path::Path;
     use std::thread;
-    use std::time::{Duration, Instant};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
-    use crate::protocol::{ReplacementCommand, ReplacementResult};
+    use crate::protocol::{EnumerateDocumentResponse, ReplacementCommand, ReplacementResult};
     use windows::Win32::Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, RPC_E_CALL_REJECTED,
         RPC_E_CHANGED_MODE, RPC_E_SERVERCALL_RETRYLATER,
@@ -574,10 +574,48 @@ mod platform {
 
         unreachable!("the retry loop always returns")
     }
+
+    pub fn enumerate_document_paragraphs(
+        include_unplaced_stories: bool,
+    ) -> Result<EnumerateDocumentResponse, String> {
+        if !is_indesign_process_running()? {
+            return Err("InDesign is not running".to_string());
+        }
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)
+            .map_err(|error| format!("Cannot generate InDesign scan request ID: {error}"))?
+            .as_millis();
+        let request_id = format!("indesign-scan-{timestamp}");
+        let command_json = serde_json::json!({
+            "requestId": request_id,
+            "includeUnplacedStories": include_unplaced_stories,
+        });
+        let request_id_json = serde_json::to_string(&request_id)
+            .map_err(|error| format!("Cannot serialize scan request ID: {error}"))?;
+        let script = format!(
+            "#targetengine \"smartlinter_persistent_engine\"\n(function() {{\n  if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{\n    var res = $.global.SmartLinterDaemonInstance.enumerateDocumentParagraphs({command_json});\n    return JSON.stringify(res);\n  }}\n  return JSON.stringify({{ requestId: {request_id_json}, sourceDocumentName: '', paragraphs: [], error: 'InDesign SmartLinterDaemonInstance is not initialized' }});\n}})();"
+        );
+        let _com = ComApartment::initialize()?;
+        let dispatch = active_indesign()?;
+        let start = Instant::now();
+        for (attempt, delay) in [100_u64, 300, 900].into_iter().enumerate() {
+            thread::sleep(Duration::from_millis(delay));
+            match do_script_with_result(&dispatch, &script) {
+                Ok(output) => {
+                    tracing::debug!(elapsed_ms = start.elapsed().as_millis() as u64, attempt = attempt + 1, "InDesign document scan completed");
+                    return serde_json::from_str(&output)
+                        .map_err(|error| format!("Cannot decode InDesign document scan result: {error}"));
+                }
+                Err(error) if is_transient_busy(&error) && attempt < 2 => continue,
+                Err(error) if is_transient_busy(&error) => return Err(format!("InDesign remained busy after 3 DoScript attempts: {error}")),
+                Err(error) => return Err(format!("InDesign DoScript failed: {error}")),
+            }
+        }
+        unreachable!("the retry loop always returns")
+    }
 }
 
 #[cfg(windows)]
-pub use platform::{detect_running_indesign, execute_replacement, get_live_paragraph_snapshot, get_live_paragraph_snapshots, inject_daemon_script, locate_paragraph};
+pub use platform::{detect_running_indesign, enumerate_document_paragraphs, execute_replacement, get_live_paragraph_snapshot, get_live_paragraph_snapshots, inject_daemon_script, locate_paragraph};
 
 #[cfg(not(windows))]
 pub fn detect_running_indesign() -> Result<bool, String> {
@@ -611,5 +649,10 @@ pub fn get_live_paragraph_snapshot(_paragraph_id: String, _base_hash: Option<Str
 
 #[cfg(not(windows))]
 pub fn get_live_paragraph_snapshots(_paragraph_ids: Vec<String>) -> Result<Vec<LiveParagraphSnapshotEntry>, String> {
+    Err("InDesign COM automation is only supported on Windows".to_string())
+}
+
+#[cfg(not(windows))]
+pub fn enumerate_document_paragraphs(_include_unplaced_stories: bool) -> Result<crate::protocol::EnumerateDocumentResponse, String> {
     Err("InDesign COM automation is only supported on Windows".to_string())
 }

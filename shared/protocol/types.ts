@@ -97,8 +97,11 @@ export interface LiveSnapshotResponse {
     results: LiveSnapshotItem[];
 }
 
+export type CoverageState = 'included' | 'requires-user-choice' | 'excluded';
+
 export interface EnumerateDocumentRequest {
     requestId: string;
+    options?: { includeUnplacedStories?: boolean };
 }
 
 export interface ScannedParagraphEntry {
@@ -106,12 +109,27 @@ export interface ScannedParagraphEntry {
     text: string;
     hash: string;
     documentOrderIndex: number;
+    storyId?: string;
+    isOverset?: boolean;
+    coverageState?: CoverageState;
+}
+
+export interface EnumerateDocumentSummary {
+    totalCount: number;
+    scannedParagraphs?: number;
+    oversetParagraphsIncluded?: number;
+    unplacedStories?: number;
+    unplacedParagraphsPendingChoice?: number;
+    skippedTablesCount?: number;
+    skippedFootnotesCount?: number;
+    skippedUnsupportedCount?: number;
 }
 
 export interface EnumerateDocumentResponse {
     requestId: string;
     sourceDocumentName: string;
     paragraphs: ScannedParagraphEntry[];
+    summary?: EnumerateDocumentSummary;
     error?: string;
 }
 
@@ -283,7 +301,18 @@ export function isLiveSnapshotResponse(val: unknown): val is LiveSnapshotRespons
 }
 
 export function isEnumerateDocumentRequest(val: unknown): val is EnumerateDocumentRequest {
-    return typeof val === 'object' && val !== null && typeof (val as Record<string, unknown>).requestId === 'string';
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.requestId === 'string'
+        && (obj.options === undefined || (
+            typeof obj.options === 'object' && obj.options !== null
+            && ((obj.options as Record<string, unknown>).includeUnplacedStories === undefined
+                || typeof (obj.options as Record<string, unknown>).includeUnplacedStories === 'boolean')
+        ));
+}
+
+export function isCoverageState(val: unknown): val is CoverageState {
+    return val === 'included' || val === 'requires-user-choice' || val === 'excluded';
 }
 
 export function isScannedParagraphEntry(val: unknown): val is ScannedParagraphEntry {
@@ -294,7 +323,18 @@ export function isScannedParagraphEntry(val: unknown): val is ScannedParagraphEn
         && typeof obj.hash === 'string'
         && typeof obj.documentOrderIndex === 'number'
         && Number.isInteger(obj.documentOrderIndex)
-        && obj.documentOrderIndex >= 0;
+        && obj.documentOrderIndex >= 0
+        && (obj.storyId === undefined || typeof obj.storyId === 'string')
+        && (obj.isOverset === undefined || typeof obj.isOverset === 'boolean')
+        && (obj.coverageState === undefined || isCoverageState(obj.coverageState));
+}
+
+export function isEnumerateDocumentSummary(val: unknown): val is EnumerateDocumentSummary {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    const optionalCountFields = ['scannedParagraphs', 'oversetParagraphsIncluded', 'unplacedStories', 'unplacedParagraphsPendingChoice', 'skippedTablesCount', 'skippedFootnotesCount', 'skippedUnsupportedCount'];
+    return typeof obj.totalCount === 'number' && Number.isInteger(obj.totalCount) && obj.totalCount >= 0
+        && optionalCountFields.every((field) => obj[field] === undefined || (typeof obj[field] === 'number' && Number.isInteger(obj[field]) && (obj[field] as number) >= 0));
 }
 
 export function isEnumerateDocumentResponse(val: unknown): val is EnumerateDocumentResponse {
@@ -304,6 +344,7 @@ export function isEnumerateDocumentResponse(val: unknown): val is EnumerateDocum
         && typeof obj.sourceDocumentName === 'string'
         && Array.isArray(obj.paragraphs)
         && (obj.error === undefined || typeof obj.error === 'string')
+        && (obj.summary === undefined || isEnumerateDocumentSummary(obj.summary))
         && obj.paragraphs.every(isScannedParagraphEntry);
 }
 
