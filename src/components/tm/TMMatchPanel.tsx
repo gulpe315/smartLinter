@@ -52,11 +52,14 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
     search,
     searchKeyword,
     applyMatch,
+    applyAutoApplyPlan,
+    isApplyingBatch,
   } = useTmStore();
 
   const [customSearchInput, setCustomSearchInput] = useState('');
   const [keywordInput, setKeywordInput] = useState('');
   const [showSearchInput, setShowSearchInput] = useState(false);
+  const [batchMessage, setBatchMessage] = useState<string | null>(null);
 
   const currentParagraphText = currentParagraph?.text || activeParagraph?.text || '';
   const effectiveTmCount = tmEntriesCount || tmEntries.length;
@@ -74,6 +77,10 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
   ), [observationParagraph, sentenceMatches, userTmOverlayEntries]);
   const eligibleCount = autoApplyPlan?.observations.filter((item) => item.kind === 'eligible').length || 0;
   const conflictCount = autoApplyPlan?.observations.filter((item) => item.kind === 'conflict').length || 0;
+
+  useEffect(() => {
+    setBatchMessage(null);
+  }, [observationParagraph?.paragraphId, observationParagraph?.hash]);
 
   useEffect(() => {
     if (searchMode !== 'keyword') return;
@@ -117,7 +124,17 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
     overrideTarget?: string,
     sentenceRange?: { startOffset: number; endOffset: number },
   ) => {
+    if (isApplyingBatch) return;
     await applyMatch(candidate, undefined, undefined, overrideTarget, sentenceRange);
+  };
+
+  const handleBatchApply = async () => {
+    if (!autoApplyPlan || eligibleCount === 0 || isApplyingBatch) return;
+    setBatchMessage(null);
+    const result = await applyAutoApplyPlan(autoApplyPlan);
+    setBatchMessage(result?.status === 'SUCCESS'
+      ? `TM exact 일괄 적용 완료: ${eligibleCount}건 (되돌리려면 에디터에서 Ctrl+Z)`
+      : '문단이 변경되었거나 사전 검증에 실패하여 적용하지 않았습니다.');
   };
 
   return (
@@ -383,7 +400,11 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
 
       {/* Footer Status Strip */}
       {isTmActuallyLoaded && (
-        <div className="flex-none px-4 py-2 bg-slate-900/80 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+        <div className="flex-none px-4 py-2 bg-slate-900/80 border-t border-slate-800 text-[11px] text-slate-400">
+          {batchMessage && (
+            <div data-testid="tm-batch-apply-message" className="mb-2 text-[10px] text-slate-300">{batchMessage}</div>
+          )}
+          <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 truncate max-w-[220px]">
             <Database className="w-3 h-3 text-cyan-400 flex-none" />
             <span className="truncate text-slate-300">{tmFileName || '인메모리 TM 로드됨'}</span>
@@ -398,6 +419,16 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
               </span>
               <span className="text-[10px] text-slate-500">관찰 전용 · 문서는 변경되지 않습니다</span>
             </div>
+            <button
+              type="button"
+              data-testid="tm-batch-apply-btn"
+              disabled={eligibleCount === 0 || isApplyingBatch}
+              onClick={handleBatchApply}
+              className="rounded border border-emerald-700/80 bg-emerald-950/80 px-2 py-1 text-[10px] font-semibold text-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isApplyingBatch ? '적용 중…' : `현 문단 TM 일괄 적용 (${eligibleCount}건)`}
+            </button>
+          </div>
           </div>
         </div>
       )}

@@ -9,6 +9,7 @@ import { useConfigStore } from '../configStore.ts';
 import { MockBridgeService } from '../../services/tauriBridge.ts';
 import { type ParagraphPayload, type ReplacementCommand } from '../../../shared/protocol/types.ts';
 import { replaceReverse } from '../../../shared/engine/diff_engine.ts';
+import { type TmAutoApplyPlan } from '../../types/tm.ts';
 
 describe('SmartLinter TM Store (tmStore)', () => {
   let mockBridge: MockBridgeService;
@@ -308,5 +309,124 @@ describe('SmartLinter TM Store (tmStore)', () => {
     expect(store.searchKeyword('bridge').map((result) => result.tuId)).toEqual(['source-hit', 'target-hit']);
     expect(store.searchKeyword('   ')).toEqual([]);
     expect(useTmStore.getState().candidates).toEqual([]);
+  });
+
+  it('applies all eligible observations in one command after live validation', async () => {
+    const text = 'First source. Second source.';
+    const plan: TmAutoApplyPlan = {
+      paragraphId: 'batch-success', baseHash: 'batch-base', paragraphText: text,
+      observations: [
+        { kind: 'eligible', segmentIndex: 0, sourceText: 'First source.', startOffset: 0, endOffset: 13, candidate: { source: 'First source.', target: 'First target.', score: 1, scorePercent: 100, grade: 'EXACT' }, origin: 'imported' },
+        { kind: 'eligible', segmentIndex: 1, sourceText: 'Second source.', startOffset: 14, endOffset: 28, candidate: { source: 'Second source.', target: 'Second target.', score: 1, scorePercent: 100, grade: 'EXACT' }, origin: 'imported' },
+      ],
+    };
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValue({ commandId: 'snapshot', status: 'FOUND', currentText: text, currentHash: 'batch-base' });
+    const dispatch = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    const result = await useTmStore.getState().applyAutoApplyPlan(plan, mockBridge);
+
+    expect(result?.status).toBe('SUCCESS');
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(useTmStore.getState().isApplyingBatch).toBe(false);
+    expect(useTmStore.getState().lastAppliedBatchResult?.status).toBe('SUCCESS');
+    expect(replaceReverse(text, dispatch.mock.calls[0][0].hunks).finalText).toBe('First target. Second target.');
+  });
+
+  it('marks top-level candidates applied after a successful single-sentence batch', async () => {
+    const text = 'Source.';
+    const candidate = { source: text, target: 'Target.', score: 1, scorePercent: 100, grade: 'EXACT' as const };
+    const plan: TmAutoApplyPlan = {
+      paragraphId: 'single-batch', baseHash: 'single-base', paragraphText: text,
+      observations: [{ kind: 'eligible', segmentIndex: 0, sourceText: text, startOffset: 0, endOffset: text.length, candidate, origin: 'imported' }],
+    };
+    useTmStore.setState({ candidates: [candidate], sentenceMatches: [] });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValue({ commandId: 'snapshot', status: 'FOUND', currentText: text, currentHash: 'single-base' });
+    vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    const result = await useTmStore.getState().applyAutoApplyPlan(plan, mockBridge);
+
+    expect(result?.status).toBe('SUCCESS');
+    expect(useTmStore.getState().candidates[0].status).toBe('applied');
+  });
+
+  it('fails closed without dispatching when the live snapshot hash changed', async () => {
+    const plan: TmAutoApplyPlan = {
+      paragraphId: 'batch-stale', baseHash: 'base', paragraphText: 'Source.',
+      observations: [{ kind: 'eligible', segmentIndex: 0, sourceText: 'Source.', startOffset: 0, endOffset: 7, candidate: { source: 'Source.', target: 'Target.', score: 1, scorePercent: 100, grade: 'EXACT' }, origin: 'imported' }],
+    };
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValue({ commandId: 'snapshot', status: 'FOUND', currentText: 'Source.', currentHash: 'changed' });
+    const dispatch = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    const result = await useTmStore.getState().applyAutoApplyPlan(plan, mockBridge);
+
+    expect(result?.status).toBe('FAILED');
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(useTmStore.getState().isApplyingBatch).toBe(false);
+    expect(useTmStore.getState().lastAppliedBatchResult?.status).toBe('FAILED');
+  });
+
+  it('does nothing for a plan without eligible observations', async () => {
+    const dispatch = vi.spyOn(mockBridge, 'sendReplacementCommand');
+    await expect(useTmStore.getState().applyAutoApplyPlan({
+      paragraphId: 'empty', baseHash: 'base', paragraphText: 'Text', observations: [],
+    }, mockBridge)).resolves.toBeNull();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('fails closed without dispatching when batch planning detects overlapping ranges', async () => {
+    const text = 'abcdef';
+    const plan: TmAutoApplyPlan = {
+      paragraphId: 'batch-overlap', baseHash: 'overlap-base', paragraphText: text,
+      observations: [
+        { kind: 'eligible', segmentIndex: 0, sourceText: 'abcdef', startOffset: 0, endOffset: 6, candidate: { source: 'abcdef', target: 'ABCDEF', score: 1, scorePercent: 100, grade: 'EXACT' }, origin: 'imported' },
+        { kind: 'eligible', segmentIndex: 1, sourceText: 'cdef', startOffset: 2, endOffset: 6, candidate: { source: 'cdef', target: 'CDEF', score: 1, scorePercent: 100, grade: 'EXACT' }, origin: 'imported' },
+      ],
+    };
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValue({ commandId: 'snapshot', status: 'FOUND', currentText: text, currentHash: 'overlap-base' });
+    const dispatch = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    const result = await useTmStore.getState().applyAutoApplyPlan(plan, mockBridge);
+
+    expect(result?.status).toBe('FAILED');
+    expect(result?.message).toContain('OVERLAPPING_ITEMS');
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(useTmStore.getState().isApplyingBatch).toBe(false);
+    expect(useTmStore.getState().lastAppliedBatchResult?.status).toBe('FAILED');
+  });
+
+  it('preserves host batch failure and leaves sentence candidates unapplied', async () => {
+    const text = 'Source.';
+    const candidate = { source: text, target: 'Target.', score: 1, scorePercent: 100, grade: 'EXACT' as const };
+    const plan: TmAutoApplyPlan = {
+      paragraphId: 'batch-host-failure', baseHash: 'host-base', paragraphText: text,
+      observations: [{ kind: 'eligible', segmentIndex: 0, sourceText: text, startOffset: 0, endOffset: text.length, candidate, origin: 'imported' }],
+    };
+    useTmStore.setState({ sentenceMatches: [{ segmentIndex: 0, sourceText: text, startOffset: 0, endOffset: text.length, candidates: [candidate] }] });
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValue({ commandId: 'snapshot', status: 'FOUND', currentText: text, currentHash: 'host-base' });
+    vi.spyOn(mockBridge, 'sendReplacementCommand').mockResolvedValue({ commandId: 'host-failed', status: 'FAILED', currentHash: 'host-base', message: 'Host rejected batch.' });
+
+    const result = await useTmStore.getState().applyAutoApplyPlan(plan, mockBridge);
+
+    expect(result?.status).toBe('FAILED');
+    expect(useTmStore.getState().isApplyingBatch).toBe(false);
+    expect(useTmStore.getState().lastAppliedBatchResult).toEqual(result);
+    expect(useTmStore.getState().sentenceMatches[0].candidates[0].status).not.toBe('applied');
+  });
+
+  it('converts a batch dispatch rejection into a recorded failure', async () => {
+    const text = 'Source.';
+    const plan: TmAutoApplyPlan = {
+      paragraphId: 'batch-dispatch-error', baseHash: 'error-base', paragraphText: text,
+      observations: [{ kind: 'eligible', segmentIndex: 0, sourceText: text, startOffset: 0, endOffset: text.length, candidate: { source: text, target: 'Target.', score: 1, scorePercent: 100, grade: 'EXACT' }, origin: 'imported' }],
+    };
+    vi.spyOn(mockBridge, 'getLiveParagraphSnapshot').mockResolvedValue({ commandId: 'snapshot', status: 'FOUND', currentText: text, currentHash: 'error-base' });
+    vi.spyOn(mockBridge, 'sendReplacementCommand').mockRejectedValue(new Error('Bridge disconnected.'));
+
+    const result = await useTmStore.getState().applyAutoApplyPlan(plan, mockBridge);
+
+    expect(result?.status).toBe('FAILED');
+    expect(result?.message).toBe('Bridge disconnected.');
+    expect(useTmStore.getState().isApplyingBatch).toBe(false);
+    expect(useTmStore.getState().lastAppliedBatchResult).toEqual(result);
   });
 });

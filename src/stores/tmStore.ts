@@ -28,6 +28,7 @@ import {
   type TmMatchCandidate,
   type TmMatchGrade,
   type TmSentenceMatch,
+  type TmAutoApplyPlan,
   getGradeFromScore,
 } from '../types/tm.ts';
 import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
@@ -37,6 +38,7 @@ import {
   DEFAULT_TM_MIN_SCORE,
   DEFAULT_TM_TOP_N,
 } from '../utils/tmMatcher.ts';
+import { planTmAutoApplyReplacement } from '../utils/tmAutoApplyReplacement.ts';
 
 export interface TMState {
   // --- Match Candidates & Search State ---
@@ -54,6 +56,8 @@ export interface TMState {
   // --- Active Applying State ---
   applyingCandidateKey: string | null;
   lastAppliedResult: ReplacementResult | null;
+  isApplyingBatch: boolean;
+  lastAppliedBatchResult: ReplacementResult | null;
 
   // --- Actions ---
   search: (queryText?: string, automaticParagraphSearch?: boolean) => Promise<TmMatchCandidate[]>;
@@ -66,6 +70,7 @@ export interface TMState {
     overrideTarget?: string,
     sentenceRange?: { startOffset: number; endOffset: number },
   ) => Promise<ReplacementResult | null>;
+  applyAutoApplyPlan: (plan: TmAutoApplyPlan, service?: IBridgeService) => Promise<ReplacementResult | null>;
   setMinScore: (minScore: number) => void;
   setTopN: (topN: number) => void;
   setSearchQuery: (searchQuery: string) => void;
@@ -90,6 +95,8 @@ const initialState = {
   keywordScope: 'both' as const,
   applyingCandidateKey: null as string | null,
   lastAppliedResult: null as ReplacementResult | null,
+  isApplyingBatch: false,
+  lastAppliedBatchResult: null as ReplacementResult | null,
 };
 
 export const useTmStore = create<TMState>((set, get) => ({
@@ -322,6 +329,74 @@ export const useTmStore = create<TMState>((set, get) => ({
         })),
       }));
       return null;
+    }
+  },
+
+  applyAutoApplyPlan: async (plan, service) => {
+    const eligible = plan.observations.filter((item) => item.kind === 'eligible');
+    if (eligible.length === 0) return null;
+
+    const bridgeService = service || getBridgeService();
+    const fail = (message: string, currentHash = plan.baseHash): ReplacementResult => ({
+      commandId: `cmd-tm-batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      status: 'FAILED',
+      currentHash,
+      message,
+    });
+    const finishFailure = (result: ReplacementResult) => {
+      set({ isApplyingBatch: false, lastAppliedBatchResult: result });
+      return result;
+    };
+
+    set({ isApplyingBatch: true, lastAppliedBatchResult: null });
+    try {
+      const snapshot = await bridgeService.getLiveParagraphSnapshot(plan.paragraphId, plan.baseHash);
+      if (snapshot.status !== 'FOUND' || !snapshot.currentText || snapshot.currentHash !== plan.baseHash) {
+        return finishFailure(fail(snapshot.message || 'Live paragraph validation failed.', snapshot.currentHash || plan.baseHash));
+      }
+
+      const replacement = planTmAutoApplyReplacement(snapshot.currentText, eligible);
+      if (!replacement.ok) {
+        return finishFailure(fail(`TM batch planning failed: ${replacement.reason}`, snapshot.currentHash));
+      }
+
+      const command: ReplacementCommand = {
+        commandId: `cmd-tm-batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        paragraphId: plan.paragraphId,
+        baseHash: plan.baseHash,
+        expectedHash: computeParagraphHash(replacement.expectedFullText),
+        hunks: replacement.hunks,
+      };
+      const result = await bridgeService.sendReplacementCommand(command);
+      if (result.status !== 'SUCCESS') return finishFailure(result);
+
+      set((state) => ({
+        isApplyingBatch: false,
+        lastAppliedBatchResult: result,
+        candidates: state.candidates.map((candidate) => (
+          eligible.some((item) => (
+            candidate.source === item.candidate.source && candidate.target === item.candidate.target
+          ))
+            ? { ...candidate, status: 'applied', errorMessage: undefined }
+            : candidate
+        )),
+        sentenceMatches: state.sentenceMatches.map((group) => {
+          const matching = eligible.find((item) => item.segmentIndex === group.segmentIndex);
+          if (!matching) return group;
+          return {
+            ...group,
+            candidates: group.candidates.map((candidate) => (
+              candidate.source === matching.candidate.source && candidate.target === matching.candidate.target
+                ? { ...candidate, status: 'applied', errorMessage: undefined }
+                : candidate
+            )),
+          };
+        }),
+      }));
+      useBridgeStore.getState().setLastReplacementResult(result);
+      return result;
+    } catch (err: any) {
+      return finishFailure(fail(err?.message || 'TM batch replacement failed unexpectedly.'));
     }
   },
 

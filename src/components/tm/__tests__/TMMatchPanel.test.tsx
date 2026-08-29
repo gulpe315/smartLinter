@@ -143,6 +143,41 @@ describe('TMMatchPanel Component', () => {
     expect(screen.getByTestId('tm-auto-apply-conflict-1')).toBeInTheDocument();
     expect(screen.queryByTestId('tm-auto-apply-conflict-0')).not.toBeInTheDocument();
     expect(screen.queryByTestId('tm-auto-apply-eligible-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('tm-batch-apply-btn')).toBeEnabled();
+  });
+
+  it('disables the batch button when there are no eligible exact observations', () => {
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 1 });
+    render(<TMMatchPanel />);
+    expect(screen.getByTestId('tm-batch-apply-btn')).toBeDisabled();
+  });
+
+  it('invokes batch application and displays its result message', async () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'batch-panel', text: 'First source. Second source.', hash: 'batch-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const entries = [
+      { id: 'first', source: 'First source.', target: 'First target.' },
+      { id: 'second', source: 'Second source.', target: 'Second target.' },
+    ];
+    const apply = vi.fn().mockResolvedValue({ commandId: 'batch', status: 'SUCCESS', currentHash: 'after' });
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 2, activeParagraph: paragraph });
+    useConfigStore.setState({ tmEntries: entries });
+    getGlobalTmMatcher().loadEntries(entries);
+    useTmStore.setState({
+      currentParagraph: paragraph,
+      sentenceMatches: [
+        { segmentIndex: 0, sourceText: 'First source.', startOffset: 0, endOffset: 13, candidates: [] },
+        { segmentIndex: 1, sourceText: 'Second source.', startOffset: 14, endOffset: 28, candidates: [] },
+      ],
+      applyAutoApplyPlan: apply,
+    });
+
+    render(<TMMatchPanel />);
+    fireEvent.click(screen.getByTestId('tm-batch-apply-btn'));
+    await waitFor(() => expect(apply).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('tm-batch-apply-message')).toHaveTextContent('TM exact 일괄 적용 완료: 2건');
   });
 
   it('shows the no-matches state when every automatic sentence group has zero candidates', () => {
