@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type EnumerateDocumentSummary, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { type DocumentGenerationParagraphPlan, type EnumerateDocumentSummary, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
 import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
@@ -19,6 +19,7 @@ import { analyzeXliffImport, applyXliffImport, parseXliffImport, type XliffConfl
 import { useBridgeStore } from './bridgeStore.ts';
 
 const TRANSLATION_SESSION_STORAGE_KEY = 'smartlinter_translation_session';
+const GENERATION_TIMEOUT = 70_000;
 let scanRequestToken = 0;
 
 export type TranslationSegmentStatus =
@@ -182,6 +183,18 @@ const groupSegmentsByParagraph = (segments: TranslationSessionSegment[]) => {
   return groups;
 };
 
+/** Rebuilds a whole paragraph from its sentence-level translation session records. */
+export function buildParagraphTargetText(paragraphSegments: TranslationSessionSegment[]): string {
+  return [...paragraphSegments]
+    .sort((a, b) => a.segmentIndex - b.segmentIndex)
+    .map((segment) => segment.status === 'untranslated' ? segment.sourceText : segment.targetDraft)
+    .join('');
+}
+
+export type DocumentGenerationPreparation =
+  | { ok: true; plans: DocumentGenerationParagraphPlan[]; translatedParagraphCount: number; untranslatedParagraphCount: number; totalParagraphCount: number }
+  | { ok: false; reason: string; translatedParagraphCount: number; untranslatedParagraphCount: number; totalParagraphCount: number };
+
 const isLegacyWordParagraphId = (paragraphId: string) => (
   /^word-para-[^-]+$/.test(paragraphId) && !paragraphId.startsWith('word-para-body-')
 );
@@ -291,6 +304,9 @@ export interface TranslationSessionState {
   scanFullDocument: (options?: { includeUnplacedStories?: boolean }, service?: IBridgeService) => Promise<void>;
   cancelScan: () => void;
   importXliff: (xmlContent: string, resolveConflicts?: (analysis: XliffImportAnalysis) => Promise<XliffConflictResolution[]>, service?: IBridgeService) => Promise<void>;
+  prepareDocumentGeneration: (service?: IBridgeService) => Promise<DocumentGenerationPreparation>;
+  generateTranslatedDocument: (plans: DocumentGenerationParagraphPlan[], service?: IBridgeService) => Promise<void>;
+  documentGenerationMessage: string | null;
   updateSegmentTarget: (segmentId: string, text: string) => void;
   removeSegment: (segmentId: string) => void;
   clearSession: () => void;
@@ -306,6 +322,7 @@ const initialState = {
   lastScanSummary: null as TranslationSessionState['lastScanSummary'],
   lastImportSummary: null as TranslationSessionState['lastImportSummary'],
   importError: null as string | null,
+  documentGenerationMessage: null as string | null,
 };
 
 export const useTranslationSessionStore = create<TranslationSessionState>()(persist((set, get) => ({
@@ -452,6 +469,40 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
         importedAt: now,
       },
     });
+  },
+
+  prepareDocumentGeneration: async (service) => {
+    const empty = { translatedParagraphCount: 0, untranslatedParagraphCount: 0, totalParagraphCount: 0 };
+    if (get().isScanning) return { ok: false, reason: '문서 스캔이 진행 중입니다.', ...empty };
+    if (!useBridgeStore.getState().editorConnected) return { ok: false, reason: '번역 문서를 생성하려면 에디터 연결이 필요합니다.', ...empty };
+    await get().scanFullDocument(undefined, service);
+    if (get().scanError) return { ok: false, reason: `문서 상태를 검증할 수 없습니다: ${get().scanError}`, ...empty };
+    const groups = groupSegmentsByParagraph(get().segments);
+    const totalParagraphCount = groups.size;
+    const invalid = get().segments.filter((segment) => segment.status === 'needs-validation').length;
+    if (invalid > 0) return { ok: false, reason: `검증이 필요한 세그먼트가 ${invalid}개 있습니다.`, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
+    const plans: DocumentGenerationParagraphPlan[] = [];
+    for (const [paragraphId, segments] of groups) {
+      const ordered = [...segments].sort((a, b) => a.segmentIndex - b.segmentIndex);
+      const sourceText = ordered.map((segment) => segment.sourceText).join('');
+      const targetText = buildParagraphTargetText(ordered);
+      const first = ordered[0];
+      if (targetText !== sourceText && first?.documentOrderIndex !== undefined) plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText });
+    }
+    return { ok: true, plans, translatedParagraphCount: plans.length, untranslatedParagraphCount: totalParagraphCount - plans.length, totalParagraphCount };
+  },
+
+  generateTranslatedDocument: async (plans, service) => {
+    set({ documentGenerationMessage: null });
+    try {
+      const response = await Promise.race([
+        (service || getBridgeService()).generateTranslatedDocument(plans),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('GENERATION_TIMEOUT')), GENERATION_TIMEOUT)),
+      ]);
+      set({ documentGenerationMessage: response.status === 'SUCCESS'
+        ? `번역 문서를 생성했습니다: ${response.appliedParagraphCount ?? 0}개 문단 적용`
+        : `번역 문서 생성 실패 (${response.status})${response.message ? `: ${response.message}` : ''}` });
+    } catch (error: any) { set({ documentGenerationMessage: `번역 문서 생성 실패: ${error?.message || String(error)}` }); }
   },
 
   updateSegmentTarget: (segmentId, text) => set((state) => {

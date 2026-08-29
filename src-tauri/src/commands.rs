@@ -10,7 +10,7 @@ use crate::ai::{
     CorrectionPreference, GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
     QaReport, QaStatus, QueueJobRequest, TmReference,
 };
-use crate::protocol::{EditorType, EnumerateDocumentResponse, LiveSnapshotItem, LiveSnapshotStatus, LocateStatus, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
+use crate::protocol::{DocumentGenerationParagraphPlan, EditorType, EnumerateDocumentResponse, GenerateTranslatedDocumentResponse, LiveSnapshotItem, LiveSnapshotStatus, LocateStatus, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
 use crate::server::{HealthResponse, ServerHandle, SessionError, SessionManager};
 use crate::tm::{parse_tm_content, GuidelineLoader, GuidelineSet, TmEntry};
 use tauri::{State, WebviewWindow};
@@ -407,6 +407,11 @@ pub async fn enumerate_document_paragraphs(
     })
     .await
     .map_err(|error| format!("InDesign document scan task failed: {error}"))?
+}
+
+#[tauri::command]
+pub async fn generate_translated_document(paragraph_plans: Vec<DocumentGenerationParagraphPlan>, server_handle: State<'_, ServerHandle>) -> Result<GenerateTranslatedDocumentResponse, String> {
+    server_handle.session_manager().request_generate_translated_document(paragraph_plans).await.map_err(|error| error.to_string())
 }
 
 /// Gets current QA paragraph contents in InDesign without changing selection or focus.

@@ -9,10 +9,13 @@
 export interface MockDocumentState {
     text: string;
     title: string;
+    saved?: boolean;
 }
 
 export class MockWordContext {
     public document: {
+        saved: boolean;
+        body: { paragraphs: { items: any[]; load: (prop: string) => void } };
         properties: {
             title: string;
             load: (prop: string) => void;
@@ -32,6 +35,13 @@ export class MockWordContext {
     constructor(docState: MockDocumentState) {
         this.docState = docState;
         this.document = {
+            saved: docState.saved !== false,
+            body: {
+                paragraphs: {
+                    items: [this.createParagraph(docState)],
+                    load: (_prop: string) => {},
+                },
+            },
             properties: {
                 title: docState.title,
                 load: (_prop: string) => {},
@@ -46,6 +56,11 @@ export class MockWordContext {
                 };
             },
         };
+    }
+
+    private createParagraph(state: MockDocumentState): any {
+        const paragraph: any = { text: state.text, load: (_prop: string) => {}, getRange: () => ({ getSubstring: (start: number, length: number) => ({ insertText: (value: string) => { state.text = state.text.slice(0, start) + value + state.text.slice(start + length); paragraph.text = state.text; } }) }) };
+        return paragraph;
     }
 
     public async sync(): Promise<void> {
@@ -86,6 +101,7 @@ export class MockOfficeHost {
                 callback?.({ status: this.AsyncResultStatus.Failed, error: { message: 'Handler not found' } });
             },
         },
+        requirements: { isSetSupported: (_name: string, _version: string) => true },
     };
 
     public addin = {
@@ -142,6 +158,18 @@ export class MockWordEnvironment {
         this.office = new MockOfficeHost();
         this.docState = { text: initialText, title: initialTitle };
         this.activeContext = new MockWordContext(this.docState);
+        (this.office.context.document as any).getFileAsync = (_type: string, _options: any, callback: (result: any) => void) => {
+            if (typeof _options === 'function') callback = _options;
+            const bytes = Array.from(new TextEncoder().encode('mock-docx'));
+            callback({ status: this.office.AsyncResultStatus.Succeeded, value: { sliceCount: 1, getSliceAsync: (_index: number, done: (result: any) => void) => done({ status: this.office.AsyncResultStatus.Succeeded, value: { index: 0, data: bytes } }), closeAsync: (done?: () => void) => done?.() } });
+        };
+        (this.activeContext as any).application = { createDocument: (_base64: string) => {
+            const copy = new MockWordContext({ ...this.docState });
+            const created: any = copy.document;
+            created.openCallCount = 0;
+            created.open = () => { created.openCallCount++; };
+            return created;
+        } };
     }
 
     public setParagraphText(newText: string, newTitle?: string): void {

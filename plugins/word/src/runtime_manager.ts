@@ -12,6 +12,7 @@ import { queryLiveParagraphSnapshots } from './snapshot_provider.ts';
 import { enumerateAllDocumentParagraphs } from './document_scanner.ts';
 import { locateWordParagraph } from './locate_provider.ts';
 import { WordReplacementExecutor } from './replacement_executor.ts';
+import { generateTranslatedWordDocument } from './document_generator.ts';
 
 export type VisibilityMode = 'Visible' | 'Hidden' | 'Uninitialized';
 
@@ -43,6 +44,7 @@ export class WordRuntimeManager {
     private cachedDocumentTitle = 'ActiveWordDocument.docx';
     private snapshotRequestUnsubscribe: (() => void) | null = null;
     private enumerateDocumentRequestUnsubscribe: (() => void) | null = null;
+    private generateTranslatedDocumentUnsubscribe: (() => void) | null = null;
     private locateRequestUnsubscribe: (() => void) | null = null;
     private commandUnsubscribe: (() => void) | null = null;
 
@@ -210,6 +212,8 @@ export class WordRuntimeManager {
             this.snapshotRequestUnsubscribe = null;
             this.enumerateDocumentRequestUnsubscribe?.();
             this.enumerateDocumentRequestUnsubscribe = null;
+            this.generateTranslatedDocumentUnsubscribe?.();
+            this.generateTranslatedDocumentUnsubscribe = null;
             this.locateRequestUnsubscribe?.();
             this.locateRequestUnsubscribe = null;
             this.commandUnsubscribe?.();
@@ -265,6 +269,13 @@ export class WordRuntimeManager {
                     ? await enumerateAllDocumentParagraphs(request, wordRunner)
                     : { requestId: request.requestId, sourceDocumentName: '', paragraphs: [] };
                 this.bridgeClient?.sendEnumerateDocumentResponse(response);
+            });
+        }
+
+        if (this.bridgeClient && !this.generateTranslatedDocumentUnsubscribe) {
+            this.generateTranslatedDocumentUnsubscribe = this.bridgeClient.onGenerateTranslatedDocumentRequest(async (request) => {
+                const response = await generateTranslatedWordDocument(request, (globalThis as any).Word?.run, this.officeHost || (globalThis as any).Office);
+                this.bridgeClient?.sendGenerateTranslatedDocumentResponse(response);
             });
         }
 

@@ -25,13 +25,14 @@ import { PinToggleButton } from './PinToggleButton.tsx';
 import { BatchProgressBar } from '../config/BatchProgressBar.tsx';
 import { TranslationScanProgressBar } from '../translation/TranslationScanProgressBar.tsx';
 import { EditorConnectionControl } from './EditorConnectionControl.tsx';
-import { useTranslationSessionStore } from '../../stores/translationSessionStore.ts';
+import { useTranslationSessionStore, type DocumentGenerationPreparation } from '../../stores/translationSessionStore.ts';
 import { buildXliffDocument } from '../../utils/xliffExport.ts';
 import { XliffConflictModal } from '../translation/XliffConflictModal.tsx';
 import type { XliffConflictItem, XliffConflictResolution } from '../../utils/xliffImport.ts';
 
 export const Header: React.FC = () => {
   const [translationExportMessage, setTranslationExportMessage] = useState<string | null>(null);
+  const [generationConfirmation, setGenerationConfirmation] = useState<Extract<DocumentGenerationPreparation, { ok: true }> | null>(null);
   const [pendingConflicts, setPendingConflicts] = useState<XliffConflictItem[] | null>(null);
   const xliffFileInputRef = useRef<HTMLInputElement>(null);
   const conflictResolverRef = useRef<((resolutions: XliffConflictResolution[]) => void) | null>(null);
@@ -52,7 +53,7 @@ export const Header: React.FC = () => {
 
   const { openSettingsModal, openGuidelineViewer, sourceLang, targetLang } = useConfigStore();
   const resetQaCards = useQaStore((state) => state.resetQaCards);
-  const { isTranslationModeActive, segments, isScanning, scanError, lastScanSummary, lastImportSummary, importError } = useTranslationSessionStore();
+  const { isTranslationModeActive, segments, isScanning, scanError, lastScanSummary, lastImportSummary, importError, documentGenerationMessage } = useTranslationSessionStore();
   const exportableSegmentCount = segments.filter((segment) => segment.status !== 'needs-validation').length;
   const needsValidationCount = segments.length - exportableSegmentCount;
   const isTranslationExportDisabled = segments.length === 0 || needsValidationCount > 0 || isScanning;
@@ -85,6 +86,15 @@ export const Header: React.FC = () => {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setTranslationExportMessage(null);
+  };
+
+  const handleGenerateDocument = async () => {
+    const result = await useTranslationSessionStore.getState().prepareDocumentGeneration();
+    if (!result.ok) {
+      useTranslationSessionStore.setState({ documentGenerationMessage: result.reason });
+      return;
+    }
+    setGenerationConfirmation(result);
   };
 
   const handleXliffFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -251,6 +261,15 @@ export const Header: React.FC = () => {
           </button>
           <button
             type="button"
+            data-testid="translation-generate-btn"
+            disabled={segments.length === 0 || isScanning}
+            onClick={handleGenerateDocument}
+            className="px-2.5 py-1 rounded-md bg-cyan-900/50 hover:bg-cyan-800/60 disabled:bg-slate-800 disabled:text-slate-500 disabled:border-slate-700 border border-cyan-700/70 text-cyan-200 text-xs font-medium transition-colors"
+          >
+            번역 문서 생성
+          </button>
+          <button
+            type="button"
             data-testid="qa-reset-btn"
             onClick={resetQaCards}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-rose-950/50 active:bg-rose-950 border border-slate-700 hover:border-rose-800 text-slate-300 hover:text-rose-200 text-xs font-medium transition-colors cursor-pointer"
@@ -346,7 +365,9 @@ export const Header: React.FC = () => {
           </button>
         </div>
       )}
-      {importError ? (
+      {documentGenerationMessage ? (
+        <p role="status" className="px-4 pb-2 text-xs text-cyan-300">{documentGenerationMessage}</p>
+      ) : importError ? (
         <p role="status" className="px-4 pb-2 text-xs text-amber-300">{importError}</p>
       ) : scanError ? (
         <p role="status" className="px-4 pb-2 text-xs text-amber-300">{scanError}</p>
@@ -371,6 +392,16 @@ export const Header: React.FC = () => {
             setPendingConflicts(null);
           }}
         />
+      )}
+      {generationConfirmation && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+          <div className="max-w-md rounded-lg border border-slate-700 bg-slate-900 p-5 text-slate-100 shadow-xl">
+            <h2 className="text-sm font-semibold">번역 문서 생성</h2>
+            <p className="mt-3 text-sm">{generationConfirmation.translatedParagraphCount}개 문단에 번역을 적용하고, {generationConfirmation.untranslatedParagraphCount}개 문단은 원문으로 유지합니다.</p>
+            <p className="mt-3 rounded border border-amber-700/60 bg-amber-950/30 p-2 text-xs text-amber-200">이번 버전은 스캔된 본문 문단만 번역합니다. 표, 머리말/바닥글, 각주·미주 및 기타 제외된 컨테이너는 원문으로 유지됩니다.</p>
+            <div className="mt-4 flex justify-end gap-2"><button onClick={() => setGenerationConfirmation(null)} className="px-3 py-1 text-xs">취소</button><button onClick={() => { const plans = generationConfirmation.plans; setGenerationConfirmation(null); void useTranslationSessionStore.getState().generateTranslatedDocument(plans); }} className="rounded bg-cyan-700 px-3 py-1 text-xs">생성</button></div>
+          </div>
+        </div>
       )}
     </header>
   );

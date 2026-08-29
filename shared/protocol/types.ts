@@ -152,6 +152,33 @@ export interface EnumerateDocumentResponse {
     error?: string;
 }
 
+/** One whole-body-paragraph write to perform in a newly-created translated Word document. */
+export interface DocumentGenerationParagraphPlan {
+    paragraphId: string;
+    documentOrderIndex: number;
+    expectedSourceHash: string;
+    targetText: string;
+}
+
+export interface GenerateTranslatedDocumentRequest {
+    requestId: string;
+    paragraphPlans: DocumentGenerationParagraphPlan[];
+}
+
+export type GenerateTranslatedDocumentStatus =
+    | 'SUCCESS'
+    | 'UNSUPPORTED_HOST'
+    | 'ORIGINAL_UNSAVED'
+    | 'FINGERPRINT_MISMATCH'
+    | 'FAILED';
+
+export interface GenerateTranslatedDocumentResponse {
+    requestId: string;
+    status: GenerateTranslatedDocumentStatus;
+    appliedParagraphCount?: number;
+    message?: string;
+}
+
 /** Request to reveal a paragraph in the active editor. Offsets are reserved for future span selection. */
 export interface LocateRequest {
     requestId: string;
@@ -216,6 +243,8 @@ export type BridgeMessage =
     | { type: 'LIVE_SNAPSHOT_RESPONSE'; payload: LiveSnapshotResponse }
     | { type: 'ENUMERATE_DOCUMENT_REQUEST'; payload: EnumerateDocumentRequest }
     | { type: 'ENUMERATE_DOCUMENT_RESPONSE'; payload: EnumerateDocumentResponse }
+    | { type: 'GENERATE_TRANSLATED_DOCUMENT_REQUEST'; payload: GenerateTranslatedDocumentRequest }
+    | { type: 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE'; payload: GenerateTranslatedDocumentResponse }
     | { type: 'LOCATE_REQUEST'; payload: LocateRequest }
     | { type: 'LOCATE_RESPONSE'; payload: LocateResponse }
     | { type: 'HEARTBEAT'; payload: HeartbeatPayload };
@@ -392,6 +421,37 @@ export function isEnumerateDocumentResponse(val: unknown): val is EnumerateDocum
         && obj.paragraphs.every(isScannedParagraphEntry);
 }
 
+export function isDocumentGenerationParagraphPlan(val: unknown): val is DocumentGenerationParagraphPlan {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.paragraphId === 'string'
+        && typeof obj.documentOrderIndex === 'number' && Number.isInteger(obj.documentOrderIndex) && obj.documentOrderIndex >= 0
+        && typeof obj.expectedSourceHash === 'string'
+        && typeof obj.targetText === 'string';
+}
+
+export function isGenerateTranslatedDocumentRequest(val: unknown): val is GenerateTranslatedDocumentRequest {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.requestId === 'string'
+        && Array.isArray(obj.paragraphPlans)
+        && obj.paragraphPlans.every(isDocumentGenerationParagraphPlan);
+}
+
+export function isGenerateTranslatedDocumentStatus(val: unknown): val is GenerateTranslatedDocumentStatus {
+    return val === 'SUCCESS' || val === 'UNSUPPORTED_HOST' || val === 'ORIGINAL_UNSAVED'
+        || val === 'FINGERPRINT_MISMATCH' || val === 'FAILED';
+}
+
+export function isGenerateTranslatedDocumentResponse(val: unknown): val is GenerateTranslatedDocumentResponse {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.requestId === 'string'
+        && isGenerateTranslatedDocumentStatus(obj.status)
+        && (obj.appliedParagraphCount === undefined || (typeof obj.appliedParagraphCount === 'number' && Number.isInteger(obj.appliedParagraphCount) && obj.appliedParagraphCount >= 0))
+        && (obj.message === undefined || typeof obj.message === 'string');
+}
+
 export function isLocateStatus(val: unknown): val is LocateStatus {
     return val === 'FOUND' || val === 'NOT_FOUND' || val === 'AMBIGUOUS' || val === 'SELECTION_FAILED' || val === 'BUSY' || val === 'ERROR';
 }
@@ -472,6 +532,10 @@ export function isBridgeMessage(val: unknown): val is BridgeMessage {
             return isEnumerateDocumentRequest(obj.payload);
         case 'ENUMERATE_DOCUMENT_RESPONSE':
             return isEnumerateDocumentResponse(obj.payload);
+        case 'GENERATE_TRANSLATED_DOCUMENT_REQUEST':
+            return isGenerateTranslatedDocumentRequest(obj.payload);
+        case 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE':
+            return isGenerateTranslatedDocumentResponse(obj.payload);
         case 'LOCATE_REQUEST':
             return isLocateRequest(obj.payload);
         case 'LOCATE_RESPONSE':

@@ -53,6 +53,8 @@ export interface ReplacementExecutionOptions {
     adapter?: WordParagraphAdapter;
     /** Custom Word.run runner */
     wordRunner?: (callback: (context: any) => Promise<any>) => Promise<any>;
+    /** Document root to operate on. Defaults to the active document. */
+    documentRoot?: any;
     /** Connected Bridge client to automatically dispatch REPLACEMENT_RESULT */
     bridgeClient?: WordBridgeClient;
     /** Simulated error injection at specific hunk index (0-based in reverse execution order) */
@@ -379,7 +381,8 @@ export class WordReplacementExecutor {
         let targetIndex: number | null = null;
 
         const resolveTargetParagraph = async (context: any): Promise<any> => {
-            const paragraphs = context.document.body?.paragraphs;
+            const documentRoot = options.documentRoot || context.document;
+            const paragraphs = documentRoot.body?.paragraphs;
             if (!paragraphs) throw new Error('Word document body paragraphs are unavailable');
             paragraphs.load('text');
             await context.sync();
@@ -397,7 +400,7 @@ export class WordReplacementExecutor {
                     text: paragraph.text || '',
                 }))
                 .filter((candidate: { text: string }) =>
-                    `word-para-${computeParagraphHash(candidate.text).slice(0, 12)}` === command.paragraphId
+                    command.paragraphId.endsWith(`-${computeParagraphHash(candidate.text).slice(0, 12)}`)
                     && computeParagraphHash(candidate.text) === command.baseHash
                 );
             if (candidates.length === 0) throw new Error(`Paragraph '${command.paragraphId}' was not found with its base hash`);

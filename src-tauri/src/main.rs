@@ -84,6 +84,7 @@ fn main() {
             commands::get_live_paragraph_snapshot,
             commands::get_live_paragraph_snapshots,
             commands::enumerate_document_paragraphs,
+            commands::generate_translated_document,
             commands::list_ollama_models,
             commands::check_ollama_health,
             commands::set_ollama_model,

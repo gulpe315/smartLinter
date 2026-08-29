@@ -10,10 +10,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, broadcast, oneshot, Mutex, RwLock};
 
-use crate::protocol::{BridgeMessage, EditorType, EnumerateDocumentRequest, EnumerateDocumentResponse, LiveSnapshotRequest, LiveSnapshotResponse, LocateRequest, LocateResponse, ParagraphPayload, ReplacementCommand, ReplacementResult};
+use crate::protocol::{BridgeMessage, EditorType, EnumerateDocumentRequest, EnumerateDocumentResponse, GenerateTranslatedDocumentRequest, GenerateTranslatedDocumentResponse, DocumentGenerationParagraphPlan, LiveSnapshotRequest, LiveSnapshotResponse, LocateRequest, LocateResponse, ParagraphPayload, ReplacementCommand, ReplacementResult};
 
 const LIVE_SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(3);
 const DOCUMENT_SCAN_TIMEOUT: Duration = Duration::from_secs(10);
+const DOCUMENT_GENERATION_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug)]
 struct PendingSnapshot {
@@ -25,6 +26,7 @@ struct PendingDocumentScan {
     session_id: String,
     sender: oneshot::Sender<EnumerateDocumentResponse>,
 }
+#[derive(Debug)] struct PendingDocumentGeneration { session_id: String, sender: oneshot::Sender<GenerateTranslatedDocumentResponse> }
 #[derive(Debug)]
 struct PendingLocate { session_id: String, sender: oneshot::Sender<LocateResponse> }
 
@@ -225,6 +227,10 @@ pub enum SessionError {
     ScanTimeout,
     #[error("Document scan request was cancelled before a response arrived")]
     ScanCancelled,
+    #[error("Translated document generation exceeded the 60 second deadline")]
+    GenerationTimeout,
+    #[error("Translated document generation was cancelled before a response arrived")]
+    GenerationCancelled,
     #[error("Locate request exceeded the 3 second deadline")]
     LocateTimeout,
     #[error("Locate request was cancelled before a response arrived")]
@@ -250,6 +256,7 @@ pub struct SessionManager {
     result_sender: broadcast::Sender<ReplacementResult>,
     pending_snapshots: Arc<Mutex<HashMap<String, PendingSnapshot>>>,
     pending_document_scans: Arc<Mutex<HashMap<String, PendingDocumentScan>>>,
+    pending_document_generations: Arc<Mutex<HashMap<String, PendingDocumentGeneration>>>,
     pending_locates: Arc<Mutex<HashMap<String, PendingLocate>>>,
 }
 
@@ -264,6 +271,7 @@ impl SessionManager {
             result_sender,
             pending_snapshots: Arc::new(Mutex::new(HashMap::new())),
             pending_document_scans: Arc::new(Mutex::new(HashMap::new())),
+            pending_document_generations: Arc::new(Mutex::new(HashMap::new())),
             pending_locates: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -526,6 +534,19 @@ impl SessionManager {
         }
     }
 
+    pub async fn request_generate_translated_document(&self, paragraph_plans: Vec<DocumentGenerationParagraphPlan>) -> Result<GenerateTranslatedDocumentResponse, SessionError> {
+        let session_guard = self.active_session.read().await;
+        let session = session_guard.as_ref().ok_or(SessionError::NotFound)?;
+        if session.editor_type != EditorType::Word { return Err(SessionError::NotFound); }
+        let sender = session.command_sender.as_ref().ok_or(SessionError::ChannelClosed)?;
+        let request_id = super::auth_manager::generate_session_token();
+        let (response_tx, response_rx) = oneshot::channel();
+        self.pending_document_generations.lock().await.insert(request_id.clone(), PendingDocumentGeneration { session_id: session.session_id.clone(), sender: response_tx });
+        if sender.send(BridgeMessage::GenerateTranslatedDocumentRequest(GenerateTranslatedDocumentRequest { request_id: request_id.clone(), paragraph_plans })).is_err() { self.pending_document_generations.lock().await.remove(&request_id); return Err(SessionError::ChannelClosed); }
+        drop(session_guard);
+        match tokio::time::timeout(DOCUMENT_GENERATION_TIMEOUT, response_rx).await { Ok(Ok(response)) => Ok(response), Ok(Err(_)) => Err(SessionError::GenerationCancelled), Err(_) => { self.pending_document_generations.lock().await.remove(&request_id); Err(SessionError::GenerationTimeout) } }
+    }
+
     /// Sends a correlated locate request and waits at most three seconds for the editor response.
     pub async fn request_locate(
         &self,
@@ -591,10 +612,15 @@ impl SessionManager {
             None => tracing::debug!(request_id = %response.request_id, "Ignoring unknown or duplicate document scan response"),
         }
     }
+    pub async fn complete_generate_translated_document(&self, session_id: &str, response: GenerateTranslatedDocumentResponse) {
+        let request_id = response.request_id.clone(); let pending = self.pending_document_generations.lock().await.remove(&request_id);
+        match pending { Some(pending) if pending.session_id == session_id => { let _ = pending.sender.send(response); }, Some(pending) => { self.pending_document_generations.lock().await.insert(request_id, pending); }, None => tracing::debug!("Ignoring unknown translated-document response") }
+    }
 
     async fn clear_pending_snapshots_for_session(&self, session_id: &str) {
         self.pending_snapshots.lock().await.retain(|_, pending| pending.session_id != session_id);
         self.pending_document_scans.lock().await.retain(|_, pending| pending.session_id != session_id);
+        self.pending_document_generations.lock().await.retain(|_, pending| pending.session_id != session_id);
         self.pending_locates.lock().await.retain(|_, pending| pending.session_id != session_id);
     }
 

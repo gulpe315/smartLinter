@@ -11,6 +11,8 @@ import {
   type ReplacementCommand,
   type ReplacementResult,
   type EnumerateDocumentResponse,
+  type GenerateTranslatedDocumentResponse,
+  type DocumentGenerationParagraphPlan,
   type QaReport,
   type QaIssue,
 } from '../../shared/protocol/types.ts';
@@ -167,6 +169,7 @@ export interface IBridgeService {
   getLiveParagraphSnapshots(paragraphIds: string[]): Promise<LiveParagraphSnapshotEntry[]>;
 
   enumerateDocumentParagraphs(options?: { includeUnplacedStories?: boolean }): Promise<EnumerateDocumentResponse>;
+  generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[]): Promise<GenerateTranslatedDocumentResponse>;
 
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
@@ -534,6 +537,10 @@ export class MockBridgeService implements IBridgeService {
     };
   }
 
+  async generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[]): Promise<GenerateTranslatedDocumentResponse> {
+    return { requestId: 'mock-generate-document', status: 'SUCCESS', appliedParagraphCount: paragraphPlans.length };
+  }
+
   async fetchBridgeHealth(): Promise<BridgeStatusPayload> {
     return {
       connected: false,
@@ -861,6 +868,11 @@ export class TauriBridgeService implements IBridgeService {
     return await invoke('enumerate_document_paragraphs', {
       includeUnplacedStories: options?.includeUnplacedStories ?? false,
     });
+  }
+
+  async generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[]): Promise<GenerateTranslatedDocumentResponse> {
+    if (!this.isTauriAvailable()) return this.fallbackService.generateTranslatedDocument(paragraphPlans);
+    return await invoke('generate_translated_document', { paragraphPlans });
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {

@@ -216,6 +216,19 @@ pub struct EnumerateDocumentResponse {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentGenerationParagraphPlan { pub paragraph_id: String, pub document_order_index: u32, pub expected_source_hash: String, pub target_text: String }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateTranslatedDocumentRequest { pub request_id: String, pub paragraph_plans: Vec<DocumentGenerationParagraphPlan> }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GenerateTranslatedDocumentStatus { Success, UnsupportedHost, OriginalUnsaved, FingerprintMismatch, Failed }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenerateTranslatedDocumentResponse { pub request_id: String, pub status: GenerateTranslatedDocumentStatus, #[serde(skip_serializing_if = "Option::is_none")] pub applied_paragraph_count: Option<u32>, #[serde(skip_serializing_if = "Option::is_none")] pub message: Option<String> }
+
 /// A dashboard request to reveal a paragraph in the active editor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -304,6 +317,8 @@ pub enum BridgeMessage {
     LiveSnapshotResponse(LiveSnapshotResponse),
     EnumerateDocumentRequest(EnumerateDocumentRequest),
     EnumerateDocumentResponse(EnumerateDocumentResponse),
+    GenerateTranslatedDocumentRequest(GenerateTranslatedDocumentRequest),
+    GenerateTranslatedDocumentResponse(GenerateTranslatedDocumentResponse),
     LocateRequest(LocateRequest),
     LocateResponse(LocateResponse),
     Heartbeat(HeartbeatPayload),
