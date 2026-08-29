@@ -60,4 +60,28 @@ describe('InDesign document scanner', () => {
         const result = scanner.enumerateAllDocumentParagraphs({ name: 'Bad.indd', stories: { get length() { throw new Error('boom'); } } }, { requestId: 'bad' });
         assert.match(result.error, /boom/);
     });
+
+    it('attaches valid inline tokens for formatted paragraphs', () => {
+        const env = new MockInDesignEnvironment(); env.stories.length = 0;
+        const story = env.createStory(['Hello bold'], { id: '40' });
+        (story.paragraphs[0] as any).textStyleRanges = [
+            { contents: 'Hello ', fontStyle: 'Regular', underline: false },
+            { contents: 'bold', fontStyle: 'Bold', underline: false },
+        ];
+        const result = loadScanner().enumerateAllDocumentParagraphs(env.activeDocument, { requestId: 'formatted' });
+        assert.deepEqual(JSON.parse(JSON.stringify(result.paragraphs[0].taggedSource)), {
+            tagStatus: 'valid', sourceTokens: [
+                { type: 'text', value: 'Hello ' },
+                { type: 'open', id: '1', kind: 'bold' }, { type: 'text', value: 'bold' }, { type: 'close', id: '1', kind: 'bold' },
+            ],
+        });
+    });
+
+    it('marks an unsupported extraction result as fallback plain text', () => {
+        const env = new MockInDesignEnvironment(); env.stories.length = 0;
+        const story = env.createStory(['Text'], { id: '41' });
+        (story.paragraphs[0] as any).textStyleRanges = [{ contents: 'Different', fontStyle: 'Regular', underline: false }];
+        const result = loadScanner().enumerateAllDocumentParagraphs(env.activeDocument, { requestId: 'fallback' });
+        assert.equal(result.paragraphs[0].taggedSource.tagStatus, 'fallback-plain');
+    });
 });

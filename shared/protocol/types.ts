@@ -129,6 +129,8 @@ export interface ScannedParagraphEntry {
     storyId?: string;
     isOverset?: boolean;
     coverageState?: CoverageState;
+    /** Inline formatting preserved by the full-document scan, when available. */
+    taggedSource?: TaggedSegmentData;
 }
 
 export interface EnumerateDocumentSummary {
@@ -367,7 +369,8 @@ export function isScannedParagraphEntry(val: unknown): val is ScannedParagraphEn
         && obj.documentOrderIndex >= 0
         && (obj.storyId === undefined || typeof obj.storyId === 'string')
         && (obj.isOverset === undefined || typeof obj.isOverset === 'boolean')
-        && (obj.coverageState === undefined || isCoverageState(obj.coverageState));
+        && (obj.coverageState === undefined || isCoverageState(obj.coverageState))
+        && (obj.taggedSource === undefined || isTaggedSegmentData(obj.taggedSource));
 }
 
 export function isEnumerateDocumentSummary(val: unknown): val is EnumerateDocumentSummary {

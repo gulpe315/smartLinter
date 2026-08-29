@@ -232,6 +232,18 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
             assert.equal(isEnumerateDocumentResponse({ ...response, error: 'Office.js document scan error: busy' }), true);
             assert.equal(isEnumerateDocumentResponse({ ...response, error: 123 }), false);
         });
+        it('accepts an optional valid tagged scan source and rejects malformed tags', () => {
+            const response = {
+                requestId: 'scan-tags', sourceDocumentName: 'document.docx', paragraphs: [{
+                    paragraphId: 'word-para-body-0-hash', text: 'Bold', hash: 'hash', documentOrderIndex: 0,
+                    taggedSource: { tagStatus: 'valid', sourceTokens: [
+                        { type: 'open', id: '1', kind: 'bold' }, { type: 'text', value: 'Bold' }, { type: 'close', id: '1', kind: 'bold' },
+                    ] },
+                }],
+            };
+            assert.equal(isEnumerateDocumentResponse(response), true);
+            assert.equal(isEnumerateDocumentResponse({ ...response, paragraphs: [{ ...response.paragraphs[0], taggedSource: { tagStatus: 'valid', sourceTokens: [{}] } }] }), false);
+        });
         it('should validate HeartbeatPayload structure', () => {
             const heartbeat = rawFixtures.heartbeatPayload as HeartbeatPayload;
             assert.equal(isHeartbeatPayload(heartbeat), true);

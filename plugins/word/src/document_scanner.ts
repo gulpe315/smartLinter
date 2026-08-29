@@ -1,5 +1,6 @@
 import { computeParagraphHash } from '../../../shared/engine/hash_util.ts';
 import type { EnumerateDocumentRequest, EnumerateDocumentResponse } from '../../../shared/protocol/types.ts';
+import { extractParagraphTokens } from './inlineTagExtractor.ts';
 
 /** Enumerates all body paragraphs in a single non-invasive Word.run scan. */
 export async function enumerateAllDocumentParagraphs(
@@ -19,11 +20,15 @@ export async function enumerateAllDocumentParagraphs(
             for (const [documentOrderIndex, paragraph] of (bodyParagraphs.items || []).entries()) {
                 const text = paragraph.text || '';
                 const hash = computeParagraphHash(text);
+                const extraction = await extractParagraphTokens(paragraph, wordRunner);
                 paragraphs.push({
                     paragraphId: `word-para-body-${documentOrderIndex}-${hash.slice(0, 12)}`,
                     text,
                     hash,
                     documentOrderIndex,
+                    taggedSource: extraction.ok
+                        ? { sourceTokens: extraction.tokens, tagStatus: 'valid' }
+                        : { sourceTokens: [{ type: 'text', value: text }], tagStatus: 'fallback-plain', fallbackReason: extraction.reason },
                 });
             }
         });

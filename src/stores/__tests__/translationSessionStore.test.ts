@@ -3,7 +3,7 @@ import { type ParagraphPayload, type ScannedParagraphEntry } from '../../../shar
 import { MockBridgeService } from '../../services/tauriBridge.ts';
 import { useConfigStore } from '../configStore.ts';
 import { useBridgeStore } from '../bridgeStore.ts';
-import { mergeScannedParagraphs, type TranslationSessionSegment, useTranslationSessionStore } from '../translationSessionStore.ts';
+import { createSegmentsFromParagraph, mergeScannedParagraphs, type TranslationSessionSegment, useTranslationSessionStore } from '../translationSessionStore.ts';
 import { getGlobalTmMatcher } from '../../utils/tmMatcher.ts';
 
 const paragraph = (overrides: Partial<ParagraphPayload> = {}): ParagraphPayload => ({
@@ -64,6 +64,44 @@ describe('translationSessionStore', () => {
       { segmentId: 'paragraph-1_0_hash-1', segmentIndex: 0, sourceText: 'First sentence.', startOffset: 0, endOffset: 15 },
       { segmentId: 'paragraph-1_1_hash-1', segmentIndex: 1, sourceText: 'Second sentence.', startOffset: 16, endOffset: 32 },
     ]);
+  });
+
+  it('keeps inline tokens with their fully-contained sentence', () => {
+    const segments = createSegmentsFromParagraph({
+      paragraphId: 'tagged', text: 'First bold sentence. Second sentence.', hash: 'tagged-hash',
+      taggedSource: { tagStatus: 'valid', sourceTokens: [
+        { type: 'text', value: 'First ' }, { type: 'open', id: '1', kind: 'bold' }, { type: 'text', value: 'bold' },
+        { type: 'close', id: '1', kind: 'bold' }, { type: 'text', value: ' sentence. Second sentence.' },
+      ] },
+    }, 1, tmContext());
+    expect(segments).toHaveLength(2);
+    expect(segments[0].taggedSource?.sourceTokens).toEqual([
+      { type: 'text', value: 'First ' }, { type: 'open', id: '1', kind: 'bold' }, { type: 'text', value: 'bold' },
+      { type: 'close', id: '1', kind: 'bold' }, { type: 'text', value: ' sentence.' },
+    ]);
+    expect(segments[1].taggedSource?.sourceTokens).toEqual([{ type: 'text', value: 'Second sentence.' }]);
+  });
+
+  it('keeps a tagged paragraph as one segment when formatting crosses a sentence boundary', () => {
+    const text = 'This starts bold. And ends in the next sentence.';
+    const segments = createSegmentsFromParagraph({
+      paragraphId: 'crosses-boundary', text, hash: 'crossing-hash',
+      taggedSource: { tagStatus: 'valid', sourceTokens: [
+        { type: 'text', value: 'This starts ' }, { type: 'open', id: '1', kind: 'bold' },
+        { type: 'text', value: 'bold. And ends' }, { type: 'close', id: '1', kind: 'bold' }, { type: 'text', value: ' in the next sentence.' },
+      ] },
+    }, 1, tmContext());
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toMatchObject({ segmentIndex: 0, sourceText: text, taggedSource: { tagStatus: 'valid' } });
+  });
+
+  it('uses ordinary sentence splitting for fallback plain tagged sources', () => {
+    const segments = createSegmentsFromParagraph({
+      paragraphId: 'fallback', text: 'First sentence. Second sentence.', hash: 'fallback-hash',
+      taggedSource: { tagStatus: 'fallback-plain', sourceTokens: [{ type: 'text', value: 'First sentence. Second sentence.' }] },
+    }, 1, tmContext());
+    expect(segments).toHaveLength(2);
+    expect(segments[0].taggedSource).toBeUndefined();
   });
 
   it('is idempotent for the same paragraph hash', () => {

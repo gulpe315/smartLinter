@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type EnumerateDocumentSummary, type ParagraphPayload, type ScannedParagraphEntry } from '../../shared/protocol/types.ts';
+import { type EnumerateDocumentSummary, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
 import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
@@ -43,10 +43,13 @@ export interface TranslationSessionSegment {
   updatedAt: number;
   /** Present only for paragraphs obtained through a full-document T3a scan. */
   documentOrderIndex?: number;
+  /** Formatting tokens for this sentence, when extracted during a T3 scan. */
+  taggedSource?: TaggedSegmentData;
 }
 
 type SegmentParagraph = Pick<ParagraphPayload, 'paragraphId' | 'text' | 'hash'> & {
   documentOrderIndex?: number;
+  taggedSource?: TaggedSegmentData;
 };
 
 export type TranslationTmContext = {
@@ -55,19 +58,89 @@ export type TranslationTmContext = {
   matcher: ReturnType<typeof getGlobalTmMatcher>;
 };
 
+type SentenceMatch = {
+  segmentIndex: number;
+  sourceText: string;
+  startOffset: number;
+  endOffset: number;
+  candidates: never[];
+  taggedSource?: TaggedSegmentData;
+};
+
+/**
+ * Splits valid inline tokens at sentence boundaries. A tag pair that spans two
+ * sentences cannot be represented safely as independent sentence streams.
+ */
+function tagAwareSentenceMatches(paragraph: SegmentParagraph): SentenceMatch[] {
+  const sentences = splitIntoSentences(paragraph.text);
+  const tagged = paragraph.taggedSource;
+  if (!tagged || tagged.tagStatus !== 'valid') {
+    return sentences.map((sentence, segmentIndex) => ({
+      segmentIndex, sourceText: sentence.text, startOffset: sentence.start, endOffset: sentence.end, candidates: [],
+    }));
+  }
+
+  let offset = 0;
+  const positioned = tagged.sourceTokens.map((token) => {
+    const start = offset;
+    if (token.type === 'text') offset += token.value.length;
+    return { token, start, end: offset };
+  });
+  // A valid tagged source must still describe this exact paragraph.
+  if (offset !== paragraph.text.length) return [{
+    segmentIndex: 0, sourceText: paragraph.text, startOffset: 0, endOffset: paragraph.text.length, candidates: [], taggedSource: tagged,
+  }];
+
+  const openById = new Map<string, number>();
+  let crossesBoundary = false;
+  const sentenceForRange = (start: number, end: number) => sentences.findIndex((sentence) => (
+    start >= sentence.start && end <= sentence.end
+  ));
+  for (let index = 0; index < positioned.length; index++) {
+    const entry = positioned[index];
+    if (entry.token.type === 'open') openById.set(entry.token.id, index);
+    if (entry.token.type === 'close') {
+      const openIndex = openById.get(entry.token.id);
+      if (openIndex === undefined || positioned[openIndex].token.type !== 'open') { crossesBoundary = true; break; }
+      const open = positioned[openIndex];
+      if (open.token.kind !== entry.token.kind) { crossesBoundary = true; break; }
+      if (sentenceForRange(open.start, entry.end) < 0) { crossesBoundary = true; break; }
+      openById.delete(entry.token.id);
+    }
+  }
+  if (openById.size > 0) crossesBoundary = true;
+  if (crossesBoundary) return [{
+    segmentIndex: 0, sourceText: paragraph.text, startOffset: 0, endOffset: paragraph.text.length, candidates: [], taggedSource: tagged,
+  }];
+
+  return sentences.map((sentence, segmentIndex) => {
+    const sourceTokens: InlineToken[] = [];
+    for (const entry of positioned) {
+      const { token } = entry;
+      if (token.type === 'text') {
+        const start = Math.max(entry.start, sentence.start);
+        const end = Math.min(entry.end, sentence.end);
+        if (start < end) sourceTokens.push({ type: 'text', value: token.value.slice(start - entry.start, end - entry.start) });
+      } else if (token.type === 'open' && entry.start >= sentence.start && entry.start < sentence.end) {
+        sourceTokens.push(token);
+      } else if (token.type === 'close' && entry.start > sentence.start && entry.start <= sentence.end) {
+        sourceTokens.push(token);
+      }
+    }
+    return {
+      segmentIndex, sourceText: sentence.text, startOffset: sentence.start, endOffset: sentence.end, candidates: [],
+      taggedSource: { sourceTokens, tagStatus: 'valid' },
+    };
+  });
+}
+
 /** Creates the sentence-level session records for one source paragraph. */
 export function createSegmentsFromParagraph(
   paragraph: SegmentParagraph,
   now: number,
   tmContext: TranslationTmContext,
 ): TranslationSessionSegment[] {
-  const sentenceMatches = splitIntoSentences(paragraph.text).map((sentence, segmentIndex) => ({
-    segmentIndex,
-    sourceText: sentence.text,
-    startOffset: sentence.start,
-    endOffset: sentence.end,
-    candidates: [],
-  }));
+  const sentenceMatches = tagAwareSentenceMatches(paragraph);
   const plan = deriveTmAutoApplyPlan(paragraph, sentenceMatches, tmContext.matcher, tmContext.userTmOverlayEntries);
   const eligibleByIndex = new Map(
     plan?.observations
@@ -92,6 +165,7 @@ export function createSegmentsFromParagraph(
       detectedAt: now,
       updatedAt: now,
       ...(paragraph.documentOrderIndex === undefined ? {} : { documentOrderIndex: paragraph.documentOrderIndex }),
+      ...(sentence.taggedSource === undefined ? {} : { taggedSource: sentence.taggedSource }),
     } satisfies TranslationSessionSegment;
   });
 }

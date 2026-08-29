@@ -1,6 +1,7 @@
 #targetengine "smartlinter_persistent_engine"
 
 #include "text_observer.jsx"
+#include "inline_tag_extractor.jsx"
 
 (function(global) {
     'use strict';
@@ -72,6 +73,10 @@
                         continue;
                     }
                     var text = String(para.contents || '');
+                    var extraction = SmartLinterInlineTagExtractor.extractParagraphTokens(para);
+                    var taggedSource = extraction.ok
+                        ? { sourceTokens: extraction.tokens, tagStatus: 'valid' }
+                        : { sourceTokens: [{ type: 'text', value: text }], tagStatus: 'fallback-plain', fallbackReason: extraction.reason };
                     response.paragraphs.push({
                         paragraphId: 'indesign-para-' + storyId + '-' + p,
                         text: text,
@@ -79,7 +84,8 @@
                         documentOrderIndex: order++,
                         storyId: storyId,
                         isOverset: overset,
-                        coverageState: placed ? 'included' : 'requires-user-choice'
+                        coverageState: placed ? 'included' : 'requires-user-choice',
+                        taggedSource: taggedSource
                     });
                     summary.scannedParagraphs++;
                     if (overset) summary.oversetParagraphsIncluded++;
