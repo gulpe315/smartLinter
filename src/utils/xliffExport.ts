@@ -2,6 +2,7 @@ import {
   type TranslationSessionSegment,
   type TranslationSegmentStatus,
 } from '../stores/translationSessionStore.ts';
+import { type InlineToken } from '../../shared/protocol/types.ts';
 
 export type XliffBuildFailure = {
   ok: false;
@@ -23,6 +24,15 @@ const escapeXml = (value: string): string => value
   .replace(/>/g, '&gt;')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&apos;');
+
+function serializeTaggedSource(tokens: InlineToken[]): string {
+  return tokens.map((token) => {
+    if (token.type === 'text') return escapeXml(token.value);
+    if (token.type === 'open') return `<bpt id="${escapeXml(token.id)}" ctype="x-${token.kind}">&lt;${token.kind[0]}&gt;</bpt>`;
+    if (token.type === 'close') return `<ept id="${escapeXml(token.id)}">&lt;/${token.kind[0]}&gt;</ept>`;
+    return `<ph id="${escapeXml(token.id)}">${escapeXml('')}</ph>`;
+  }).join('');
+}
 
 const sortSegments = (segments: TranslationSessionSegment[]): TranslationSessionSegment[] => {
   const paragraphs = new Map<string, { firstSeenAt: number; firstSeenOrdinal: number; documentOrderIndex?: number }>();
@@ -71,9 +81,12 @@ export function buildXliffDocument(
     const target = segment.targetDraft
       ? `<target state="${targetState}">${escapeXml(segment.targetDraft)}</target>`
       : `<target state="${targetState}"/>`;
+    const source = segment.taggedSource?.tagStatus === 'valid'
+      ? serializeTaggedSource(segment.taggedSource.sourceTokens)
+      : escapeXml(segment.sourceText);
     return [
       `      <trans-unit id="${escapeXml(segment.segmentId)}" xml:space="preserve">`,
-      `        <source>${escapeXml(segment.sourceText)}</source>`,
+      `        <source>${source}</source>`,
       `        ${target}`,
       '      </trans-unit>',
     ].join('\n');

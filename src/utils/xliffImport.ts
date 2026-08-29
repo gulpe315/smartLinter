@@ -1,10 +1,14 @@
 import { type TranslationSessionSegment } from '../stores/translationSessionStore.ts';
+import { type InlineToken, type InlineTokenKind, type TaggedSegmentData } from '../../shared/protocol/types.ts';
 
 export interface ParsedTransUnit {
   id: string;
   sourceText: string;
   targetText: string | null;
   state: string | null;
+  sourceTokens?: InlineToken[];
+  targetTokens?: InlineToken[];
+  inlineCodeIssue?: 'INLINE_CODE_MISMATCH' | 'UNEXPECTED_INLINE_CODE';
 }
 
 export type XliffParseResult =
@@ -22,6 +26,7 @@ export interface XliffImportAnalysis {
   skippedSourceMismatch: ParsedTransUnit[];
   skippedNotFound: ParsedTransUnit[];
   skippedDuplicateId: string[];
+  skippedInlineCodeIssue: ParsedTransUnit[];
   notProvided: ParsedTransUnit[];
 }
 
@@ -33,6 +38,102 @@ const descendantsByLocalName = (parent: ParentNode, localName: string): Element[
 
 const firstChildByLocalName = (parent: Element, localName: string): Element | null => (
   Array.from(parent.children).find((element) => element.localName === localName) ?? null
+);
+
+const inlineKinds: InlineTokenKind[] = ['bold', 'italic', 'underline'];
+
+const kindFromCtype = (ctype: string | null): InlineTokenKind | null => {
+  const kind = ctype?.startsWith('x-') ? ctype.slice(2) : '';
+  return inlineKinds.includes(kind as InlineTokenKind) ? kind as InlineTokenKind : null;
+};
+
+function parseInlineTokens(element: Element | null): InlineToken[] | undefined {
+  if (!element) return undefined;
+  const hasInlineCode = Array.from(element.children).some((child) => (
+    child.localName === 'bpt' || child.localName === 'ept' || child.localName === 'ph'
+  ));
+  if (!hasInlineCode) return undefined;
+
+  const tokens: InlineToken[] = [];
+  const openKinds = new Map<string, InlineTokenKind>();
+  for (const node of Array.from(element.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE) {
+      tokens.push({ type: 'text', value: node.textContent ?? '' });
+      continue;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) continue;
+    const code = node as Element;
+    const id = code.getAttribute('id') ?? '';
+    if (code.localName === 'bpt') {
+      const kind = kindFromCtype(code.getAttribute('ctype')) ?? ('invalid' as InlineTokenKind);
+      openKinds.set(id, kind);
+      tokens.push({ type: 'open', id, kind });
+    } else if (code.localName === 'ept') {
+      tokens.push({ type: 'close', id, kind: openKinds.get(id) ?? ('invalid' as InlineTokenKind) });
+    } else if (code.localName === 'ph') {
+      tokens.push({ type: 'placeholder', id, kind: code.getAttribute('ctype') ?? '' });
+    }
+  }
+  return tokens;
+}
+
+type InlineCodeStructure = {
+  orderedSignature: string[];
+  codesById: Map<string, { kind: string; parentId: string | null }>;
+};
+
+/** Returns inline-code signatures, or null when the token sequence is malformed. */
+function inlineCodeSignature(tokens: InlineToken[]): InlineCodeStructure | null {
+  const stack: Array<{ id: string; kind: string }> = [];
+  const orderedSignature: string[] = [];
+  const codesById = new Map<string, { kind: string; parentId: string | null }>();
+  const ids = new Set<string>();
+  for (const token of tokens) {
+    if (token.type === 'text') continue;
+    if (token.type === 'placeholder') {
+      if (!token.id || ids.has(`ph:${token.id}`)) return null;
+      ids.add(`ph:${token.id}`);
+      orderedSignature.push(`ph:${token.id}:${token.kind}`);
+      codesById.set(`ph:${token.id}`, { kind: token.kind, parentId: null });
+      continue;
+    }
+    if (!token.id || !inlineKinds.includes(token.kind)) return null;
+    if (token.type === 'open') {
+      if (ids.has(token.id)) return null;
+      ids.add(token.id);
+      codesById.set(token.id, { kind: token.kind, parentId: stack.at(-1)?.id ?? null });
+      stack.push({ id: token.id, kind: token.kind });
+      orderedSignature.push(`open:${token.id}:${token.kind}`);
+    } else {
+      const open = stack.pop();
+      if (!open || open.id !== token.id || open.kind !== token.kind) return null;
+      orderedSignature.push(`close:${token.id}:${token.kind}`);
+    }
+  }
+  return stack.length === 0 ? { orderedSignature, codesById } : null;
+}
+
+const sameInlineCodeStructure = (
+  left: InlineToken[],
+  right: InlineToken[],
+  positionIndependent = false,
+): boolean => {
+  const leftSignature = inlineCodeSignature(left);
+  const rightSignature = inlineCodeSignature(right);
+  if (!leftSignature || !rightSignature) return false;
+  if (!positionIndependent) {
+    return leftSignature.orderedSignature.length === rightSignature.orderedSignature.length
+      && leftSignature.orderedSignature.every((part, index) => part === rightSignature.orderedSignature[index]);
+  }
+  return leftSignature.codesById.size === rightSignature.codesById.size
+    && [...leftSignature.codesById].every(([id, code]) => {
+      const other = rightSignature.codesById.get(id);
+      return other?.kind === code.kind && other.parentId === code.parentId;
+    });
+};
+
+const textFromTokens = (tokens: InlineToken[] | undefined, fallback: string): string => (
+  tokens ? tokens.filter((token) => token.type === 'text').map((token) => token.value).join('') : fallback
 );
 
 export function parseXliffImport(xmlContent: string): XliffParseResult {
@@ -65,11 +166,15 @@ export function parseXliffImport(xmlContent: string): XliffParseResult {
     units: transUnits.map((unit) => {
       const source = firstChildByLocalName(unit, 'source');
       const target = firstChildByLocalName(unit, 'target');
+      const sourceTokens = parseInlineTokens(source);
+      const targetTokens = parseInlineTokens(target);
       return {
         id: unit.getAttribute('id') ?? '',
-        sourceText: source?.textContent ?? '',
-        targetText: target ? (target.textContent ?? '') : null,
+        sourceText: textFromTokens(sourceTokens, source?.textContent ?? ''),
+        targetText: target ? textFromTokens(targetTokens, target.textContent ?? '') : null,
         state: target?.getAttribute('state') ?? null,
+        ...(sourceTokens ? { sourceTokens } : {}),
+        ...(targetTokens ? { targetTokens } : {}),
       };
     }),
   };
@@ -85,7 +190,7 @@ export function analyzeXliffImport(
   const segmentsById = new Map(currentSegments.map((segment) => [segment.segmentId, segment]));
   const analysis: XliffImportAnalysis = {
     autoApply: [], conflicts: [], skippedSourceMismatch: [], skippedNotFound: [],
-    skippedDuplicateId: [...duplicateIds], notProvided: [],
+    skippedDuplicateId: [...duplicateIds], skippedInlineCodeIssue: [], notProvided: [],
   };
 
   for (const incoming of units) {
@@ -93,6 +198,21 @@ export function analyzeXliffImport(
     const segment = segmentsById.get(incoming.id);
     if (!segment) { analysis.skippedNotFound.push(incoming); continue; }
     if (incoming.sourceText !== segment.sourceText) { analysis.skippedSourceMismatch.push(incoming); continue; }
+    const sourceTagged = segment.taggedSource?.tagStatus === 'valid';
+    const inlineCodeIssue = !sourceTagged
+      ? (incoming.targetTokens ? 'UNEXPECTED_INLINE_CODE' : undefined)
+      : (!incoming.sourceTokens
+        || !sameInlineCodeStructure(incoming.sourceTokens, segment.taggedSource!.sourceTokens)
+        || (incoming.targetTokens && !sameInlineCodeStructure(
+          incoming.targetTokens, segment.taggedSource!.sourceTokens, true,
+        ))
+          ? 'INLINE_CODE_MISMATCH'
+          : undefined);
+    if (inlineCodeIssue) {
+      incoming.inlineCodeIssue = inlineCodeIssue;
+      analysis.skippedInlineCodeIssue.push(incoming);
+      continue;
+    }
     if (incoming.targetText === null) { analysis.notProvided.push(incoming); continue; }
     if (incoming.targetText === segment.targetDraft || !segment.isUserEdited) {
       analysis.autoApply.push({ segment, incoming });
@@ -125,6 +245,13 @@ export function applyXliffImport(
       origin: 'external-cat',
       isUserEdited: false,
       updatedAt: now,
+      ...(incoming.targetTokens && segment.taggedSource?.tagStatus === 'valid' ? {
+        taggedTarget: {
+          sourceTokens: segment.taggedSource.sourceTokens,
+          targetTokens: incoming.targetTokens,
+          tagStatus: 'valid',
+        } satisfies TaggedSegmentData,
+      } : {}),
     };
   });
 }

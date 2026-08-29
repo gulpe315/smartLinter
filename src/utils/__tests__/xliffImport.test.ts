@@ -76,6 +76,117 @@ describe('analyzeXliffImport', () => {
     expect(analysis.autoApply.map((item) => item.segment.segmentId)).toEqual(['unchanged', 'auto-empty']);
     expect(analysis.conflicts.map((item) => item.segment.segmentId)).toEqual(['conflict-empty']);
   });
+
+  it('parses matching inline codes, accepts moved target code positions, and applies taggedTarget', () => {
+    const tagged = segment({ sourceText: 'A bold word', taggedSource: { tagStatus: 'valid', sourceTokens: [
+      { type: 'text', value: 'A ' }, { type: 'open', id: 'b1', kind: 'bold' },
+      { type: 'text', value: 'bold' }, { type: 'close', id: 'b1', kind: 'bold' }, { type: 'text', value: ' word' },
+    ] } });
+    const parsed = parseXliffImport(xml('<trans-unit id="segment-1"><source>A <bpt id="b1" ctype="x-bold">&lt;b&gt;</bpt>bold<ept id="b1">&lt;/b&gt;</ept> word</source><target><bpt id="b1" ctype="x-bold">&lt;b&gt;</bpt>번역<ept id="b1">&lt;/b&gt;</ept>문장</target></trans-unit>'));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.units[0]).toMatchObject({ sourceText: 'A bold word', targetText: '번역문장' });
+    expect(parsed.units[0].sourceTokens).toEqual(tagged.taggedSource!.sourceTokens);
+    const analysis = analyzeXliffImport(parsed.units, [tagged]);
+    expect(analysis.autoApply).toHaveLength(1);
+    const applied = applyXliffImport([tagged], analysis.autoApply, [], 2);
+    expect(applied[0].taggedTarget?.targetTokens).toEqual(parsed.units[0].targetTokens);
+  });
+
+  it('accepts target inline spans reordered by translation word order', () => {
+    const tagged = segment({ sourceText: 'Click the Save button and view Manual.', taggedSource: { tagStatus: 'valid', sourceTokens: [
+      { type: 'text', value: 'Click the ' }, { type: 'open', id: 'bold-1', kind: 'bold' },
+      { type: 'text', value: 'Save' }, { type: 'close', id: 'bold-1', kind: 'bold' },
+      { type: 'text', value: ' button and view ' }, { type: 'open', id: 'italic-1', kind: 'italic' },
+      { type: 'text', value: 'Manual' }, { type: 'close', id: 'italic-1', kind: 'italic' }, { type: 'text', value: '.' },
+    ] } });
+    const analysis = analyzeXliffImport([unit({
+      sourceText: tagged.sourceText, sourceTokens: tagged.taggedSource!.sourceTokens,
+      targetText: '설명서를 보고 저장 버튼을 누르세요.', targetTokens: [
+        { type: 'open', id: 'italic-1', kind: 'italic' }, { type: 'text', value: '설명서' },
+        { type: 'close', id: 'italic-1', kind: 'italic' }, { type: 'text', value: '를 보고 ' },
+        { type: 'open', id: 'bold-1', kind: 'bold' }, { type: 'text', value: '저장' },
+        { type: 'close', id: 'bold-1', kind: 'bold' }, { type: 'text', value: ' 버튼을 누르세요.' },
+      ],
+    })], [tagged]);
+    expect(analysis.skippedInlineCodeIssue).toHaveLength(0);
+    expect(analysis.autoApply).toHaveLength(1);
+  });
+
+  it.each([
+    ['changes a span kind', [
+      { type: 'open', id: 'italic-1', kind: 'bold' }, { type: 'text', value: '설명서' },
+      { type: 'close', id: 'italic-1', kind: 'bold' }, { type: 'open', id: 'bold-1', kind: 'bold' },
+      { type: 'text', value: '저장' }, { type: 'close', id: 'bold-1', kind: 'bold' },
+    ]],
+    ['deletes a span ID', [
+      { type: 'open', id: 'bold-1', kind: 'bold' }, { type: 'text', value: '저장' },
+      { type: 'close', id: 'bold-1', kind: 'bold' },
+    ]],
+    ['changes the nesting relationship', [
+      { type: 'open', id: 'bold-1', kind: 'bold' }, { type: 'open', id: 'italic-1', kind: 'italic' },
+      { type: 'text', value: '설명서와 저장' }, { type: 'close', id: 'italic-1', kind: 'italic' },
+      { type: 'close', id: 'bold-1', kind: 'bold' },
+    ]],
+  ])('isolates a target that %s', (_label, targetTokens) => {
+    const tagged = segment({ sourceText: 'Save Manual', taggedSource: { tagStatus: 'valid', sourceTokens: [
+      { type: 'open', id: 'bold-1', kind: 'bold' }, { type: 'text', value: 'Save' },
+      { type: 'close', id: 'bold-1', kind: 'bold' }, { type: 'text', value: ' ' },
+      { type: 'open', id: 'italic-1', kind: 'italic' }, { type: 'text', value: 'Manual' },
+      { type: 'close', id: 'italic-1', kind: 'italic' },
+    ] } });
+    const analysis = analyzeXliffImport([unit({
+      sourceText: tagged.sourceText, sourceTokens: tagged.taggedSource!.sourceTokens, targetTokens,
+    })], [tagged]);
+    expect(analysis.skippedInlineCodeIssue[0].inlineCodeIssue).toBe('INLINE_CODE_MISMATCH');
+  });
+
+  it('isolates inline-code mismatches while processing other valid units', () => {
+    const tagged = segment({ segmentId: 'tagged', sourceText: 'Bold', taggedSource: { tagStatus: 'valid', sourceTokens: [
+      { type: 'open', id: 'b1', kind: 'bold' }, { type: 'text', value: 'Bold' }, { type: 'close', id: 'b1', kind: 'bold' },
+    ] } });
+    const plain = segment({ segmentId: 'plain', sourceText: 'Plain' });
+    const analysis = analyzeXliffImport([
+      unit({ id: 'tagged', sourceText: 'Bold', targetText: '번역', sourceTokens: tagged.taggedSource!.sourceTokens, targetTokens: [
+        { type: 'open', id: 'b1', kind: 'italic' }, { type: 'text', value: '번역' }, { type: 'close', id: 'b1', kind: 'italic' },
+      ] }),
+      unit({ id: 'plain', sourceText: 'Plain', targetText: 'OK' }),
+    ], [tagged, plain]);
+    expect(analysis.skippedInlineCodeIssue).toHaveLength(1);
+    expect(analysis.skippedInlineCodeIssue[0].inlineCodeIssue).toBe('INLINE_CODE_MISMATCH');
+    expect(analysis.autoApply.map((item) => item.segment.segmentId)).toEqual(['plain']);
+  });
+
+  it('isolates a target with a deleted inline opening code', () => {
+    const tagged = segment({ taggedSource: { tagStatus: 'valid', sourceTokens: [
+      { type: 'open', id: 'b1', kind: 'bold' }, { type: 'text', value: 'Source text' }, { type: 'close', id: 'b1', kind: 'bold' },
+    ] } });
+    const analysis = analyzeXliffImport([unit({ sourceTokens: tagged.taggedSource!.sourceTokens, targetTokens: [
+      { type: 'text', value: '번역' }, { type: 'close', id: 'b1', kind: 'bold' },
+    ] })], [tagged]);
+    expect(analysis.skippedInlineCodeIssue[0].inlineCodeIssue).toBe('INLINE_CODE_MISMATCH');
+  });
+
+  it('isolates unexpected inline codes for plain-text segments', () => {
+    const plain = segment({ sourceText: 'Plain' });
+    const analysis = analyzeXliffImport([unit({ sourceText: 'Plain', targetTokens: [
+      { type: 'open', id: 'b1', kind: 'bold' }, { type: 'text', value: 'Incoming target' }, { type: 'close', id: 'b1', kind: 'bold' },
+    ] })], [plain]);
+    expect(analysis.skippedInlineCodeIssue).toHaveLength(1);
+    expect(analysis.skippedInlineCodeIssue[0].inlineCodeIssue).toBe('UNEXPECTED_INLINE_CODE');
+    expect(analysis.autoApply).toHaveLength(0);
+  });
+
+  it('isolates duplicate inline-code IDs as an inline-code mismatch', () => {
+    const tagged = segment({ taggedSource: { tagStatus: 'valid', sourceTokens: [
+      { type: 'open', id: 'b1', kind: 'bold' }, { type: 'text', value: 'Source text' }, { type: 'close', id: 'b1', kind: 'bold' },
+    ] } });
+    const analysis = analyzeXliffImport([unit({ sourceTokens: tagged.taggedSource!.sourceTokens, targetTokens: [
+      { type: 'open', id: 'b1', kind: 'bold' }, { type: 'text', value: 'One' }, { type: 'close', id: 'b1', kind: 'bold' },
+      { type: 'open', id: 'b1', kind: 'bold' }, { type: 'text', value: 'Two' }, { type: 'close', id: 'b1', kind: 'bold' },
+    ] })], [tagged]);
+    expect(analysis.skippedInlineCodeIssue[0].inlineCodeIssue).toBe('INLINE_CODE_MISMATCH');
+  });
 });
 
 describe('applyXliffImport', () => {

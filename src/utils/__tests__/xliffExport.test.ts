@@ -55,6 +55,37 @@ describe('buildXliffDocument', () => {
     }
   });
 
+  it('serializes a valid tagged source with XLIFF bpt/ept inline codes', () => {
+    const result = buildXliffDocument([segment({
+      sourceText: 'A bold word',
+      taggedSource: { tagStatus: 'valid', sourceTokens: [
+        { type: 'text', value: 'A ' },
+        { type: 'open', id: 'fmt-1', kind: 'bold' },
+        { type: 'text', value: 'bold' },
+        { type: 'close', id: 'fmt-1', kind: 'bold' },
+        { type: 'text', value: ' word' },
+      ] },
+    })], { sourceLang: 'en', targetLang: 'ko' });
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.xml).toContain('<source>A <bpt id="fmt-1" ctype="x-bold">&lt;b&gt;</bpt>bold<ept id="fmt-1">&lt;/b&gt;</ept> word</source>');
+    }
+  });
+
+  it('keeps untagged and fallback sources on the plain-text export path', () => {
+    const result = buildXliffDocument([
+      segment({ segmentId: 'plain', sourceText: 'Plain & source' }),
+      segment({ segmentId: 'fallback', sourceText: 'Fallback < source', taggedSource: { tagStatus: 'fallback-plain', sourceTokens: [] } }),
+    ], { sourceLang: 'en', targetLang: 'ko' });
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.xml).toContain('<source>Plain &amp; source</source>');
+      expect(result.xml).toContain('<source>Fallback &lt; source</source>');
+    }
+  });
+
   it('fails closed when any segment needs validation', () => {
     const result = buildXliffDocument([
       segment(),

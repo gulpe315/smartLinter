@@ -45,6 +45,8 @@ export interface TranslationSessionSegment {
   documentOrderIndex?: number;
   /** Formatting tokens for this sentence, when extracted during a T3 scan. */
   taggedSource?: TaggedSegmentData;
+  /** Formatting tokens returned by an external CAT import, when present. */
+  taggedTarget?: TaggedSegmentData;
 }
 
 type SegmentParagraph = Pick<ParagraphPayload, 'paragraphId' | 'text' | 'hash'> & {
@@ -278,6 +280,7 @@ export interface TranslationSessionState {
     skippedSourceMismatchCount: number;
     skippedNotFoundCount: number;
     skippedDuplicateIdCount: number;
+    skippedInlineCodeIssueCount?: number;
     notProvidedCount: number;
     toolId: string | null;
     importedAt: number;
@@ -443,6 +446,7 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
         skippedSourceMismatchCount: analysis.skippedSourceMismatch.length,
         skippedNotFoundCount: analysis.skippedNotFound.length,
         skippedDuplicateIdCount: analysis.skippedDuplicateId.length,
+        skippedInlineCodeIssueCount: analysis.skippedInlineCodeIssue.length,
         notProvidedCount: analysis.notProvided.length,
         toolId: parsed.toolId,
         importedAt: now,
