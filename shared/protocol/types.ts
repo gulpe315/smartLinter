@@ -395,6 +395,8 @@ export interface QaIssue {
     startOffset?: number;
     /** End offset in the target paragraph, measured in UTF-16 code units */
     endOffset?: number;
+    /** Zero-based sentence/TU index when the issue lies wholly within one segment. */
+    segmentIndex?: number;
     provenance?: QaProvenance;
     confidence?: number;
     ruleId?: string;
@@ -449,6 +451,7 @@ export function isQaIssue(val: unknown): val is QaIssue {
         typeof obj.suggestedSegment === 'string' &&
         typeof obj.reason === 'string' &&
         typeof obj.severity === 'string' &&
+        (obj.segmentIndex === undefined || (typeof obj.segmentIndex === 'number' && Number.isInteger(obj.segmentIndex as number) && (obj.segmentIndex as number) >= 0)) &&
         suggestionsAreValid
     );
 }

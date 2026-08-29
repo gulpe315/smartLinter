@@ -97,6 +97,7 @@ fn particle_issue(text: &str, mapping: &Mapping, wrong: &str, correct: &str, sta
         severity: QaSeverity::Medium,
         start_offset: Some(utf16_offset(text, start)),
         end_offset: Some(utf16_offset(text, end)),
+        segment_index: None,
         provenance: Some("deterministic:particle-whitelist-v1".into()),
         confidence: Some(0.90),
         rule_id: Some(format!("particle.pronoun.v1.{}.{}", mapping.stem, mapping.wrong_particle)),

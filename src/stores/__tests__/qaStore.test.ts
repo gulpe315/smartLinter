@@ -199,6 +199,23 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     expect(useQaStore.getState().cards[0]).toMatchObject({ startOffset: 2, endOffset: 4 });
   });
 
+  it('passes a QA issue segmentIndex through addReport into the created card', () => {
+    useQaStore.getState().addReport({
+      paragraphId: 'paragraph-segment-index',
+      paragraphText: 'First sentence. Second sentence.',
+      paragraphHash: 'segment-index-hash',
+      report: {
+        status: 'FAIL',
+        issues: [{
+          category: 'Grammar', originalSegment: 'Second', suggestedSegment: 'Revised', reason: 'Fix', severity: 'LOW',
+          segmentIndex: 1,
+        }],
+      },
+    });
+
+    expect(useQaStore.getState().cards[0]).toMatchObject({ segmentIndex: 1 });
+  });
+
   it('archives an obsolete card in dismissedCards instead of leaving it active', () => {
     const cardId = useQaStore.getState().addCard({
       paragraphId: 'para-obsolete', category: 'Grammar', originalSegment: 'teh', suggestedSegment: 'the', reason: 'Typo',

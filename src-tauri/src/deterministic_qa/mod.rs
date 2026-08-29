@@ -302,6 +302,7 @@ fn dictionary_issue(
         severity,
         start_offset: Some(utf16_offset(text, start)),
         end_offset: Some(utf16_offset(text, end)),
+        segment_index: None,
         provenance: Some("deterministic".into()),
         confidence: Some(confidence),
         rule_id: Some(format!("{}.{}", category.id, typo)),
@@ -374,6 +375,7 @@ fn marker_issues(text: &str, markers: &ListMarkers) -> Vec<QaIssue> {
                     category: "list.markers".into(), original_segment: token.into(), suggested_segment: String::new(),
                     reason: "Non-monotonic list-marker progression; no automatic correction is proposed.".into(), severity: QaSeverity::Low,
                     start_offset: Some(utf16_offset(text, start)), end_offset: Some(utf16_offset(text, end)), provenance: Some("deterministic".into()),
+                    segment_index: None,
                     confidence: Some(0.35), rule_id: Some(format!("list.markers.{}", token)), conflict_group_id: None,
                     suggestions: None,
                 });

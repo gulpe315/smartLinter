@@ -97,6 +97,27 @@ describe('QACardList Component', () => {
     expect(screen.queryByTestId('qa-empty-state')).not.toBeInTheDocument();
   });
 
+  it('groups consecutive cards by paragraph and segmentIndex while leaving unresolved cards ungrouped', () => {
+    const shared = {
+      paragraphId: 'paragraph-grouped', paragraphText: 'First sentence. Second sentence.',
+      category: 'Grammar', suggestedSegment: 'fixed', reason: 'Fix', severity: 'LOW' as const,
+    };
+    useQaStore.getState().addCard({ ...shared, id: 'unresolved-card', originalSegment: 'unknown' });
+    useQaStore.getState().addCard({ ...shared, id: 'second-sentence-card', originalSegment: 'Second', segmentIndex: 1 });
+    useQaStore.getState().addCard({ ...shared, id: 'first-sentence-card-two', originalSegment: 'sentence', segmentIndex: 0 });
+    useQaStore.getState().addCard({ ...shared, id: 'first-sentence-card-one', originalSegment: 'First', segmentIndex: 0 });
+
+    render(<QACardList />);
+
+    const firstGroup = screen.getByTestId('qa-sentence-group-paragraph-grouped-0').parentElement!;
+    expect(within(firstGroup).getByTestId('qa-card-item-first-sentence-card-one')).toBeInTheDocument();
+    expect(within(firstGroup).getByTestId('qa-card-item-first-sentence-card-two')).toBeInTheDocument();
+    expect(screen.getByTestId('qa-sentence-group-paragraph-grouped-1')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^qa-sentence-group-/)).toHaveLength(2);
+    expect(screen.getByTestId('qa-card-item-unresolved-card')).toBeInTheDocument();
+    expect(screen.queryByTestId('qa-sentence-group-paragraph-grouped-undefined')).not.toBeInTheDocument();
+  });
+
   it('highlights every rendered card for the active paragraph without changing card order', () => {
     useQaStore.getState().addCard({ id: 'older-other', paragraphId: 'para-other', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Other', severity: 'LOW' });
     useQaStore.getState().addCard({ id: 'focused-two', paragraphId: 'para-focused', category: 'Style', originalSegment: 'very', suggestedSegment: '', reason: 'Wordy', severity: 'LOW' });

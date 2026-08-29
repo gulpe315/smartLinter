@@ -20,12 +20,29 @@ import {
 } from 'lucide-react';
 import { useQaStore } from '../../stores/qaStore.ts';
 import { useBridgeStore } from '../../stores/bridgeStore.ts';
-import { type QASeverityFilter } from '../../types/qa.ts';
+import { type QACardData, type QASeverityFilter } from '../../types/qa.ts';
 import { QACardItem } from './QACardItem.tsx';
+import { splitIntoSentences } from '../../utils/sentenceBoundary.ts';
 
 export interface QACardListProps {
   className?: string;
 }
+
+type ActiveCardGroup = { paragraphId: string; segmentIndex: number; excerpt: string; cards: QACardData[] } | { card: QACardData };
+
+const groupActiveCards = (cards: QACardData[]): ActiveCardGroup[] => {
+  const groups: ActiveCardGroup[] = [];
+  for (const card of cards) {
+    if (card.segmentIndex === undefined) { groups.push({ card }); continue; }
+    const previous = groups.at(-1);
+    if (previous && 'cards' in previous && previous.paragraphId === card.paragraphId && previous.segmentIndex === card.segmentIndex) {
+      previous.cards.push(card); continue;
+    }
+    const text = splitIntoSentences(card.paragraphText)[card.segmentIndex]?.text ?? '';
+    groups.push({ paragraphId: card.paragraphId, segmentIndex: card.segmentIndex, excerpt: text.length > 120 ? `${text.slice(0, 117)}...` : text, cards: [card] });
+  }
+  return groups;
+};
 
 export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
   const {
@@ -57,6 +74,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
   const { activeParagraph, editorConnected, editorType } = useBridgeStore();
 
   const filteredCards = getFilteredCards();
+  const activeCardGroups = useMemo(() => groupActiveCards(filteredCards), [filteredCards]);
   const focusedCardIds = useMemo(
     () => new Set(
       filteredCards
@@ -272,7 +290,18 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
           )
         ) : filteredCards.length > 0 ? (
           <div className="space-y-3">
-            {filteredCards.map((card) => (
+            {activeCardGroups.map((group) => 'cards' in group ? (
+              <section key={`${group.paragraphId}-${group.segmentIndex}-${group.cards[0].id}`} className="space-y-2">
+                <div data-testid={`qa-sentence-group-${group.paragraphId}-${group.segmentIndex}`} className="px-2 py-1 border-l-2 border-indigo-700/70 text-[10px] text-slate-400 bg-slate-900/50 rounded-r">
+                  <span className="font-semibold text-indigo-300">문장 {group.segmentIndex + 1}</span>{group.excerpt && <span className="ml-1.5 font-mono">{group.excerpt}</span>}
+                </div>
+                <div className="space-y-3">{group.cards.map((card) => (
+                  <div key={card.id} ref={(element) => { if (element) cardRefs.current.set(card.id, element); else cardRefs.current.delete(card.id); }} className="animate-in fade-in slide-in-from-top-2 duration-300 fill-mode-forwards">
+                    <QACardItem card={card} isFocused={focusedCardIds.has(card.id)} onAccept={(id) => acceptCard(id, undefined, { autoResolveStale: true })} onAcceptMatching={(id) => acceptMatchingCards(id)} onDismiss={(id) => dismissCard(id)} onMarkObsolete={(id) => markCardObsolete(id)} onLocateFailure={setLocateFailureNotice} onLocateStart={() => setLastLocatedCardId(card.id)} />
+                  </div>
+                ))}</div>
+              </section>
+            ) : (() => { const card = group.card; return (
               <div
                 key={card.id}
                 ref={(element) => {
@@ -292,7 +321,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
                   onLocateStart={() => setLastLocatedCardId(card.id)}
                 />
               </div>
-            ))}
+            ); })())}
           </div>
         ) : (
           /* Empty / Clean State Guide */

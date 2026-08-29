@@ -40,6 +40,8 @@ export interface QACardData {
   /** UTF-16 span offsets supplied by the QA engine when the source occurrence is unique. */
   startOffset?: number;
   endOffset?: number;
+  /** Zero-based sentence/TU index when this issue lies wholly within one segment. */
+  segmentIndex?: number;
   /** Selectable alternatives carried over from the QaIssue, if any. */
   suggestions?: QaSuggestion[];
   /** The TM fuzzy match that informed this card's analysis, when available. */

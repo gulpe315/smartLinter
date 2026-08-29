@@ -235,12 +235,33 @@ pub async fn analyze_paragraph(
     let mut report = QaParser::parse(&job_result.response);
     let deterministic_issues = crate::deterministic_qa::detect(&paragraph.text, target_lang.as_str());
     report.issues = crate::deterministic_qa::merge(deterministic_issues, report.issues, &paragraph.text);
+    let segments = segment_text(&paragraph.text);
+    assign_issue_segment_indices(&mut report.issues, &segments);
     report.status = if report.issues.is_empty() {
         QaStatus::Pass
     } else {
         QaStatus::Fail
     };
     Ok(report)
+}
+
+fn assign_issue_segment_indices(issues: &mut [crate::ai::QaIssue], segments: &[SegmentSpan]) {
+    for issue in issues {
+        issue.segment_index = match (issue.start_offset, issue.end_offset) {
+            (Some(start), Some(end)) if start <= end => {
+                if let (Ok(start), Ok(end)) = (u32::try_from(start), u32::try_from(end)) {
+                    let mut matches = segments.iter().enumerate().filter_map(|(index, segment)|
+                        (segment.start <= start && end <= segment.end).then_some(index as u32)
+                    );
+                    let segment_index = matches.next();
+                    if matches.next().is_none() { segment_index } else { None }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+    }
 }
 
 /// Executes an interactive natural language AI revision command on a target paragraph.
@@ -830,6 +851,44 @@ mod tests {
     use crate::server::NoopEventSink;
     use std::sync::Arc;
     use tokio::sync::mpsc;
+
+    #[test]
+    fn assigns_segment_indices_for_issues_in_different_sentences() {
+        let text = "First issue. Second issue.";
+        let mut first = crate::ai::QaIssue::new("test", "First", "First", "test", crate::ai::QaSeverity::Low);
+        first.start_offset = Some(0);
+        first.end_offset = Some(5);
+        let mut second = crate::ai::QaIssue::new("test", "Second", "Second", "test", crate::ai::QaSeverity::Low);
+        second.start_offset = Some(13);
+        second.end_offset = Some(19);
+        let mut issues = vec![first, second];
+
+        assign_issue_segment_indices(&mut issues, &segment_text(text));
+
+        assert_eq!(issues[0].segment_index, Some(0));
+        assert_eq!(issues[1].segment_index, Some(1));
+    }
+
+    #[test]
+    fn leaves_segment_index_empty_when_issue_has_no_offsets() {
+        let mut issues = vec![crate::ai::QaIssue::new("test", "missing", "missing", "test", crate::ai::QaSeverity::Low)];
+
+        assign_issue_segment_indices(&mut issues, &segment_text("First issue. Second issue."));
+
+        assert_eq!(issues[0].segment_index, None);
+    }
+
+    #[test]
+    fn leaves_segment_index_empty_when_issue_crosses_sentence_boundary() {
+        let mut issue = crate::ai::QaIssue::new("test", "e. S", "e. S", "test", crate::ai::QaSeverity::Low);
+        issue.start_offset = Some(10);
+        issue.end_offset = Some(15);
+        let mut issues = vec![issue];
+
+        assign_issue_segment_indices(&mut issues, &segment_text("First issue. Second issue."));
+
+        assert_eq!(issues[0].segment_index, None);
+    }
 
     #[tokio::test]
     async fn disconnect_editor_session_clears_an_active_session() {

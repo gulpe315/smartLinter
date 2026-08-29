@@ -144,6 +144,9 @@ pub struct QaIssue {
     /// End offset in the target paragraph, measured in UTF-16 code units.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end_offset: Option<usize>,
+    /// Zero-based sentence/TU index when this issue lies wholly within one segment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub segment_index: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provenance: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -176,6 +179,7 @@ impl QaIssue {
             severity,
             start_offset: None,
             end_offset: None,
+            segment_index: None,
             provenance: None,
             confidence: None,
             rule_id: None,
@@ -353,6 +357,7 @@ impl RawIssuePayload {
             severity,
             start_offset: None,
             end_offset: None,
+            segment_index: None,
             provenance: None,
             confidence: None,
             rule_id: None,
