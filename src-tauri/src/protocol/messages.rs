@@ -161,6 +161,29 @@ pub struct LiveSnapshotResponse {
     pub results: Vec<LiveSnapshotItem>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnumerateDocumentRequest {
+    pub request_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScannedParagraphEntry {
+    pub paragraph_id: String,
+    pub text: String,
+    pub hash: String,
+    pub document_order_index: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnumerateDocumentResponse {
+    pub request_id: String,
+    pub source_document_name: String,
+    pub paragraphs: Vec<ScannedParagraphEntry>,
+}
+
 /// A dashboard request to reveal a paragraph in the active editor.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -247,6 +270,8 @@ pub enum BridgeMessage {
     ReplacementResult(ReplacementResult),
     LiveSnapshotRequest(LiveSnapshotRequest),
     LiveSnapshotResponse(LiveSnapshotResponse),
+    EnumerateDocumentRequest(EnumerateDocumentRequest),
+    EnumerateDocumentResponse(EnumerateDocumentResponse),
     LocateRequest(LocateRequest),
     LocateResponse(LocateResponse),
     Heartbeat(HeartbeatPayload),

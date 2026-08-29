@@ -10,14 +10,20 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, broadcast, oneshot, Mutex, RwLock};
 
-use crate::protocol::{BridgeMessage, EditorType, LiveSnapshotRequest, LiveSnapshotResponse, LocateRequest, LocateResponse, ParagraphPayload, ReplacementCommand, ReplacementResult};
+use crate::protocol::{BridgeMessage, EditorType, EnumerateDocumentRequest, EnumerateDocumentResponse, LiveSnapshotRequest, LiveSnapshotResponse, LocateRequest, LocateResponse, ParagraphPayload, ReplacementCommand, ReplacementResult};
 
 const LIVE_SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(3);
+const DOCUMENT_SCAN_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug)]
 struct PendingSnapshot {
     session_id: String,
     sender: oneshot::Sender<LiveSnapshotResponse>,
+}
+#[derive(Debug)]
+struct PendingDocumentScan {
+    session_id: String,
+    sender: oneshot::Sender<EnumerateDocumentResponse>,
 }
 #[derive(Debug)]
 struct PendingLocate { session_id: String, sender: oneshot::Sender<LocateResponse> }
@@ -215,6 +221,10 @@ pub enum SessionError {
     SnapshotTimeout,
     #[error("Live snapshot request was cancelled before a response arrived")]
     SnapshotCancelled,
+    #[error("Document scan request exceeded the 10 second deadline")]
+    ScanTimeout,
+    #[error("Document scan request was cancelled before a response arrived")]
+    ScanCancelled,
     #[error("Locate request exceeded the 3 second deadline")]
     LocateTimeout,
     #[error("Locate request was cancelled before a response arrived")]
@@ -239,6 +249,7 @@ pub struct SessionManager {
     event_sink: Arc<dyn BridgeEventSink>,
     result_sender: broadcast::Sender<ReplacementResult>,
     pending_snapshots: Arc<Mutex<HashMap<String, PendingSnapshot>>>,
+    pending_document_scans: Arc<Mutex<HashMap<String, PendingDocumentScan>>>,
     pending_locates: Arc<Mutex<HashMap<String, PendingLocate>>>,
 }
 
@@ -252,6 +263,7 @@ impl SessionManager {
             event_sink,
             result_sender,
             pending_snapshots: Arc::new(Mutex::new(HashMap::new())),
+            pending_document_scans: Arc::new(Mutex::new(HashMap::new())),
             pending_locates: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -488,6 +500,32 @@ impl SessionManager {
         }
     }
 
+    /// Sends a correlated full-document scan request and waits at most ten seconds.
+    pub async fn request_document_scan(&self) -> Result<EnumerateDocumentResponse, SessionError> {
+        let session_guard = self.active_session.read().await;
+        let session = session_guard.as_ref().ok_or(SessionError::NotFound)?;
+        let sender = session.command_sender.as_ref().ok_or(SessionError::ChannelClosed)?;
+        let request_id = super::auth_manager::generate_session_token();
+        let request = EnumerateDocumentRequest { request_id: request_id.clone() };
+        let (response_tx, response_rx) = oneshot::channel();
+        self.pending_document_scans.lock().await.insert(request_id.clone(), PendingDocumentScan {
+            session_id: session.session_id.clone(), sender: response_tx,
+        });
+        if sender.send(BridgeMessage::EnumerateDocumentRequest(request)).is_err() {
+            self.pending_document_scans.lock().await.remove(&request_id);
+            return Err(SessionError::ChannelClosed);
+        }
+        drop(session_guard);
+        match tokio::time::timeout(DOCUMENT_SCAN_TIMEOUT, response_rx).await {
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(_)) => Err(SessionError::ScanCancelled),
+            Err(_) => {
+                self.pending_document_scans.lock().await.remove(&request_id);
+                Err(SessionError::ScanTimeout)
+            }
+        }
+    }
+
     /// Sends a correlated locate request and waits at most three seconds for the editor response.
     pub async fn request_locate(
         &self,
@@ -517,7 +555,8 @@ impl SessionManager {
 
     pub async fn complete_locate(&self, session_id: &str, response: LocateResponse) {
         let request_id = response.request_id.clone();
-        match self.pending_locates.lock().await.remove(&request_id) {
+        let pending = self.pending_locates.lock().await.remove(&request_id);
+        match pending {
             Some(pending) if pending.session_id == session_id => { let _ = pending.sender.send(response); }
             Some(pending) => { self.pending_locates.lock().await.insert(request_id, pending); tracing::debug!(session_id, "Ignoring locate response from a stale session"); }
             None => tracing::debug!(request_id = %response.request_id, "Ignoring unknown or duplicate locate response"),
@@ -540,8 +579,22 @@ impl SessionManager {
         }
     }
 
+    pub async fn complete_document_scan(&self, session_id: &str, response: EnumerateDocumentResponse) {
+        let request_id = response.request_id.clone();
+        let pending = self.pending_document_scans.lock().await.remove(&request_id);
+        match pending {
+            Some(pending) if pending.session_id == session_id => { let _ = pending.sender.send(response); }
+            Some(pending) => {
+                self.pending_document_scans.lock().await.insert(request_id, pending);
+                tracing::debug!(session_id, "Ignoring document scan response from a stale session");
+            }
+            None => tracing::debug!(request_id = %response.request_id, "Ignoring unknown or duplicate document scan response"),
+        }
+    }
+
     async fn clear_pending_snapshots_for_session(&self, session_id: &str) {
         self.pending_snapshots.lock().await.retain(|_, pending| pending.session_id != session_id);
+        self.pending_document_scans.lock().await.retain(|_, pending| pending.session_id != session_id);
         self.pending_locates.lock().await.retain(|_, pending| pending.session_id != session_id);
     }
 
@@ -715,5 +768,73 @@ mod tests {
         ));
         manager.record_heartbeat(&new_id, Some("fresh.indd".to_string())).await.unwrap();
         assert_eq!(manager.get_snapshot().await.unwrap().active_document.as_deref(), Some("fresh.indd"));
+    }
+
+    #[tokio::test]
+    async fn document_scan_request_completes_when_the_originating_session_responds() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let session_id = manager.acquire_session(EditorType::Word, None, Some(sender)).await.unwrap();
+        let request_task = tokio::spawn({ let manager = manager.clone(); async move { manager.request_document_scan().await } });
+        let BridgeMessage::EnumerateDocumentRequest(request) = receiver.recv().await.unwrap() else { panic!("expected document scan request"); };
+        manager.complete_document_scan(&session_id, EnumerateDocumentResponse {
+            request_id: request.request_id,
+            source_document_name: "test.docx".to_string(),
+            paragraphs: vec![],
+        }).await;
+        assert_eq!(request_task.await.unwrap().unwrap().source_document_name, "test.docx");
+    }
+
+    #[tokio::test]
+    async fn document_scan_requires_an_active_session() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        assert_eq!(manager.request_document_scan().await, Err(SessionError::NotFound));
+    }
+
+    #[tokio::test]
+    async fn document_scan_ignores_responses_from_another_session() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let session_id = manager.acquire_session(EditorType::Word, None, Some(sender)).await.unwrap();
+        let request_task = tokio::spawn({ let manager = manager.clone(); async move { manager.request_document_scan().await } });
+        let BridgeMessage::EnumerateDocumentRequest(request) = receiver.recv().await.unwrap() else { panic!("expected document scan request"); };
+        manager.complete_document_scan("other-session", EnumerateDocumentResponse {
+            request_id: request.request_id.clone(), source_document_name: "wrong.docx".to_string(), paragraphs: vec![],
+        }).await;
+        assert!(!request_task.is_finished());
+        manager.complete_document_scan(&session_id, EnumerateDocumentResponse {
+            request_id: request.request_id, source_document_name: "right.docx".to_string(), paragraphs: vec![],
+        }).await;
+        assert_eq!(request_task.await.unwrap().unwrap().source_document_name, "right.docx");
+    }
+
+    #[tokio::test]
+    async fn locate_ignores_responses_from_another_session() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let session_id = manager.acquire_session(EditorType::Word, None, Some(sender)).await.unwrap();
+        let request_task = tokio::spawn({ let manager = manager.clone(); async move {
+            manager.request_locate("paragraph-1".to_string(), None, None, None).await
+        } });
+        let BridgeMessage::LocateRequest(request) = receiver.recv().await.unwrap() else { panic!("expected locate request"); };
+        tokio::time::timeout(Duration::from_secs(1), manager.complete_locate("other-session", LocateResponse {
+            request_id: request.request_id.clone(), status: crate::protocol::LocateStatus::Found, message: None,
+        })).await.expect("stale locate response must not deadlock");
+        assert!(!request_task.is_finished());
+        manager.complete_locate(&session_id, LocateResponse {
+            request_id: request.request_id, status: crate::protocol::LocateStatus::Found, message: None,
+        }).await;
+        assert_eq!(request_task.await.unwrap().unwrap().status, crate::protocol::LocateStatus::Found);
+    }
+
+    #[tokio::test]
+    async fn document_scan_times_out_after_ten_seconds() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        manager.acquire_session(EditorType::Word, None, Some(sender)).await.unwrap();
+        let request_task = tokio::spawn({ let manager = manager.clone(); async move { manager.request_document_scan().await } });
+        let _ = receiver.recv().await.unwrap();
+        tokio::time::sleep(DOCUMENT_SCAN_TIMEOUT + Duration::from_millis(50)).await;
+        assert_eq!(request_task.await.unwrap(), Err(SessionError::ScanTimeout));
     }
 }

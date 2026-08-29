@@ -10,6 +10,7 @@ import {
   type ParagraphPayload,
   type ReplacementCommand,
   type ReplacementResult,
+  type EnumerateDocumentResponse,
   type QaReport,
   type QaIssue,
 } from '../../shared/protocol/types.ts';
@@ -164,6 +165,8 @@ export interface IBridgeService {
 
   /** Returns current contents for multiple paragraphs without changing editor selection or focus. */
   getLiveParagraphSnapshots(paragraphIds: string[]): Promise<LiveParagraphSnapshotEntry[]>;
+
+  enumerateDocumentParagraphs(): Promise<EnumerateDocumentResponse>;
 
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
@@ -517,6 +520,20 @@ export class MockBridgeService implements IBridgeService {
     }));
   }
 
+  async enumerateDocumentParagraphs(): Promise<EnumerateDocumentResponse> {
+    const texts = ['Mock document introduction.', 'Mock body paragraph.', 'Mock conclusion.'];
+    return {
+      requestId: 'mock-document-scan',
+      sourceDocumentName: 'MockDocument.docx',
+      paragraphs: texts.map((text, documentOrderIndex) => ({
+        paragraphId: `word-para-body-${documentOrderIndex}-mockhash${documentOrderIndex}`,
+        text,
+        hash: `mockhash${documentOrderIndex}`,
+        documentOrderIndex,
+      })),
+    };
+  }
+
   async fetchBridgeHealth(): Promise<BridgeStatusPayload> {
     return {
       connected: false,
@@ -835,6 +852,13 @@ export class TauriBridgeService implements IBridgeService {
       console.warn('Tauri invoke segment_sentences failed:', error);
       return this.fallbackService.segmentSentences(text);
     }
+  }
+
+  async enumerateDocumentParagraphs(): Promise<EnumerateDocumentResponse> {
+    if (!this.isTauriAvailable()) {
+      return this.fallbackService.enumerateDocumentParagraphs();
+    }
+    return await invoke('enumerate_document_paragraphs');
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {

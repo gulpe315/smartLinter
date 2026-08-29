@@ -97,6 +97,23 @@ export interface LiveSnapshotResponse {
     results: LiveSnapshotItem[];
 }
 
+export interface EnumerateDocumentRequest {
+    requestId: string;
+}
+
+export interface ScannedParagraphEntry {
+    paragraphId: string;
+    text: string;
+    hash: string;
+    documentOrderIndex: number;
+}
+
+export interface EnumerateDocumentResponse {
+    requestId: string;
+    sourceDocumentName: string;
+    paragraphs: ScannedParagraphEntry[];
+}
+
 /** Request to reveal a paragraph in the active editor. Offsets are reserved for future span selection. */
 export interface LocateRequest {
     requestId: string;
@@ -159,6 +176,8 @@ export type BridgeMessage =
     | { type: 'REPLACEMENT_RESULT'; payload: ReplacementResult }
     | { type: 'LIVE_SNAPSHOT_REQUEST'; payload: LiveSnapshotRequest }
     | { type: 'LIVE_SNAPSHOT_RESPONSE'; payload: LiveSnapshotResponse }
+    | { type: 'ENUMERATE_DOCUMENT_REQUEST'; payload: EnumerateDocumentRequest }
+    | { type: 'ENUMERATE_DOCUMENT_RESPONSE'; payload: EnumerateDocumentResponse }
     | { type: 'LOCATE_REQUEST'; payload: LocateRequest }
     | { type: 'LOCATE_RESPONSE'; payload: LocateResponse }
     | { type: 'HEARTBEAT'; payload: HeartbeatPayload };
@@ -262,6 +281,30 @@ export function isLiveSnapshotResponse(val: unknown): val is LiveSnapshotRespons
         && obj.results.every(isLiveSnapshotItem);
 }
 
+export function isEnumerateDocumentRequest(val: unknown): val is EnumerateDocumentRequest {
+    return typeof val === 'object' && val !== null && typeof (val as Record<string, unknown>).requestId === 'string';
+}
+
+export function isScannedParagraphEntry(val: unknown): val is ScannedParagraphEntry {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.paragraphId === 'string'
+        && typeof obj.text === 'string'
+        && typeof obj.hash === 'string'
+        && typeof obj.documentOrderIndex === 'number'
+        && Number.isInteger(obj.documentOrderIndex)
+        && obj.documentOrderIndex >= 0;
+}
+
+export function isEnumerateDocumentResponse(val: unknown): val is EnumerateDocumentResponse {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.requestId === 'string'
+        && typeof obj.sourceDocumentName === 'string'
+        && Array.isArray(obj.paragraphs)
+        && obj.paragraphs.every(isScannedParagraphEntry);
+}
+
 export function isLocateStatus(val: unknown): val is LocateStatus {
     return val === 'FOUND' || val === 'NOT_FOUND' || val === 'AMBIGUOUS' || val === 'SELECTION_FAILED' || val === 'BUSY' || val === 'ERROR';
 }
@@ -338,6 +381,10 @@ export function isBridgeMessage(val: unknown): val is BridgeMessage {
             return isLiveSnapshotRequest(obj.payload);
         case 'LIVE_SNAPSHOT_RESPONSE':
             return isLiveSnapshotResponse(obj.payload);
+        case 'ENUMERATE_DOCUMENT_REQUEST':
+            return isEnumerateDocumentRequest(obj.payload);
+        case 'ENUMERATE_DOCUMENT_RESPONSE':
+            return isEnumerateDocumentResponse(obj.payload);
         case 'LOCATE_REQUEST':
             return isLocateRequest(obj.payload);
         case 'LOCATE_RESPONSE':

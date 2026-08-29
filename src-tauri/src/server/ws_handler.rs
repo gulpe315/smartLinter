@@ -200,6 +200,9 @@ async fn handle_websocket_connection(
                     Ok(BridgeMessage::LiveSnapshotResponse(response)) => {
                         session_mgr.complete_live_snapshot(&current_session_id, response).await;
                     }
+                    Ok(BridgeMessage::EnumerateDocumentResponse(response)) => {
+                        session_mgr.complete_document_scan(&current_session_id, response).await;
+                    }
                     Ok(BridgeMessage::LocateResponse(response)) => {
                         session_mgr.complete_locate(&current_session_id, response).await;
                     }
@@ -209,6 +212,7 @@ async fn handle_websocket_connection(
                     Ok(BridgeMessage::AuthResponse(_))
                     | Ok(BridgeMessage::ReplacementCommand(_))
                     | Ok(BridgeMessage::LiveSnapshotRequest(_))
+                    | Ok(BridgeMessage::EnumerateDocumentRequest(_))
                     | Ok(BridgeMessage::LocateRequest(_)) => {
                         // Unexpected incoming server-to-client message types
                     }

@@ -51,6 +51,13 @@ describe('TauriBridgeService & IPC Integration', () => {
     service.destroy();
   });
 
+  it('returns a plausible document scan from MockBridgeService', async () => {
+    const response = await new MockBridgeService().enumerateDocumentParagraphs();
+    expect(response.sourceDocumentName).toBe('MockDocument.docx');
+    expect(response.paragraphs).toHaveLength(3);
+    expect(response.paragraphs.map((paragraph) => paragraph.documentOrderIndex)).toEqual([0, 1, 2]);
+  });
+
   it('invokes Tauri command set_always_on_top through the official API bindings', async () => {
     const invokeMock = vi.fn().mockResolvedValue(true);
     (window as any).isTauri = true;

@@ -9,6 +9,7 @@
 import { WordBridgeClient, type BridgeClientConfig } from './bridge_client.ts';
 import { WordDocumentListener, type DocumentListenerConfig } from './document_listener.ts';
 import { queryLiveParagraphSnapshots } from './snapshot_provider.ts';
+import { enumerateAllDocumentParagraphs } from './document_scanner.ts';
 import { locateWordParagraph } from './locate_provider.ts';
 import { WordReplacementExecutor } from './replacement_executor.ts';
 
@@ -41,6 +42,7 @@ export class WordRuntimeManager {
     private isShuttingDown = false;
     private cachedDocumentTitle = 'ActiveWordDocument.docx';
     private snapshotRequestUnsubscribe: (() => void) | null = null;
+    private enumerateDocumentRequestUnsubscribe: (() => void) | null = null;
     private locateRequestUnsubscribe: (() => void) | null = null;
     private commandUnsubscribe: (() => void) | null = null;
 
@@ -206,6 +208,8 @@ export class WordRuntimeManager {
         if (this.bridgeClient) {
             this.snapshotRequestUnsubscribe?.();
             this.snapshotRequestUnsubscribe = null;
+            this.enumerateDocumentRequestUnsubscribe?.();
+            this.enumerateDocumentRequestUnsubscribe = null;
             this.locateRequestUnsubscribe?.();
             this.locateRequestUnsubscribe = null;
             this.commandUnsubscribe?.();
@@ -251,6 +255,16 @@ export class WordRuntimeManager {
                         })),
                     };
                 this.bridgeClient?.sendSnapshotResponse(response);
+            });
+        }
+
+        if (this.bridgeClient && !this.enumerateDocumentRequestUnsubscribe) {
+            this.enumerateDocumentRequestUnsubscribe = this.bridgeClient.onEnumerateDocumentRequest(async (request) => {
+                const wordRunner = (globalThis as any).Word?.run;
+                const response = wordRunner
+                    ? await enumerateAllDocumentParagraphs(request, wordRunner)
+                    : { requestId: request.requestId, sourceDocumentName: '', paragraphs: [] };
+                this.bridgeClient?.sendEnumerateDocumentResponse(response);
             });
         }
 

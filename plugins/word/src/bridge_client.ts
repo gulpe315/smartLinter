@@ -11,6 +11,8 @@ import {
     type ReplacementResult,
     type LiveSnapshotRequest,
     type LiveSnapshotResponse,
+    type EnumerateDocumentRequest,
+    type EnumerateDocumentResponse,
     type LocateRequest,
     type LocateResponse,
     type AuthHandshake,
@@ -53,6 +55,7 @@ export interface BridgeClientConfig {
 
 export type CommandHandler = (command: ReplacementCommand) => void | Promise<void>;
 export type SnapshotRequestHandler = (request: LiveSnapshotRequest) => void | Promise<void>;
+export type EnumerateDocumentRequestHandler = (request: EnumerateDocumentRequest) => void | Promise<void>;
 export type LocateRequestHandler = (request: LocateRequest) => void | Promise<void>;
 export type StatusChangeHandler = (status: BridgeConnectionStatus, message?: string) => void;
 
@@ -77,6 +80,7 @@ export class WordBridgeClient {
 
     private readonly commandHandlers: Set<CommandHandler> = new Set();
     private readonly snapshotRequestHandlers: Set<SnapshotRequestHandler> = new Set();
+    private readonly enumerateDocumentRequestHandlers: Set<EnumerateDocumentRequestHandler> = new Set();
     private readonly locateRequestHandlers: Set<LocateRequestHandler> = new Set();
     private readonly statusHandlers: Set<StatusChangeHandler> = new Set();
 
@@ -128,6 +132,12 @@ export class WordBridgeClient {
     public onSnapshotRequest(handler: SnapshotRequestHandler): () => void {
         this.snapshotRequestHandlers.add(handler);
         return () => this.snapshotRequestHandlers.delete(handler);
+    }
+
+    /** Subscribes to full-document enumeration requests received over the connected WebSocket. */
+    public onEnumerateDocumentRequest(handler: EnumerateDocumentRequestHandler): () => void {
+        this.enumerateDocumentRequestHandlers.add(handler);
+        return () => this.enumerateDocumentRequestHandlers.delete(handler);
     }
 
     /** Subscribes to locate requests received over the connected WebSocket. */
@@ -289,6 +299,18 @@ export class WordBridgeClient {
         }
         try {
             const message: BridgeMessage = { type: 'LIVE_SNAPSHOT_RESPONSE', payload: response };
+            this.ws.send(JSON.stringify(message));
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /** Sends a full-document enumeration response. This RPC is WebSocket-only. */
+    public sendEnumerateDocumentResponse(response: EnumerateDocumentResponse): boolean {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'CONNECTED') return false;
+        try {
+            const message: BridgeMessage = { type: 'ENUMERATE_DOCUMENT_RESPONSE', payload: response };
             this.ws.send(JSON.stringify(message));
             return true;
         } catch {
@@ -471,6 +493,15 @@ export class WordBridgeClient {
                     }
                 }
                 break;
+            case 'ENUMERATE_DOCUMENT_REQUEST':
+                for (const handler of this.enumerateDocumentRequestHandlers) {
+                    try {
+                        void Promise.resolve(handler(message.payload)).catch(() => {});
+                    } catch {
+                        // Error isolated
+                    }
+                }
+                break;
             case 'LOCATE_REQUEST':
                 for (const handler of this.locateRequestHandlers) {
                     try { void Promise.resolve(handler(message.payload)).catch(() => {}); } catch { /* isolated */ }
@@ -480,6 +511,7 @@ export class WordBridgeClient {
             case 'PARAGRAPH_PAYLOAD':
             case 'REPLACEMENT_RESULT':
             case 'LIVE_SNAPSHOT_RESPONSE':
+            case 'ENUMERATE_DOCUMENT_RESPONSE':
             case 'LOCATE_RESPONSE':
             case 'HEARTBEAT':
             case 'AUTH_HANDSHAKE':

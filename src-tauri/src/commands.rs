@@ -10,7 +10,7 @@ use crate::ai::{
     CorrectionPreference, GenerateOptions, LocalLlmProvider, MicroScopingQueue, OllamaProvider, PromptBuilder, QaParser,
     QaReport, QaStatus, QueueJobRequest, TmReference,
 };
-use crate::protocol::{EditorType, LiveSnapshotItem, LiveSnapshotStatus, LocateStatus, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
+use crate::protocol::{EditorType, EnumerateDocumentResponse, LiveSnapshotItem, LiveSnapshotStatus, LocateStatus, ParagraphPayload, ReplacementCommand, ReplacementResult, ReplacementStatus};
 use crate::server::{HealthResponse, ServerHandle, SessionError, SessionManager};
 use crate::tm::{parse_tm_content, GuidelineLoader, GuidelineSet, TmEntry};
 use tauri::{State, WebviewWindow};
@@ -385,6 +385,24 @@ pub async fn locate_paragraph_in_editor(
     })
         .await
         .map_err(|error| format!("InDesign paragraph location task failed: {error}"))?
+}
+
+/// Enumerates all body paragraphs in the active Word document.
+#[tauri::command]
+pub async fn enumerate_document_paragraphs(
+    server_handle: State<'_, ServerHandle>,
+) -> Result<EnumerateDocumentResponse, String> {
+    let session = server_handle
+        .session_manager()
+        .get_snapshot()
+        .await
+        .ok_or_else(|| "No active editor session".to_string())?;
+
+    if session.editor_type != EditorType::Word {
+        return Err("Document scan is currently supported only for Word (InDesign support planned for T3b)".to_string());
+    }
+
+    server_handle.session_manager().request_document_scan().await.map_err(|error| error.to_string())
 }
 
 /// Gets current QA paragraph contents in InDesign without changing selection or focus.
