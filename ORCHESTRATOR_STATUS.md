@@ -1,10 +1,72 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 C(번역 모드+XLIFF)
-T2(plain-text XLIFF export) 착수·완료 — 이 트랙 최초의 실제 UI. 아래 이
-절을 먼저 읽을 것.**
+**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 새 세션(콜드스타트 후속), T2가
+"구현 재량으로 넘어간" 항목 중 코드 변경이 필요한 2건(originalFileName
+연결, sourceLang 선택기)을 마무리 — 아래 이 절을 먼저 읽을 것.**
 
-## 이번 세션 완료(6차 후속) — 트랙 C T2: plain-text XLIFF export
+## 이번 세션 완료(7차 후속) — T2 남은 항목 마무리(originalFileName·sourceLang 선택기)
+
+**커밋 2개(`6fb7b5d` FOLLOWUP3 지시서, `095a37b` 구현 — 그 전에 `7657312`
+FOLLOWUP2 지시서도 이번 세션에 커밋함, 전부 아직 원격 push 안 함, 로컬이
+원격보다 36개 커밋 앞섬).** 콜드스타트로 시작해 베이스라인
+검증(`npm test` 197/197, `npx vitest run` 410/410, `npm run build`,
+`cargo test --release` 107/109 — 실패 1건은 기존 문서화된 라이브 Ollama
+타임아웃 플레이크)부터 마친 뒤, 사용자에게 다음 작업(T3 착수 vs T2 남은
+항목 마무리 vs 트랙 B Stage D/E 재검토 vs push)을 물어 "T2의 남은
+미완료 항목 마무리"를 선택받았다.
+
+- **설계 자문 생략 — 의도적 판단.** 이번 두 항목은 이미 이전 세션에
+  설계·검토가 끝난 채 "구현 재량으로 넘어간" 것들이었다(원문 언어
+  필드/기본값은 `RECONCILED_TRANSLATION_MODE_T2.md`에서 이미 합의,
+  originalFileName 연결 방법은 agy가 `TASK_REQUEST_TRANSLATION_MODE_T2_FOLLOWUP.md`
+  참고 항목에서 이미 구체적으로 제시함) — 새 설계 결정이 필요 없는
+  기계적 배선이라 판단해 `DESIGN_REQUEST_*`/`RECONCILE_*` 라운드 없이
+  바로 `TASK_REQUEST_TRANSLATION_MODE_T2_FOLLOWUP2.md`로 Codex에 구현
+  지시했다. 이유를 지시서 본문에 남겨둠 — 다음 세션이 "왜 이번엔 설계
+  자문이 없었지"라고 헷갈리지 않게.
+- **구현(FOLLOWUP2)**: `Header.tsx`의 `handleTranslationExport`가
+  `useBridgeStore().activeDocument`를 `buildXliffDocument`의
+  `originalFileName`으로 넘기도록 수정(`null`이면 `undefined`로 넘겨
+  기존 기본값 `smartlinter_export`가 그대로 적용됨). `SettingsModal.tsx`
+  "문서 언어 설정" 섹션에 기존 `target-language-select`/
+  `explanation-language-select`와 완전히 같은 패턴으로
+  `source-language-select`(라벨 "번역 원문 언어")를 추가 — "미검증"
+  배지는 QA 대상 언어용 개념이라 의도적으로 안 넣음. Claude가 diff를 줄
+  단위로 검토(범위 밖 파일 없음 확인)하고 `npm test`(197/197)·
+  `npx vitest run`(411/411)·`npm run build` 독립 재실행, 전부 1차
+  구현에서 바로 통과.
+- **agy 독립 리뷰 — High/Medium 없음, Low 3건.** 첫 시도에서 agy에게
+  `git diff` 명령을 직접 실행해 읽어달라고 했다가
+  `jetski: no output produced`로 실패(`agy-codex-cli-quirks` 메모리의
+  "agy는 헤드리스에서 명령 실행이 막힌다"가 diff 조회 목적의 `git diff`
+  에도 그대로 적용된다는 걸 재확인) — diff를 텍스트 파일로 미리 저장해
+  파일 읽기만으로 재요청해 해결. Low 3건: (a) 언어 설정 그리드에 3번째
+  칸이 추가되며 비대칭 배치가 됨 + sourceLang→targetLang→
+  explanationLang 순서가 인지적으로 더 자연스러울 것(디자인 취향
+  문제로 판단해 스킵), (b) `source-language-select`에 "미검증" 배지가
+  없음을 확인하는 부정 assertion 테스트 누락, (c) `sourceLang` 변경이
+  export 옵션에 반영되는지 확인하는 테스트 누락.
+- **FOLLOWUP3 — 테스트 커버리지 2건만 반영.** (b)/(c)는 이미 구현된
+  동작을 검증하는 저비용 회귀 안전망이라 판단해 반영, (a)는 순수
+  디자인 취향이라 스킵(과설계 금지 원칙) — Codex에게 **소스 코드는
+  건드리지 말고 테스트 파일 2개에만** 추가하도록 명시적으로 제약한
+  지시서를 보냄. 결과 전부 요청대로 테스트 파일에만 추가됨. Claude가
+  diff 재확인 후 `npm test`(197/197)·`npx vitest run`(412/412)·
+  `npm run build` 독립 재실행.
+- **커밋 분리**: 지시서 문서 커밋(`6fb7b5d`)과 구현 커밋(`095a37b`)을
+  나눴다 — 구현 커밋 하나에 FOLLOWUP2(소스+최초 테스트)와
+  FOLLOWUP3(추가 테스트)를 합쳐서 담았다(별도로 나눌 실익이 없는 작은
+  후속이라 판단).
+- **T2로 여전히 안 끝난 것(다음 세션이 참고할 것)**: 실제
+  Tauri/WebView2 빌드에서 XLIFF 다운로드가 실제로 동작하고 `.xlf`
+  확장자가 붙는지 수동 검증은 이번에도 안 했다(jsdom 테스트로만 확인) —
+  이건 코드 변경이 아니라 Claude가 직접 앱을 띄워 확인해야 하는
+  항목이라 이번 지시서 범위에서 명시적으로 제외했다. 다음 세션에서
+  기회가 되면 `run` 스킬로 실제 빌드를 띄워 확인할 것.
+
+---
+
+## 이전 세션 완료(6차 후속) — 트랙 C T2: plain-text XLIFF export
 
 **커밋 3개(`12c97be` 설계 자문 문서, `47e1fa7` 구현 지시서, `0066f6f`
 구현, `5e13189` 후속 지시서 기록 — 아직 원격 push 안 함, 로컬이
@@ -341,13 +403,14 @@ exact TM 후보를 관찰만")를 완료했다.
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `5e13189`(Add T2 follow-up
-   task request documenting the review round)인지 확인.** 아니면 그
-   이후 커밋을 먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이
-   원격보다 27개 커밋 앞섬(`8e567d8`~`5e13189`) — 전부 push 안 함, 사용자가
-   "로컬 커밋만 계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고
-   명시적으로 정함(다음 세션에서도 매번 push 여부를 다시 묻지 말 것,
-   사용자가 먼저 요청할 때만 push).**
+1. **`git log --oneline -1`로 최신 커밋이 `095a37b`(Complete Translation
+   Mode T2 remaining items: sourceLang selector and originalFileName
+   wiring)인지 확인.** 아니면 그 이후 커밋을 먼저 훑을 것. 세션 종료
+   시점 상태: **작업 트리 깨끗, 로컬이 원격보다 36개 커밋 앞섬(가장 오래된
+   `8e567d8`~`095a37b`) — 전부 push 안 함, 사용자가 "로컬 커밋만 계속
+   쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고 명시적으로 정함
+   (다음 세션에서도 매번 push 여부를 다시 묻지 말 것, 사용자가 먼저
+   요청할 때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
    확인: `npm test`(197/197), `npx vitest run`(37 files / **410**/410 —
    `tmMatcher.test.ts`의 "10,000 TU 벤치마크 <50ms" 벤치마크 테스트는
@@ -430,21 +493,25 @@ exact TM 후보를 관찰만")를 완료했다.
 **트랙 A 완료(`923d62d`/`5543aca`). 트랙 B는 Stage A/B/C 전부 완료**
 — 사용자가 정한 범위(Stage D/E 제외) 내에서 완결됐다. **트랙 C(번역
 모드+XLIFF)는 T0(`9b755d7`)/T1(`3ee4d99`/`e1590ea`/`c98ac52`)/
-T2(`12c97be`/`47e1fa7`/`0066f6f`/`5e13189`)까지 완료.**
+T2(`12c97be`/`47e1fa7`/`0066f6f`/`5e13189`, 남은 항목까지
+`7657312`/`6fb7b5d`/`095a37b`로 마무리)까지 완료.**
 
 - ~~트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)~~ — **완료.**
 - ~~트랙 B: TM 자동 치환 — Stage A/B/C~~ — **완료.** Stage D/E는
   라이브 Word/InDesign 검증 전엔 착수하지 않는다는 결론 유지. 실시간
   키스트로크 자동 치환은 **절대 금지**.
-- **트랙 C: 번역 모드+XLIFF — T0/T1/T2 완료.** 로드맵 단계는
-  T0(요구사항 고정) → T1(세션 스파이크) → T2(plain-text XLIFF
-  export, 완료) → **T3(문서 전체 스캔)** → T4(태그 보존) → T5(XLIFF
-  import/merge) → T6(새 문서 생성) → T7(bilingual 편집, 기본 비활성)
+- **트랙 C: 번역 모드+XLIFF — T0/T1/T2 완료(T2의 코드 변경 후속
+  항목까지 전부 마무리).** 로드맵 단계는 T0(요구사항 고정) →
+  T1(세션 스파이크) → T2(plain-text XLIFF export, 완료) →
+  **T3(문서 전체 스캔)** → T4(태그 보존) → T5(XLIFF import/merge) →
+  T6(새 문서 생성) → T7(bilingual 편집, 기본 비활성)
   (`CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md` 표 참고).
   T2로 "번역 모드 ON → 문단 방문 시 세션 누적 → XLIFF 내보내기"
-  전체 흐름이 처음으로 실제 UI에서 동작 가능해졌다(단, 실제
-  Tauri/WebView2 빌드에서의 수동 다운로드 확인은 아직 안 함 — 위
-  "T2로 아직 안 끝난 것" 참고). **다음 세션은 T3(문서 전체 스캔)
+  전체 흐름이 처음으로 실제 UI에서 동작 가능해졌다. **T2에서 유일하게
+  남은 항목은 실제 Tauri/WebView2 빌드에서의 XLIFF 다운로드 수동
+  검증**(코드 변경 아님, Claude가 `run` 스킬로 앱을 띄워 확인하면 됨) —
+  다음 세션이 시간 여유가 있으면 이걸 먼저 해도 되고, 곧바로 T3로 가도
+  된다(사용자에게 물어볼 것). **다음 세션은 T3(문서 전체 스캔)
   착수 여부를 사용자에게 물어볼 것** — T3는 "방문한 문단만"이 아니라
   문서 전체(또는 명시 범위)를 스캔하는 새 API가 Word/InDesign 양쪽에
   필요해서 지금까지의 트랙 C 태스크보다 스코프가 크다(에디터
