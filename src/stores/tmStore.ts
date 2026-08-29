@@ -27,8 +27,10 @@ import { useConfigStore } from './configStore.ts';
 import {
   type TmMatchCandidate,
   type TmMatchGrade,
+  type TmSentenceMatch,
   getGradeFromScore,
 } from '../types/tm.ts';
+import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
 import {
   TsFuzzyMatcher,
   getGlobalTmMatcher,
@@ -39,6 +41,7 @@ import {
 export interface TMState {
   // --- Match Candidates & Search State ---
   candidates: TmMatchCandidate[];
+  sentenceMatches: TmSentenceMatch[];
   currentParagraph: ParagraphPayload | null;
   searchQuery: string;
   minScore: number;
@@ -53,7 +56,7 @@ export interface TMState {
   lastAppliedResult: ReplacementResult | null;
 
   // --- Actions ---
-  search: (queryText?: string) => Promise<TmMatchCandidate[]>;
+  search: (queryText?: string, automaticParagraphSearch?: boolean) => Promise<TmMatchCandidate[]>;
   searchWithCustomQuery: (query: string) => Promise<TmMatchCandidate[]>;
   searchKeyword: (query: string) => TmMatchCandidate[];
   applyMatch: (
@@ -61,6 +64,7 @@ export interface TMState {
     paragraphOverride?: ParagraphPayload,
     service?: IBridgeService,
     overrideTarget?: string,
+    sentenceRange?: { startOffset: number; endOffset: number },
   ) => Promise<ReplacementResult | null>;
   setMinScore: (minScore: number) => void;
   setTopN: (topN: number) => void;
@@ -75,6 +79,7 @@ export interface TMState {
 
 const initialState = {
   candidates: [] as TmMatchCandidate[],
+  sentenceMatches: [] as TmSentenceMatch[],
   currentParagraph: null as ParagraphPayload | null,
   searchQuery: '',
   minScore: DEFAULT_TM_MIN_SCORE, // 0.75 (75%)
@@ -90,14 +95,14 @@ const initialState = {
 export const useTmStore = create<TMState>((set, get) => ({
   ...initialState,
 
-  search: async (queryText) => {
+  search: async (queryText, automaticParagraphSearch = false) => {
     const textToSearch =
       queryText !== undefined
         ? queryText
         : get().currentParagraph?.text || useBridgeStore.getState().activeParagraph?.text || '';
 
     if (!textToSearch.trim()) {
-      set({ candidates: [], isSearching: false, matchDurationMs: 0 });
+      set({ candidates: [], sentenceMatches: [], isSearching: false, matchDurationMs: 0 });
       return [];
     }
 
@@ -114,13 +119,24 @@ export const useTmStore = create<TMState>((set, get) => ({
       matcher.loadEntries(entries);
 
       const { minScore, topN } = get();
-      const results = matcher.search(textToSearch, topN, minScore);
+      const sentenceMatches = automaticParagraphSearch
+        ? splitIntoSentences(textToSearch).map((segment, segmentIndex) => ({
+            segmentIndex,
+            sourceText: segment.text,
+            startOffset: segment.start,
+            endOffset: segment.end,
+            candidates: matcher.search(segment.text, topN, minScore),
+          }))
+        : [];
+      const useSentenceMatches = sentenceMatches.length >= 2;
+      const results = useSentenceMatches ? [] : matcher.search(textToSearch, topN, minScore);
 
       const endTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
       const durationMs = Math.round((endTime - startTime) * 100) / 100;
 
       set({
         candidates: results,
+        sentenceMatches: useSentenceMatches ? sentenceMatches : [],
         isSearching: false,
         matchDurationMs: durationMs,
         searchQuery: textToSearch,
@@ -129,7 +145,7 @@ export const useTmStore = create<TMState>((set, get) => ({
       return results;
     } catch (err) {
       console.warn('TM fuzzy search error:', err);
-      set({ candidates: [], isSearching: false, matchDurationMs: null });
+      set({ candidates: [], sentenceMatches: [], isSearching: false, matchDurationMs: null });
       return [];
     }
   },
@@ -143,7 +159,7 @@ export const useTmStore = create<TMState>((set, get) => ({
     const trimmed = query.trim();
     set({ searchQuery: query });
     if (!trimmed) {
-      set({ candidates: [], matchDurationMs: 0 });
+      set({ candidates: [], sentenceMatches: [], matchDurationMs: 0 });
       return [];
     }
 
@@ -180,12 +196,13 @@ export const useTmStore = create<TMState>((set, get) => ({
     const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
     set({
       candidates: results,
+      sentenceMatches: [],
       matchDurationMs: Math.round((end - start) * 100) / 100,
     });
     return results;
   },
 
-  applyMatch: async (candidate, paragraphOverride, service, overrideTarget) => {
+  applyMatch: async (candidate, paragraphOverride, service, overrideTarget, sentenceRange) => {
     const candidateKey = `${candidate.source}:::${candidate.target}`;
     set({ applyingCandidateKey: candidateKey });
 
@@ -195,6 +212,19 @@ export const useTmStore = create<TMState>((set, get) => ({
       useBridgeStore.getState().activeParagraph;
 
     const bridgeService = service || getBridgeService();
+    const updateSentenceCandidate = (
+      sentenceMatches: TmSentenceMatch[],
+      update: (item: TmMatchCandidate) => TmMatchCandidate,
+    ) => sentenceRange ? sentenceMatches.map((group) => (
+      group.startOffset === sentenceRange.startOffset && group.endOffset === sentenceRange.endOffset
+        ? {
+            ...group,
+            candidates: group.candidates.map((item) => (
+              item.source === candidate.source && item.target === candidate.target ? update(item) : item
+            )),
+          }
+        : group
+    )) : sentenceMatches;
 
     // Mark candidate as applying
     set((state) => ({
@@ -203,6 +233,7 @@ export const useTmStore = create<TMState>((set, get) => ({
           ? { ...c, status: 'applying', errorMessage: undefined }
           : c
       ),
+      sentenceMatches: updateSentenceCandidate(state.sentenceMatches, (c) => ({ ...c, status: 'applying', errorMessage: undefined })),
     }));
 
     try {
@@ -212,9 +243,15 @@ export const useTmStore = create<TMState>((set, get) => ({
       // reach the card that initiated this operation.
       const targetReplacement = overrideTarget ?? candidate.target;
 
-      // 1. Calculate diff hunks
-      const hunks: TextHunk[] = extractDiffHunks(originalText, targetReplacement);
-      const expectedHash = computeParagraphHash(targetReplacement);
+      const expectedFullText = sentenceRange
+        ? originalText.substring(0, sentenceRange.startOffset)
+          + targetReplacement
+          + originalText.substring(sentenceRange.endOffset)
+        : targetReplacement;
+
+      // 1. Calculate diff hunks against the complete paragraph.
+      const hunks: TextHunk[] = extractDiffHunks(originalText, expectedFullText);
+      const expectedHash = computeParagraphHash(expectedFullText);
       const baseHash = activePara?.hash || computeParagraphHash(originalText);
 
       const command: ReplacementCommand = {
@@ -238,6 +275,7 @@ export const useTmStore = create<TMState>((set, get) => ({
               ? { ...c, status: 'applied' }
               : c
           ),
+          sentenceMatches: updateSentenceCandidate(state.sentenceMatches, (c) => ({ ...c, status: 'applied' })),
         }));
 
         // Update bridge store's last replacement result
@@ -256,6 +294,11 @@ export const useTmStore = create<TMState>((set, get) => ({
                 }
               : c
           ),
+          sentenceMatches: updateSentenceCandidate(state.sentenceMatches, (c) => ({
+            ...c,
+            status: 'failed',
+            errorMessage: result.message || `TM replacement failed (${result.status})`,
+          })),
         }));
       }
 
@@ -272,6 +315,11 @@ export const useTmStore = create<TMState>((set, get) => ({
               }
             : c
         ),
+        sentenceMatches: updateSentenceCandidate(state.sentenceMatches, (c) => ({
+          ...c,
+          status: 'failed',
+          errorMessage: err?.message || 'TM replacement failed unexpectedly.',
+        })),
       }));
       return null;
     }
@@ -282,7 +330,7 @@ export const useTmStore = create<TMState>((set, get) => ({
     // Re-run search with new score threshold
     const text = get().searchQuery || get().currentParagraph?.text;
     if (text) {
-      get().search(text);
+      get().search(text, get().sentenceMatches.length > 0);
     }
   },
 
@@ -290,7 +338,7 @@ export const useTmStore = create<TMState>((set, get) => ({
     set({ topN });
     const text = get().searchQuery || get().currentParagraph?.text;
     if (text) {
-      get().search(text);
+      get().search(text, get().sentenceMatches.length > 0);
     }
   },
 
@@ -300,9 +348,9 @@ export const useTmStore = create<TMState>((set, get) => ({
 
   setKeywordScope: (keywordScope) => set({ keywordScope }),
 
-  setCandidates: (candidates) => set({ candidates }),
+  setCandidates: (candidates) => set({ candidates, sentenceMatches: [] }),
 
-  clearCandidates: () => set({ candidates: [], matchDurationMs: null }),
+  clearCandidates: () => set({ candidates: [], sentenceMatches: [], matchDurationMs: null }),
 
   initEventListener: (service) => {
     const bridgeService = service || getBridgeService();
@@ -315,7 +363,7 @@ export const useTmStore = create<TMState>((set, get) => ({
         // must not inherit a prior manual keyword-search mode.
         set({ currentParagraph: payload, searchQuery: payload.text, searchMode: 'fuzzy' });
         // Execute TM matching immediately (< 100ms)
-        get().search(payload.text);
+        get().search(payload.text, true);
       })
     );
 
@@ -332,7 +380,7 @@ export const useTmStore = create<TMState>((set, get) => ({
           getGlobalTmMatcher().loadEntries(entries);
           const currentText = get().currentParagraph?.text;
           if (currentText) {
-            get().search(currentText);
+            get().search(currentText, true);
           }
         }
       })

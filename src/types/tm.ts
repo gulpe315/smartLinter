@@ -43,6 +43,17 @@ export interface TmMatchCandidate {
   matchedKeyword?: string;
 }
 
+/** TM candidates found for one sentence inside an automatically searched paragraph. */
+export interface TmSentenceMatch {
+  segmentIndex: number;
+  sourceText: string;
+  /** JavaScript UTF-16 offset, inclusive. */
+  startOffset: number;
+  /** JavaScript UTF-16 offset, exclusive. */
+  endOffset: number;
+  candidates: TmMatchCandidate[];
+}
+
 /**
  * Derives visual grade from normalized score (0.0 to 1.0 or 0 to 100).
  */

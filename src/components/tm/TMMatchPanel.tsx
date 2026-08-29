@@ -36,6 +36,7 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
   const { tmEntries, openSettingsModal } = useConfigStore();
   const {
     candidates,
+    sentenceMatches,
     currentParagraph,
     isSearching,
     matchDurationMs,
@@ -58,6 +59,10 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
   const currentParagraphText = currentParagraph?.text || activeParagraph?.text || '';
   const effectiveTmCount = tmEntriesCount || tmEntries.length;
   const isTmActuallyLoaded = tmLoaded || effectiveTmCount > 0;
+  const candidateCount = candidates.length + sentenceMatches.reduce(
+    (total, group) => total + group.candidates.length,
+    0,
+  );
 
   useEffect(() => {
     if (searchMode !== 'keyword') return;
@@ -96,8 +101,12 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
     searchKeyword(keywordInput);
   };
 
-  const handleApply = async (candidate: TmMatchCandidate, overrideTarget?: string) => {
-    await applyMatch(candidate, undefined, undefined, overrideTarget);
+  const handleApply = async (
+    candidate: TmMatchCandidate,
+    overrideTarget?: string,
+    sentenceRange?: { startOffset: number; endOffset: number },
+  ) => {
+    await applyMatch(candidate, undefined, undefined, overrideTarget, sentenceRange);
   };
 
   return (
@@ -293,7 +302,7 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
               Word 또는 InDesign에서 문단을 편집하면 0.1초(100ms) 이내에 계산된 유사 매치 후보군이 자동으로 표시됩니다.
             </p>
           </div>
-        ) : candidates.length === 0 ? (
+        ) : candidateCount === 0 ? (
           /* No match found */
           <div
             data-testid="tm-no-matches-state"
@@ -324,7 +333,21 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
             data-testid="tm-match-candidates-list"
             className="space-y-3"
           >
-            {candidates.map((cand) => (
+            {sentenceMatches.length > 0 ? sentenceMatches.map((group) => (
+              <section key={`${currentParagraph?.paragraphId || activeParagraph?.paragraphId || 'no-paragraph'}-${group.segmentIndex}`} className="space-y-2">
+                <div data-testid={`tm-sentence-group-${group.segmentIndex}`} className="px-2 py-1 border-l-2 border-cyan-700/70 text-[10px] text-slate-400 bg-slate-900/50 rounded-r">
+                  <span className="font-semibold text-cyan-300">문장 {group.segmentIndex + 1}</span><span className="ml-1.5 font-mono">{group.sourceText}</span>
+                </div>
+                <div className="space-y-3">{group.candidates.map((cand) => (
+                  <TMMatchCard
+                    key={`${group.segmentIndex}-${cand.tuId || `${cand.source}-${cand.target}-${cand.scorePercent}`}`}
+                    candidate={cand}
+                    currentText={group.sourceText}
+                    onApply={(candidate, overrideTarget) => handleApply(candidate, overrideTarget, group)}
+                  />
+                ))}</div>
+              </section>
+            )) : candidates.map((cand) => (
               <TMMatchCard
                 key={`${currentParagraph?.paragraphId || activeParagraph?.paragraphId || 'no-paragraph'}-${cand.tuId || `${cand.source}-${cand.target}-${cand.scorePercent}`}`}
                 candidate={cand}
@@ -345,7 +368,7 @@ export const TMMatchPanel: React.FC<TMMatchPanelProps> = ({ className = '' }) =>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono text-slate-500">
-              후보: <strong className="text-cyan-400">{candidates.length}</strong>건
+              후보: <strong className="text-cyan-400">{candidateCount}</strong>건
             </span>
           </div>
         </div>

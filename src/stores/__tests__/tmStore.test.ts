@@ -8,6 +8,7 @@ import { useBridgeStore } from '../bridgeStore.ts';
 import { useConfigStore } from '../configStore.ts';
 import { MockBridgeService } from '../../services/tauriBridge.ts';
 import { type ParagraphPayload, type ReplacementCommand } from '../../../shared/protocol/types.ts';
+import { replaceReverse } from '../../../shared/engine/diff_engine.ts';
 
 describe('SmartLinter TM Store (tmStore)', () => {
   let mockBridge: MockBridgeService;
@@ -108,7 +109,32 @@ describe('SmartLinter TM Store (tmStore)', () => {
     expect(state.currentParagraph?.paragraphId).toBe('para-101');
     expect(state.candidates.length).toBeGreaterThan(0);
     expect(state.candidates[0].grade).toBe('EXACT');
+    expect(state.sentenceMatches).toEqual([]);
     expect(state.searchMode).toBe('fuzzy');
+
+    cleanup();
+  });
+
+  it('groups automatic multi-sentence paragraph matches by sentence with source offsets', async () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'multi-sentence',
+      text: 'Click the Settings button to configure bridge preferences. Click the Save button to apply all changes.',
+      hash: 'multi-hash', source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const cleanup = useTmStore.getState().initEventListener(mockBridge);
+
+    mockBridge.emit('new-paragraph-detected', paragraph);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const { candidates, sentenceMatches } = useTmStore.getState();
+    expect(candidates).toEqual([]);
+    expect(sentenceMatches).toHaveLength(2);
+    expect(sentenceMatches.map((group) => group.sourceText)).toEqual([
+      'Click the Settings button to configure bridge preferences.',
+      'Click the Save button to apply all changes.',
+    ]);
+    expect(sentenceMatches[1].startOffset).toBe(paragraph.text.indexOf(sentenceMatches[1].sourceText));
+    expect(sentenceMatches.every((group) => group.candidates[0]?.grade === 'EXACT')).toBe(true);
 
     cleanup();
   });
@@ -145,6 +171,48 @@ describe('SmartLinter TM Store (tmStore)', () => {
     const updatedState = useTmStore.getState();
     const appliedCandidate = updatedState.candidates.find((c) => c.source === targetCandidate.source);
     expect(appliedCandidate?.status).toBe('applied');
+  });
+
+  it('applies only the requested sentence range and preserves the surrounding paragraph text', async () => {
+    const originalText = 'Keep this first sentence. Replace this second sentence. Keep this last sentence.';
+    const replacement = 'Translated second sentence.';
+    const rangeStart = originalText.indexOf('Replace this second sentence.');
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'range-apply', text: originalText, hash: 'range-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const candidate = {
+      source: 'Replace this second sentence.', target: replacement,
+      score: 1, scorePercent: 100, grade: 'EXACT' as const,
+    };
+    const sendReplacementSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    await useTmStore.getState().applyMatch(
+      candidate,
+      paragraph,
+      mockBridge,
+      undefined,
+      { startOffset: rangeStart, endOffset: rangeStart + candidate.source.length },
+    );
+
+    const command = sendReplacementSpy.mock.calls[0][0] as ReplacementCommand;
+    expect(replaceReverse(originalText, command.hunks).finalText).toBe(
+      'Keep this first sentence. Translated second sentence. Keep this last sentence.',
+    );
+  });
+
+  it('replaces the full paragraph when applyMatch has no sentence range', async () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'full-apply', text: 'Original full paragraph.', hash: 'full-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    const candidate = { source: paragraph.text, target: 'Entire paragraph replacement.', score: 1, scorePercent: 100, grade: 'EXACT' as const };
+    const sendReplacementSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+    await useTmStore.getState().applyMatch(candidate, paragraph, mockBridge);
+
+    const command = sendReplacementSpy.mock.calls[0][0] as ReplacementCommand;
+    expect(replaceReverse(paragraph.text, command.hunks).finalText).toBe(candidate.target);
   });
 
   it('applies an override target while updating the original candidate card status', async () => {

@@ -91,6 +91,68 @@ describe('TMMatchPanel Component', () => {
     expect(screen.getByText('브릿지 환경 설정을 구성하려면 설정 버튼을 클릭하십시오.')).toBeInTheDocument();
   });
 
+  it('renders automatic multi-sentence matches under non-interactive sentence group headers', () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'grouped-panel', text: 'First source sentence. Second source sentence.', hash: 'grouped-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 2, activeParagraph: paragraph });
+    useTmStore.setState({
+      currentParagraph: paragraph,
+      sentenceMatches: [
+        { segmentIndex: 0, sourceText: 'First source sentence.', startOffset: 0, endOffset: 22, candidates: [{ source: 'First source sentence.', target: 'First target.', score: 1, scorePercent: 100, grade: 'EXACT' }] },
+        { segmentIndex: 1, sourceText: 'Second source sentence.', startOffset: 23, endOffset: 46, candidates: [{ source: 'Second source sentence.', target: 'Second target.', score: 1, scorePercent: 100, grade: 'EXACT' }] },
+      ],
+      candidates: [],
+    });
+
+    render(<TMMatchPanel />);
+
+    expect(screen.getByTestId('tm-sentence-group-0')).toHaveTextContent('문장 1');
+    expect(screen.getByTestId('tm-sentence-group-1')).toHaveTextContent('문장 2');
+  });
+
+  it('shows the no-matches state when every automatic sentence group has zero candidates', () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'empty-grouped-panel', text: 'First source sentence. Second source sentence.', hash: 'empty-grouped-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 2, activeParagraph: paragraph });
+    useTmStore.setState({
+      currentParagraph: paragraph,
+      candidates: [],
+      sentenceMatches: [
+        { segmentIndex: 0, sourceText: 'First source sentence.', startOffset: 0, endOffset: 22, candidates: [] },
+        { segmentIndex: 1, sourceText: 'Second source sentence.', startOffset: 23, endOffset: 46, candidates: [] },
+      ],
+    });
+
+    render(<TMMatchPanel />);
+
+    expect(screen.getByTestId('tm-no-matches-state')).toBeInTheDocument();
+    expect(screen.queryByTestId('tm-match-candidates-list')).not.toBeInTheDocument();
+  });
+
+  it('renders flat candidates without sentence headers for single-sentence and keyword searches', () => {
+    const paragraph: ParagraphPayload = {
+      paragraphId: 'flat-panel', text: 'Single source sentence.', hash: 'flat-hash',
+      source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
+    };
+    useBridgeStore.setState({ tmLoaded: true, tmEntriesCount: 1, activeParagraph: paragraph });
+    useTmStore.setState({
+      currentParagraph: paragraph,
+      candidates: [{ source: paragraph.text, target: 'Single target.', score: 1, scorePercent: 100, grade: 'EXACT', matchMode: 'keyword' }],
+      sentenceMatches: [],
+      searchMode: 'keyword',
+    });
+
+    render(<TMMatchPanel />);
+
+    expect(screen.getByTestId('tm-match-candidates-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('tm-sentence-group-0')).not.toBeInTheDocument();
+    expect(screen.getByText('Single target.')).toBeInTheDocument();
+  });
+
   it('resets a card edit when the current paragraph changes', () => {
     const firstParagraph: ParagraphPayload = {
       paragraphId: 'edit-reset-1', text: 'First paragraph.', hash: 'h-1', source: 'WORD', timestamp: Date.now(), editorType: 'WORD',
