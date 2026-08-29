@@ -1,20 +1,73 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐ 마지막 업데이트: 2026-08-29 새 PC 이관 후 첫 후속 세션(세그멘터+영어QA+QA카드
-segmentIndex+TM 문장단위 검색/적용+자동번역/번역모드 설계자문 세션). 아래 이 절을 먼저
+**⭐⭐⭐ 마지막 업데이트: 2026-08-29 트랙 A(QA 카드 Mode A) 세션. 아래 이 절을 먼저
 읽을 것.**
+
+## 이번 세션 완료 — 트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용) 착수·완료
+
+**커밋 2개(`923d62d` 설계 자문 문서, `5543aca` 구현 — 둘 다 아직 원격 push 안 함):**
+지난 세션이 남긴 "다음 세션 남은 것" 3트랙(A/B/C, 우선순위는 사용자가
+"위 ABC 차례대로 진행"으로 확정) 중 트랙 A를 완료했다. 트랙 B(TM 자동 치환)와
+트랙 C(번역 모드+XLIFF)는 **아직 착수 전 — 다음 세션은 트랙 B부터 시작**.
+
+- **설계**: Codex/agy에 `DESIGN_REQUEST_QA_SENTENCE_MODE_A_APPLY.md`로 동시 자문
+  → 두 쟁점(① 전송 hunk를 카드 range 통짜로 만들지 문단 전체 diff로 만들지,
+  ② STALE_REJECTED를 Mode A에서 자동 재해결할지)에서 답이 갈려
+  `RECONCILE_QA_SENTENCE_MODE_A_APPLY.md`로 재조율 라운드 진행. 결과:
+  ①은 두 원안 다 기각되고 **"카드 range 안에서만 최소 diff"**(각 카드의
+  `oldText`/`newText`를 독립적으로 `extractDiffHunks`한 뒤 문단 오프셋으로
+  승격)라는 제3의 절충안으로 수렴 — Word/InDesign 실제 치환 코드
+  (`replacement_executor.ts`/`atomic_replacer.jsx`)를 직접 읽고 "hunk 범위
+  밖 서식은 안 건드리지만 안쪽 서식은 복원 안 한다"는 사실관계로 판단했다.
+  ②는 Codex 안(`autoResolveStale: false` 고정) 채택 — agy가 자기 절충안의
+  한계(대표 카드만 재분석, 나머지는 `addCard`로 신규 추가되어 중복 카드 위험)를
+  스스로 인정하고 수렴했다. 재조율 중 Codex가 **기존 코드의 잠재 레이스
+  컨디션**을 새로 찾아냄: `stale_conflict_resolver.ts`의 전역
+  `replacement-result` 리스너가 항상 `autoResolveStale: true`로 호출해서,
+  호출자가 넘긴 옵션을 신뢰하면 어느 경로가 먼저 도착하냐에 따라 결과가
+  달라짐 — `PendingCommand`에 `autoResolveStale` 정책을 등록 시점에 저장해
+  `processReplacementResult`가 그 값을 신뢰의 원천으로 쓰도록 고쳐 해결(기존
+  단일 카드 경로 회귀 없음, 회귀 테스트로 확인). 최종 확정 스펙은
+  `RECONCILED_QA_SENTENCE_MODE_A_APPLY.md`.
+- **구현**: Codex 1차 구현 후 Claude diff 검토에서 **요구한 테스트(qaStore.test.ts/
+  QACardList.test.tsx)가 전혀 추가 안 됨**을 발견(과거 세션과 같은 패턴) →
+  후속 지시서로 재작업. agy 독립 코드 리뷰에서 결함 2건 추가 발견: (a)
+  `QACardList.tsx`의 `groupActiveCards`가 배열에서 **인접한** 카드만 그룹으로
+  묶어서, 같은 문장 카드가 배열에서 떨어지면(실제로 발생 가능 — `addCard`가
+  배열 맨 앞에 prepend) 그룹이 쪼개져 버튼이 안 뜸(Medium), (b) `failGroup`
+  에러 메시지가 영어로 하드코딩(Low). 둘 다 Claude가 직접 고치지 않고
+  2차 후속 지시서로 Codex에게 되돌려 수정 → agy가 수정 결과를 다시 확인.
+  **사용자가 이 흐름 중 "모델들의 작업 결과가 안 좋다고 해서 너 혼자 하려고
+  말고 더욱 요청 자문해서 함께 해결해"라고 명시적으로 확인** — Claude의
+  역할은 diff 검토로 결함을 찾는 것까지이지 직접 수정이 아니다, 항상 Codex/agy
+  루프로 되돌릴 것(`consult-agy-codex-when-stuck` 메모리에 반영함).
+- **검증**: Claude가 매 라운드(1차 구현, 1차 후속, 2차 후속) 후
+  `npm test`(197/197)·`npx vitest run`(345/345)·`npm run build` 독립
+  재실행. `cargo test`는 이번 트랙이 Rust를 안 건드려서 별도 재확인 불필요
+  (세션 시작 시 107/109 베이스라인 확인 완료, 라이브 Ollama 타임아웃 1건
+  제외 회귀 없음).
+- **agy 헤드리스 권한 관련 재확인(중요, 메모리에도 반영)**: agy는 `write_file`도
+  명령 실행과 동일하게 헤드리스에서 막힌다(`jetski: no output produced`) —
+  파일 저장을 시키지 말고 항상 stdout으로 답변을 받아 Claude가 저장할 것.
+
+**다음 세션 시작 시**: 아래 "다음 세션 남은 것"에서 트랙 A 항목은 지우고
+트랙 B(TM 자동 치환)부터 시작할 것 — `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
+"1. 자동 치환" 절의 단계별 권고(A 관찰 스파이크 → B 수동 일괄 적용 → C 세션
+로그·되돌리기 → D 명시적 자동 모드 → E 문단 이탈 자동화)를 따를 것.
+
+---
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `f996060`(Search and apply TM matches
-   per sentence instead of per paragraph)인지 확인.** 아니면 그 이후 커밋을
-   먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이 원격보다 7개
-   커밋 앞섬(`8e567d8`~`f996060`) — 전부 push 안 함, 사용자가 "로컬 커밋만
+1. **`git log --oneline -1`로 최신 커밋이 `5543aca`(Add QA card Mode A:
+   sentence one-click unified apply)인지 확인.** 아니면 그 이후 커밋을
+   먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이 원격보다 9개
+   커밋 앞섬(`8e567d8`~`5543aca`) — 전부 push 안 함, 사용자가 "로컬 커밋만
    계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고 명시적으로 정함
    (다음 세션에서도 매번 push 여부를 다시 묻지 말 것, 사용자가 먼저 요청할
    때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(29 files / **323**/323),
+   확인: `npm test`(197/197), `npx vitest run`(30 files / **345**/345),
    `npm run build`(성공). `cargo test --release`는 **107/109**가 정상 —
    실패하는 1건(`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은
    라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.**
@@ -212,18 +265,16 @@ SENTENCE_UNIT_CAT_PARITY.md` 로드맵)의 다음 단계 이름이었다. 이번
 
 ## 다음 세션 남은 것
 
-세 개의 독립적인 트랙이 남아 있다(서로 선후 관계 없음, 사용자가 우선순위를 정할 것):
+사용자가 "위 ABC 차례대로 진행"으로 순서를 확정했다. **트랙 A는 완료됨
+(`923d62d`/`5543aca`, 위 세션 요약 참고) — 다음 세션은 트랙 B부터 시작.**
 
-- **트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)** — 문장의 모든 활성 이슈를 반영한
-  `finalSuggestedText`를 계산해 문단 텍스트에서 그 문장 구간만 통째로 교체하는 단일
-  트랜잭션. `qaStore.ts`의 `acceptCard`(해시 검증/`extractDiffHunks`/`pendingCommands`
-  추적)를 건드리는 첫 단계이므로 **반드시 자체 설계 검토(가능하면 Codex/agy 자문)부터
-  다시 시작할 것** — 아직 손대지 않았다. `CODEX_ANSWER_SENTENCE_UNIT_CAT_PARITY.md`
-  1장 참고.
-- **트랙 B: TM 자동 치환** — `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
+- ~~트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)~~ — **완료.**
+- **트랙 B(다음 세션 시작점): TM 자동 치환** — `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
   "1. 자동 치환" 절의 단계별 권고(A. 관찰 스파이크 → B. 수동 일괄 적용 → C. 세션
-  로그·되돌리기 → D. 명시적 자동 모드 → E. 문단 이탈 자동화)를 그대로 따를 것. Stage 1c가
-  끝났으니 이제 착수 가능. 실시간 키스트로크 자동 치환은 **절대 금지**(두 자문 공통).
+  로그·되돌리기 → D. 명시적 자동 모드 → E. 문단 이탈 자동화)를 그대로 따를 것. 트랙 A와
+  마찬가지로 **착수 전 설계 자문(Codex/agy) → 재조율(필요 시) → Codex 구현 → Claude
+  diff 검토+독립 테스트 → agy 독립 리뷰 → 커밋** 순서를 지킬 것. 실시간 키스트로크
+  자동 치환은 **절대 금지**(두 자문 공통).
 - **트랙 C: [번역 모드]+XLIFF** — 같은 문서 "2. 번역 모드와 XLIFF" 절의 T0~T7 단계.
   T0(요구사항 고정: sidecar vs 새 문서 생성 vs bilingual 편집 중 확정)부터 시작할 것.
   XLIFF는 항상 사이드카로, 에디터 원본 문서에 직접 쓰는 방식(T7)은 최후순위·기본
@@ -232,7 +283,7 @@ SENTENCE_UNIT_CAT_PARITY.md` 로드맵)의 다음 단계 이름이었다. 이번
   다뤄짐 — 별도로 먼저 착수할 필요 없음.
 - **원격 push는 사용자가 전체 작업 마무리를 선언할 때만** — 매 세션/커밋마다 다시 묻지
   말 것(사용자가 명시적으로 확정, `smartlinter-defer-remote-push` 메모리 참고). 지금
-  로컬이 원격보다 7개 커밋 앞서 있음.
+  로컬이 원격보다 9개 커밋 앞서 있음(트랙 A 커밋 2개 추가).
 
 ## 새 PC 이관 (2026-08-29) — 다른 PC에서 이어받을 때 반드시 읽을 것
 
