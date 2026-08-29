@@ -1,10 +1,85 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 C T3(문서 전체
-스캔) 설계 자문·재조율 완료 + T3a-1(Word 왕복 배선) 구현·리뷰·데드락
-2건 수정까지 완료 — 아래 이 절을 먼저 읽을 것.**
+**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 새 세션, 트랙 C T3a-2(대시보드
+비파괴적 병합 + UI) 설계 자문·재조율·구현·agy 리뷰·후속 수정까지 전부
+완료 — T3a(Word 전체 문서 스캔) 전 단계가 이번에 마무리됐다. 아래 이
+절을 먼저 읽을 것.**
 
-## 이번 세션 완료(8차 후속) — 트랙 C T3 설계 확정 + T3a-1(Word 문서 전체 스캔 왕복 배선)
+## 이번 세션 완료(9차 후속) — 트랙 C T3a-2: 대시보드 병합 로직 + UI (T3a 완료)
+
+**커밋 3개(`d9d697e` 설계 자문+재조율 문서, `9cc657d` 구현 지시서,
+`74cc5d9` 구현+후속 수정 — 아직 원격 push 안 함, 로컬이 원격보다
+48개 커밋 앞섬).** 콜드스타트로 시작해 베이스라인 검증(`npm test`
+201/201, `npx vitest run` 413/413, `npm run build`)부터 마친 뒤, 지난
+세션 핸드오프가 지목한 다음 단계(T3a-2: 대시보드 병합 + UI)를 바로
+착수했다.
+
+- **설계 자문에서 스펙 결함을 미리 발견**: `RECONCILED_TRANSLATION_MODE_T3.md`
+  §5는 export 시점 재검증에 기존 `queryLiveParagraphSnapshots`를
+  "변경 없이 재사용"하기로 돼 있었는데, Claude가 코드를 직접 읽어
+  이 전제가 틀렸음을 사전에 확인했다 — 그 함수는 요청 ID를
+  `word-para-<hash>` 포맷으로만 재구성해 대조하므로, T3a-1이 만드는
+  합성 ID(`word-para-body-<index>-<hash>`)를 넣으면 무조건
+  `NOT_FOUND`가 나서 export가 영구 차단되는 실제 블로커였다. 이
+  사실관계를 `DESIGN_REQUEST_TRANSLATION_MODE_T3A_2.md`에 명시해
+  자문 품질을 높였다.
+- **자문 2라운드(설계+재조율)**: 4개 질문 중 이중 ID 매칭 방식((a)안 —
+  스캔 순회 시 두 포맷 모두 후보 등록), 함수 분리 원칙(공유 순수
+  헬퍼 + 별도 `mergeScannedParagraphs` 원자적 리듀서),
+  `documentOrderIndex` 필드 추가는 즉시 수렴. 2개(병합 매칭 키 우선순위,
+  UI 배치)는 갈려 `RECONCILE_TRANSLATION_MODE_T3A_2.md`로 재조율 →
+  agy가 스스로 구체적 실패 시나리오(동일 텍스트 문단이 2개 이상일 때
+  `sourceHash` 단독 매칭이 번역 초안을 다른 문단으로 스왑시키는 오염
+  시나리오)를 만들어 자기 원안을 철회하고 Codex 안(`paragraphId` 1차,
+  `sourceHash`는 1:1 제한적 폴백만)과 `Header.tsx` 통합 UI 배치로
+  완전히 수렴했다. 최종 스펙은 `RECONCILED_TRANSLATION_MODE_T3A_2.md`.
+  이 라운드에서 Codex가 `document_scanner.ts`의 기존 결함(오류를 빈
+  `paragraphs: []`로 뭉개 진짜 빈 문서와 구별 불가)도 발견 —
+  Claude가 코드로 재확인 후 이번 구현 범위에 포함시켰다.
+- **구현(Codex 1차) — 스펙 그대로 정확히 구현됨**: 프로토콜
+  (`EnumerateDocumentResponse.error` 필드) → Rust(`messages.rs` 필드
+  추가, 세션 로직은 무변경) → Word 플러그인(`snapshot_provider.ts`/
+  `locate_provider.ts` 이중 ID 매칭, `document_scanner.ts` 에러 필드) →
+  스토어(`mergeScannedParagraphs`, `createSegmentsFromParagraph` 공유
+  헬퍼, `scanFullDocument`/`cancelScan` 액션, `scanRequestToken` 가드) →
+  `xliffExport.ts`(`documentOrderIndex` 우선 정렬) → UI(`Header.tsx`
+  스캔 버튼+스캔 중 export 2중 차단, 신규 `TranslationScanProgressBar.tsx`)
+  전 계층이 1차 구현에서 요청한 함수 시그니처·테스트 케이스 그대로
+  나왔다. Claude가 diff를 파일별로 전부 직접 읽고 검토.
+- **Claude 독립 검증 + agy 독립 리뷰에서 결함 1건 확인**:
+  `npm test`(205/205)·`npx vitest run`(426/426)·`npm run build`·
+  타겟 `cargo test`(신규 `error` 필드 직렬화 테스트 포함) 전부 통과
+  확인 후, diff를 agy에게 넘겨 특히 "레거시 그룹 안에 서로 다른
+  `sourceHash`가 섞여 있을 수 있는 경우"를 짚어 리뷰를 요청했다(Claude가
+  스스로 의심했던 지점). agy가 실제로 확인: `mergeScannedParagraphs`의
+  레거시 폴백 매칭이 그룹 내 첫 세그먼트의 해시만 대표값으로 삼아서
+  (1) 오래된 스냅샷 해시가 대표로 뽑히면 승격 기회를 놓치거나 (2) 최악의
+  경우 그 오래된 해시가 문서의 다른 위치와 우연히 일치하면 최신 세그먼트까지
+  엉뚱한 위치로 잘못 승격될 이론적 위험이 있었다(데이터 유실은 아님).
+  agy가 제시한 방어 조건(그룹 내 모든 세그먼트가 동일 `sourceHash`일 때만
+  폴백 후보로 등록)을 그대로 Codex에게 후속 지시서로 되돌려 수정시켰다
+  — 이번에도 Claude가 직접 고치지 않음. 혼합 해시 그룹이 자동 승격되지
+  않고 양쪽 draft가 모두 보존되는지 검증하는 회귀 테스트도 추가됨.
+- **성능 벤치마크 플레이크 재확인**: 후속 수정 검증 중 `tmMatcher.test.ts`의
+  10,000 TU 벤치마크가 다른 백그라운드 프로세스(agy/vitest/cargo 동시
+  실행) 부하로 1회 실패했으나, 격리 재실행 시 즉시 통과 확인 — 이
+  프로젝트에서 반복돼온 알려진 패턴(코드 회귀 아님).
+- **최종 검증**: 조용한 환경에서 `npm test`(205/205)·`npx vitest run`
+  (**427/427**)·`npm run build` 전부 재확인 후 커밋.
+- **T3a 완료 — 다음 세션이 참고할 것**: Word 전체 문서 스캔(T3a)이
+  왕복 배선(T3a-1)+병합/UI(T3a-2) 양쪽 다 끝나서, 실제로 "번역 모드
+  ON → 전체 문서 스캔 버튼 → 문서 전체 문단이 세션에 비파괴적으로
+  병합 → XLIFF 내보내기"까지 이론상 end-to-end로 동작해야 한다. **단,
+  실제 Word/Tauri 빌드로 브라우저가 아닌 진짜 에디터에서 라이브
+  검증은 아직 안 함**(이전 세션들과 동일한 한계). `RECONCILED_TRANSLATION_MODE_T3.md`
+  §3에 InDesign(T3b) 최종 스펙(`CoverageState` 3분류, overset 포함,
+  unplaced story 옵트인)이 이미 기록돼 있으니 다음은 T3b 착수가
+  유력하나 **사용자에게 먼저 물어볼 것**(자동 결정 금지 원칙 유지).
+  인라인 태그 보존(T4), XLIFF import/merge(T5)도 여전히 범위 밖.
+
+---
+
+## 이전 세션 완료(8차 후속) — 트랙 C T3 설계 확정 + T3a-1(Word 문서 전체 스캔 왕복 배선)
 
 **커밋 6개(`8c25de6` T3 설계 자문 문서, `103d428` T3 답변+재조율 요청,
 `568ec44` T3 최종 확정 스펙, `4c0721b` T3a-1 구현 지시서, `2ad6b6f`
