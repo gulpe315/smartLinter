@@ -362,7 +362,9 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
     set({
       segments: applyXliffImport(get().segments, analysis.autoApply, resolvedConflicts, now),
       lastImportSummary: {
-        appliedCount: analysis.autoApply.length + resolvedConflicts.filter((resolution) => resolution.resolution === 'use-incoming').length,
+        appliedCount: analysis.autoApply.length + resolvedConflicts.filter(
+          (resolution) => resolution.resolution === 'use-incoming' && resolution.incoming != null,
+        ).length,
         conflictCount: analysis.conflicts.length,
         skippedSourceMismatchCount: analysis.skippedSourceMismatch.length,
         skippedNotFoundCount: analysis.skippedNotFound.length,

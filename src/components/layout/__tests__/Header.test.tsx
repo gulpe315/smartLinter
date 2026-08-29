@@ -8,6 +8,7 @@ import { useQaStore } from '../../../stores/qaStore.ts';
 import { useConfigStore } from '../../../stores/configStore.ts';
 import { useTranslationSessionStore, type TranslationSessionSegment } from '../../../stores/translationSessionStore.ts';
 import { buildXliffDocument } from '../../../utils/xliffExport.ts';
+import type { XliffConflictItem } from '../../../utils/xliffImport.ts';
 
 vi.mock('../../../utils/xliffExport.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../utils/xliffExport.ts')>();
@@ -93,6 +94,81 @@ describe('Header Component', () => {
     useTranslationSessionStore.setState({ scanError: 'Scan failed' });
     render(<Header />);
     expect(screen.getByRole('status')).toHaveTextContent('Scan failed');
+  });
+
+  it('opens the file picker and imports the selected XLIFF file', async () => {
+    const segment: TranslationSessionSegment = {
+      segmentId: 'segment', paragraphId: 'paragraph', segmentIndex: 0, sourceText: 'Source', sourceHash: 'hash',
+      startOffset: 0, endOffset: 6, targetDraft: '', origin: 'empty', isUserEdited: false, status: 'untranslated', detectedAt: 1, updatedAt: 1,
+    };
+    const importXliff = vi.fn(async () => {});
+    useTranslationSessionStore.setState({ segments: [segment], importXliff });
+    render(<Header />);
+    const input = screen.getByTestId('translation-import-file-input') as HTMLInputElement;
+    const inputClick = vi.spyOn(input, 'click');
+    fireEvent.click(screen.getByTestId('translation-import-btn'));
+    expect(inputClick).toHaveBeenCalledOnce();
+
+    const file = new File(['ignored'], 'review.xlf', { type: 'application/xliff+xml' });
+    Object.defineProperty(file, 'text', { value: vi.fn().mockResolvedValue('<xliff />') });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(importXliff).toHaveBeenCalledWith('<xliff />', expect.any(Function)));
+  });
+
+  it('shows the conflict modal and resolves the import callback after merging', async () => {
+    const segment: TranslationSessionSegment = {
+      segmentId: 'segment', paragraphId: 'paragraph', segmentIndex: 0, sourceText: 'Source', sourceHash: 'hash',
+      startOffset: 0, endOffset: 6, targetDraft: 'Current', origin: 'manual', isUserEdited: true, status: 'draft', detectedAt: 1, updatedAt: 1,
+    };
+    const conflict: XliffConflictItem = { segment, incoming: { id: 'segment', sourceText: 'Source', targetText: 'Incoming', state: 'translated' } };
+    let receivedResolutions: unknown;
+    const importXliff = vi.fn(async (_xml: string, resolveConflicts?: (analysis: any) => Promise<any>) => {
+      receivedResolutions = await resolveConflicts?.({ conflicts: [conflict] });
+    });
+    useTranslationSessionStore.setState({ segments: [segment], importXliff });
+    render(<Header />);
+    const input = screen.getByTestId('translation-import-file-input');
+    const file = new File(['ignored'], 'review.xlf');
+    Object.defineProperty(file, 'text', { value: vi.fn().mockResolvedValue('<xliff />') });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByTestId('xliff-conflict-modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('외부 값 적용'));
+    fireEvent.click(screen.getByRole('button', { name: '선택한 내용으로 병합' }));
+    await waitFor(() => expect(receivedResolutions).toEqual([{ segmentId: 'segment', resolution: 'use-incoming' }]));
+  });
+
+  it('does not show a conflict modal when the import analysis has no conflicts', async () => {
+    const segment: TranslationSessionSegment = {
+      segmentId: 'segment', paragraphId: 'paragraph', segmentIndex: 0, sourceText: 'Source', sourceHash: 'hash',
+      startOffset: 0, endOffset: 6, targetDraft: '', origin: 'empty', isUserEdited: false, status: 'untranslated', detectedAt: 1, updatedAt: 1,
+    };
+    const importXliff = vi.fn(async (_xml: string, resolveConflicts?: (analysis: any) => Promise<any>) => resolveConflicts?.({ conflicts: [] }));
+    useTranslationSessionStore.setState({ segments: [segment], importXliff });
+    render(<Header />);
+    const file = new File(['ignored'], 'review.xlf');
+    Object.defineProperty(file, 'text', { value: vi.fn().mockResolvedValue('<xliff />') });
+    fireEvent.change(screen.getByTestId('translation-import-file-input'), { target: { files: [file] } });
+    await waitFor(() => expect(importXliff).toHaveBeenCalledOnce());
+    expect(screen.queryByTestId('xliff-conflict-modal')).not.toBeInTheDocument();
+  });
+
+  it('renders import errors before the import summary and disables import without segments', () => {
+    useTranslationSessionStore.setState({
+      importError: 'Import failed',
+      lastImportSummary: { appliedCount: 3, conflictCount: 2, skippedSourceMismatchCount: 1, skippedNotFoundCount: 2, skippedDuplicateIdCount: 0, notProvidedCount: 4, toolId: null, importedAt: 1 },
+    });
+    render(<Header />);
+    expect(screen.getByTestId('translation-import-btn')).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Import failed');
+  });
+
+  it('renders the XLIFF import summary', () => {
+    useTranslationSessionStore.setState({
+      lastImportSummary: { appliedCount: 3, conflictCount: 2, skippedSourceMismatchCount: 1, skippedNotFoundCount: 2, skippedDuplicateIdCount: 0, notProvidedCount: 4, toolId: null, importedAt: 1 },
+    });
+    render(<Header />);
+    expect(screen.getByRole('status')).toHaveTextContent('XLIFF 가져오기 완료: 3개 반영, 2개 충돌 처리, 3개 원문 변경/미존재로 건너뜀, 4개 번역 미제공');
   });
 
   it('exports session segments through a Blob download', () => {

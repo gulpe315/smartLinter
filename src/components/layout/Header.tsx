@@ -6,7 +6,7 @@
  * layout switcher buttons, and triggers for settings & guideline panels.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles,
   Database,
@@ -27,9 +27,14 @@ import { TranslationScanProgressBar } from '../translation/TranslationScanProgre
 import { EditorConnectionControl } from './EditorConnectionControl.tsx';
 import { useTranslationSessionStore } from '../../stores/translationSessionStore.ts';
 import { buildXliffDocument } from '../../utils/xliffExport.ts';
+import { XliffConflictModal } from '../translation/XliffConflictModal.tsx';
+import type { XliffConflictItem, XliffConflictResolution } from '../../utils/xliffImport.ts';
 
 export const Header: React.FC = () => {
   const [translationExportMessage, setTranslationExportMessage] = useState<string | null>(null);
+  const [pendingConflicts, setPendingConflicts] = useState<XliffConflictItem[] | null>(null);
+  const xliffFileInputRef = useRef<HTMLInputElement>(null);
+  const conflictResolverRef = useRef<((resolutions: XliffConflictResolution[]) => void) | null>(null);
   const {
     llmAlive,
     llmModel,
@@ -47,7 +52,7 @@ export const Header: React.FC = () => {
 
   const { openSettingsModal, openGuidelineViewer, sourceLang, targetLang } = useConfigStore();
   const resetQaCards = useQaStore((state) => state.resetQaCards);
-  const { isTranslationModeActive, segments, isScanning, scanError, lastScanSummary } = useTranslationSessionStore();
+  const { isTranslationModeActive, segments, isScanning, scanError, lastScanSummary, lastImportSummary, importError } = useTranslationSessionStore();
   const exportableSegmentCount = segments.filter((segment) => segment.status !== 'needs-validation').length;
   const needsValidationCount = segments.length - exportableSegmentCount;
   const isTranslationExportDisabled = segments.length === 0 || needsValidationCount > 0 || isScanning;
@@ -80,6 +85,20 @@ export const Header: React.FC = () => {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setTranslationExportMessage(null);
+  };
+
+  const handleXliffFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const xmlContent = await file.text();
+    await useTranslationSessionStore.getState().importXliff(xmlContent, (analysis) => {
+      if (analysis.conflicts.length === 0) return Promise.resolve([]);
+      return new Promise((resolve) => {
+        conflictResolverRef.current = resolve;
+        setPendingConflicts(analysis.conflicts);
+      });
+    });
   };
 
   return (
@@ -202,6 +221,24 @@ export const Header: React.FC = () => {
           >
             {isScanning ? '스캔 중...' : '전체 문서 스캔'}
           </button>
+          <input
+            ref={xliffFileInputRef}
+            type="file"
+            accept=".xlf,.xliff,.xml"
+            data-testid="translation-import-file-input"
+            className="hidden"
+            onChange={handleXliffFileSelected}
+          />
+          <button
+            type="button"
+            data-testid="translation-import-btn"
+            disabled={isScanning || segments.length === 0}
+            onClick={() => xliffFileInputRef.current?.click()}
+            className="px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800 disabled:text-slate-500 border border-slate-700 text-slate-300 text-xs font-medium transition-colors"
+            title="외부 CAT 툴에서 검토한 XLIFF 파일을 가져옵니다"
+          >
+            XLIFF 가져오기
+          </button>
           <button
             type="button"
             data-testid="translation-export-btn"
@@ -309,11 +346,32 @@ export const Header: React.FC = () => {
           </button>
         </div>
       )}
-      {scanError ? (
+      {importError ? (
+        <p role="status" className="px-4 pb-2 text-xs text-amber-300">{importError}</p>
+      ) : scanError ? (
         <p role="status" className="px-4 pb-2 text-xs text-amber-300">{scanError}</p>
+      ) : lastImportSummary ? (
+        <p role="status" className="px-4 pb-2 text-xs text-emerald-300">
+          XLIFF 가져오기 완료: {lastImportSummary.appliedCount}개 반영, {lastImportSummary.conflictCount}개 충돌 처리, {lastImportSummary.skippedSourceMismatchCount + lastImportSummary.skippedNotFoundCount}개 원문 변경/미존재로 건너뜀, {lastImportSummary.notProvidedCount}개 번역 미제공
+        </p>
       ) : needsValidationCount > 0 && translationExportMessage ? (
         <p role="status" className="px-4 pb-2 text-xs text-amber-300">{translationExportMessage}</p>
       ) : null}
+      {pendingConflicts && (
+        <XliffConflictModal
+          conflicts={pendingConflicts}
+          onResolve={(resolutions) => {
+            conflictResolverRef.current?.(resolutions);
+            conflictResolverRef.current = null;
+            setPendingConflicts(null);
+          }}
+          onCancel={() => {
+            conflictResolverRef.current?.([]);
+            conflictResolverRef.current = null;
+            setPendingConflicts(null);
+          }}
+        />
+      )}
     </header>
   );
 };
