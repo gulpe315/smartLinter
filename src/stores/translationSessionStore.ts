@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type ParagraphPayload, type ScannedParagraphEntry } from '../../shared/protocol/types.ts';
+import { type EnumerateDocumentSummary, type ParagraphPayload, type ScannedParagraphEntry } from '../../shared/protocol/types.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
 import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
@@ -191,10 +191,14 @@ export interface TranslationSessionState {
   segments: TranslationSessionSegment[];
   isScanning: boolean;
   scanError: string | null;
-  lastScanSummary: { totalCount: number; scannedAt: number } | null;
+  lastScanSummary: (Partial<EnumerateDocumentSummary> & {
+    totalCount: number;
+    scannedAt: number;
+    includeUnplacedStories: boolean;
+  }) | null;
   setTranslationMode: (active: boolean) => void;
   upsertParagraphSegments: (paragraph: ParagraphPayload) => void;
-  scanFullDocument: (service?: IBridgeService) => Promise<void>;
+  scanFullDocument: (options?: { includeUnplacedStories?: boolean }, service?: IBridgeService) => Promise<void>;
   cancelScan: () => void;
   updateSegmentTarget: (segmentId: string, text: string) => void;
   removeSegment: (segmentId: string) => void;
@@ -208,7 +212,7 @@ const initialState = {
   segments: [] as TranslationSessionSegment[],
   isScanning: false,
   scanError: null as string | null,
-  lastScanSummary: null as { totalCount: number; scannedAt: number } | null,
+  lastScanSummary: null as TranslationSessionState['lastScanSummary'],
 };
 
 export const useTranslationSessionStore = create<TranslationSessionState>()(persist((set, get) => ({
@@ -269,14 +273,14 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
     });
   },
 
-  scanFullDocument: async (service) => {
+  scanFullDocument: async (options, service) => {
     if (!get().isTranslationModeActive || get().isScanning) return;
     const requestToken = ++scanRequestToken;
     set({ isScanning: true, scanError: null });
     try {
       const bridgeService = service || getBridgeService();
       const response = await Promise.race([
-        bridgeService.enumerateDocumentParagraphs(),
+        bridgeService.enumerateDocumentParagraphs(options),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SCAN_TIMEOUT')), 10_000)),
       ]);
       if (requestToken !== scanRequestToken) return;
@@ -290,7 +294,17 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
       const now = Date.now();
       const merged = mergeScannedParagraphs(get().segments, response.paragraphs, now, { tmEntries, userTmOverlayEntries, matcher });
       if (requestToken !== scanRequestToken) return;
-      set({ segments: merged, isScanning: false, scanError: null, lastScanSummary: { totalCount: response.paragraphs.length, scannedAt: now } });
+      set({
+        segments: merged,
+        isScanning: false,
+        scanError: null,
+        lastScanSummary: {
+          ...(response.summary ?? {}),
+          totalCount: response.paragraphs.length,
+          scannedAt: now,
+          includeUnplacedStories: options?.includeUnplacedStories === true,
+        },
+      });
     } catch (error: any) {
       if (requestToken !== scanRequestToken) return;
       set({ isScanning: false, scanError: error?.message === 'SCAN_TIMEOUT'

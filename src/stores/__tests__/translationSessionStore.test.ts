@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type ParagraphPayload, type ScannedParagraphEntry } from '../../../shared/protocol/types.ts';
 import { MockBridgeService } from '../../services/tauriBridge.ts';
 import { useConfigStore } from '../configStore.ts';
@@ -291,5 +291,50 @@ describe('translationSessionStore', () => {
     ], [], 10, tmContext());
     expect(merged).toHaveLength(1);
     expect(merged[0]).toMatchObject({ paragraphId: 'word-para-edited', status: 'needs-validation' });
+  });
+
+  it('scans with default options and safely records a Word-style response without a summary', async () => {
+    const service = new MockBridgeService();
+    const enumerate = vi.spyOn(service, 'enumerateDocumentParagraphs').mockResolvedValue({
+      requestId: 'word-scan', sourceDocumentName: 'Document.docx', paragraphs: [],
+    });
+    useTranslationSessionStore.getState().setTranslationMode(true);
+
+    await useTranslationSessionStore.getState().scanFullDocument(undefined, service);
+
+    expect(enumerate).toHaveBeenCalledWith(undefined);
+    expect(useTranslationSessionStore.getState().lastScanSummary).toMatchObject({
+      totalCount: 0,
+      includeUnplacedStories: false,
+    });
+    expect(useTranslationSessionStore.getState().lastScanSummary).toHaveProperty('scannedAt');
+    expect(useTranslationSessionStore.getState().lastScanSummary).not.toHaveProperty('unplacedStories');
+  });
+
+  it('forwards the unplaced-story opt-in and retains the scan summary', async () => {
+    const service = new MockBridgeService();
+    const enumerate = vi.spyOn(service, 'enumerateDocumentParagraphs').mockResolvedValue({
+      requestId: 'indesign-scan',
+      sourceDocumentName: 'Layout.indd',
+      paragraphs: [scanned('story-1:paragraph-1', 'hash', 0)],
+      summary: {
+        totalCount: 4,
+        scannedParagraphs: 1,
+        unplacedStories: 2,
+        unplacedParagraphsPendingChoice: 3,
+      },
+    });
+    useTranslationSessionStore.getState().setTranslationMode(true);
+
+    await useTranslationSessionStore.getState().scanFullDocument({ includeUnplacedStories: true }, service);
+
+    expect(enumerate).toHaveBeenCalledWith({ includeUnplacedStories: true });
+    expect(useTranslationSessionStore.getState().lastScanSummary).toMatchObject({
+      totalCount: 1,
+      scannedParagraphs: 1,
+      unplacedStories: 2,
+      unplacedParagraphsPendingChoice: 3,
+      includeUnplacedStories: true,
+    });
   });
 });

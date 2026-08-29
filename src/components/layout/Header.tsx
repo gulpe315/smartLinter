@@ -47,7 +47,7 @@ export const Header: React.FC = () => {
 
   const { openSettingsModal, openGuidelineViewer, sourceLang, targetLang } = useConfigStore();
   const resetQaCards = useQaStore((state) => state.resetQaCards);
-  const { isTranslationModeActive, segments, isScanning, scanError } = useTranslationSessionStore();
+  const { isTranslationModeActive, segments, isScanning, scanError, lastScanSummary } = useTranslationSessionStore();
   const exportableSegmentCount = segments.filter((segment) => segment.status !== 'needs-validation').length;
   const needsValidationCount = segments.length - exportableSegmentCount;
   const isTranslationExportDisabled = segments.length === 0 || needsValidationCount > 0 || isScanning;
@@ -293,6 +293,22 @@ export const Header: React.FC = () => {
       {/* Top Real-time Batch Progress Bar */}
       <BatchProgressBar />
       <TranslationScanProgressBar />
+      {lastScanSummary && (lastScanSummary.unplacedStories ?? 0) > 0 && !lastScanSummary.includeUnplacedStories && (
+        <div className="px-4 pb-2 flex items-center gap-2 text-xs text-amber-300">
+          <span>
+            미배치 스토리 {lastScanSummary.unplacedStories}개(문단 {lastScanSummary.unplacedParagraphsPendingChoice}개)가 제외됐습니다.
+          </span>
+          <button
+            type="button"
+            data-testid="translation-rescan-unplaced-btn"
+            disabled={isScanning}
+            onClick={() => useTranslationSessionStore.getState().scanFullDocument({ includeUnplacedStories: true })}
+            className="underline text-amber-200 hover:text-amber-100 disabled:text-slate-500"
+          >
+            미배치 스토리 포함 재스캔
+          </button>
+        </div>
+      )}
       {scanError ? (
         <p role="status" className="px-4 pb-2 text-xs text-amber-300">{scanError}</p>
       ) : needsValidationCount > 0 && translationExportMessage ? (

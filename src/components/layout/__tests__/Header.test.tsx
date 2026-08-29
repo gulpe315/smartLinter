@@ -47,6 +47,38 @@ describe('Header Component', () => {
     expect(scan).toHaveBeenCalledOnce();
   });
 
+  it('offers a rescan that includes unplaced InDesign stories when they were excluded', () => {
+    const scan = vi.fn(async () => {});
+    useTranslationSessionStore.setState({
+      scanFullDocument: scan,
+      lastScanSummary: {
+        totalCount: 2, scannedAt: 1, includeUnplacedStories: false,
+        unplacedStories: 1, unplacedParagraphsPendingChoice: 3,
+      },
+    });
+    render(<Header />);
+
+    fireEvent.click(screen.getByTestId('translation-rescan-unplaced-btn'));
+
+    expect(scan).toHaveBeenCalledWith({ includeUnplacedStories: true });
+  });
+
+  it('hides the unplaced-story rescan after opt-in scanning has completed', () => {
+    useTranslationSessionStore.setState({
+      lastScanSummary: { totalCount: 2, scannedAt: 1, includeUnplacedStories: true, unplacedStories: 1 },
+    });
+    render(<Header />);
+    expect(screen.queryByTestId('translation-rescan-unplaced-btn')).not.toBeInTheDocument();
+  });
+
+  it('does not offer an unplaced-story rescan for Word scan summaries', () => {
+    useTranslationSessionStore.setState({
+      lastScanSummary: { totalCount: 2, scannedAt: 1, includeUnplacedStories: false },
+    });
+    render(<Header />);
+    expect(screen.queryByTestId('translation-rescan-unplaced-btn')).not.toBeInTheDocument();
+  });
+
   it('disables XLIFF export while the full-document scan is running', () => {
     useTranslationSessionStore.setState({ isScanning: true, segments: [{
       segmentId: 'segment', paragraphId: 'paragraph', segmentIndex: 0, sourceText: 'Source', sourceHash: 'hash',

@@ -166,7 +166,7 @@ export interface IBridgeService {
   /** Returns current contents for multiple paragraphs without changing editor selection or focus. */
   getLiveParagraphSnapshots(paragraphIds: string[]): Promise<LiveParagraphSnapshotEntry[]>;
 
-  enumerateDocumentParagraphs(): Promise<EnumerateDocumentResponse>;
+  enumerateDocumentParagraphs(options?: { includeUnplacedStories?: boolean }): Promise<EnumerateDocumentResponse>;
 
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
@@ -520,7 +520,7 @@ export class MockBridgeService implements IBridgeService {
     }));
   }
 
-  async enumerateDocumentParagraphs(): Promise<EnumerateDocumentResponse> {
+  async enumerateDocumentParagraphs(_options?: { includeUnplacedStories?: boolean }): Promise<EnumerateDocumentResponse> {
     const texts = ['Mock document introduction.', 'Mock body paragraph.', 'Mock conclusion.'];
     return {
       requestId: 'mock-document-scan',
@@ -854,11 +854,13 @@ export class TauriBridgeService implements IBridgeService {
     }
   }
 
-  async enumerateDocumentParagraphs(): Promise<EnumerateDocumentResponse> {
+  async enumerateDocumentParagraphs(options?: { includeUnplacedStories?: boolean }): Promise<EnumerateDocumentResponse> {
     if (!this.isTauriAvailable()) {
-      return this.fallbackService.enumerateDocumentParagraphs();
+      return this.fallbackService.enumerateDocumentParagraphs(options);
     }
-    return await invoke('enumerate_document_paragraphs');
+    return await invoke('enumerate_document_paragraphs', {
+      includeUnplacedStories: options?.includeUnplacedStories ?? false,
+    });
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {

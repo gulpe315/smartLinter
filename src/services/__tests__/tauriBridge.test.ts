@@ -58,6 +58,20 @@ describe('TauriBridgeService & IPC Integration', () => {
     expect(response.paragraphs.map((paragraph) => paragraph.documentOrderIndex)).toEqual([0, 1, 2]);
   });
 
+  it('uses the existing document scan behavior when no options are supplied', async () => {
+    const invokeMock = vi.fn().mockResolvedValue({ paragraphs: [] });
+    (window as any).isTauri = true;
+    (window as any).__TAURI_INTERNALS__ = { invoke: invokeMock };
+
+    const service = new TauriBridgeService();
+    await service.enumerateDocumentParagraphs();
+
+    expect(invokeMock).toHaveBeenCalledWith('enumerate_document_paragraphs', {
+      includeUnplacedStories: false,
+    }, undefined);
+    service.destroy();
+  });
+
   it('invokes Tauri command set_always_on_top through the official API bindings', async () => {
     const invokeMock = vi.fn().mockResolvedValue(true);
     (window as any).isTauri = true;
