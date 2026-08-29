@@ -1,11 +1,97 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 새 세션, 트랙 C T3a-2(대시보드
-비파괴적 병합 + UI) 설계 자문·재조율·구현·agy 리뷰·후속 수정까지 전부
-완료 — T3a(Word 전체 문서 스캔) 전 단계가 이번에 마무리됐다. 아래 이
-절을 먼저 읽을 것.**
+**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션 후속, 트랙 C T3b
+(InDesign 전체 문서 스캔) 설계 자문·재조율·T3b-1(왕복 배선)·T3b-2
+(옵트인 UI)까지 전부 완료 — 트랙 C의 T3(문서 전체 스캔) 전체가 이번에
+Word/InDesign 양쪽 다 끝났다. 이 PC엔 Word/InDesign이 설치돼 있지
+않아 전부 목(mock) 기반으로 구현·검증했다(이 프로젝트의 오랜 관례).
+아래 이 절을 먼저 읽을 것.**
 
-## 이번 세션 완료(9차 후속) — 트랙 C T3a-2: 대시보드 병합 로직 + UI (T3a 완료)
+## 이번 세션 완료(10차 후속) — 트랙 C T3b: InDesign 전체 문서 스캔 (T3 전체 완료)
+
+**커밋 6개(`940acc3` T3b 설계 자문+재조율, `50d129d` T3b-1 지시서,
+`7f44da6` T3b-1 구현, `36f7557` T3b-2 지시서, `2d1fcbc` T3b-2 구현
+— 아직 원격 push 안 함).** 사용자가 "이 PC에 Word/InDesign이 설치돼
+있지 않다"고 알려줘서, 지금 상태에서 뭘 할 수 있는지 먼저 점검한 뒤
+(이 프로젝트의 InDesign 플러그인 전체가 처음부터 `MockInDesignEnvironment`
++ Node `vm` 샌드박스로 개발돼왔다는 걸 코드로 확인) T3b(InDesign
+전체 문서 스캔) 착수를 승인받았다.
+
+- **설계**: `DESIGN_REQUEST_TRANSLATION_MODE_T3B.md`로 자문 — InDesign
+  `paragraphId`가 이미 위치 기반(`indesign-para-<storyId>-<index>`)
+  이라 Word의 "레거시 vs 합성 ID" 이원화 문제가 애초에 없다는 사실을
+  Claude가 먼저 확인해 자문 품질을 높였다. 6개 질문 중 4개(Mock 확장,
+  프로토콜 하위호환 필드, `mergeScannedParagraphs` **무수정 재사용**,
+  파일/함수명)는 즉시 수렴. 2개(overset 판정 단위, 제외 컨테이너 판정
+  메커니즘)는 갈려 `RECONCILE_TRANSLATION_MODE_T3B.md`로 재조율 →
+  agy가 Codex의 반박(프레임 경계 분할 문단의 거짓 음성,
+  `constructor.name`이 ExtendScript 호스트 객체에서 비표준이라는 위험)
+  을 스스로 구체적 시나리오로 검증한 뒤 전면 수용 — `story.overflows`
+  기반 스토리 단위 overset, `typename`+16단계 부모체인 기반 제외
+  판정으로 수렴. Claude가 `indesign_com.rs`를 직접 읽어 "InDesign
+  전송 계층은 WebSocket이 아니라 동기 COM `DoScript`"라는 사실도
+  자문 없이 바로 정정(agy의 초안 오류). 최종 스펙은
+  `RECONCILED_TRANSLATION_MODE_T3B.md`.
+- **T3b-1(왕복 배선) — 1차 구현이 스펙을 정확히 따름**: 프로토콜
+  하위호환 확장(`storyId`/`isOverset`/`coverageState`/`summary`,
+  전부 optional) → InDesign 신규 `document_scanner.jsx`
+  (`enumerateAllDocumentParagraphs`) → `MockInDesignEnvironment`
+  다중 스토리/배치/오버셋/컨테이너 확장(기존
+  `atomic_replacer.test.ts`의 `stories` 오버라이드 15곳과 무충돌
+  공존) → Rust COM 배선(`indesign_com.rs`에
+  `get_live_paragraph_snapshots`와 동일한 재시도 패턴으로 신규 함수,
+  `commands.rs`가 `EditorType`에 따라 Word=WebSocket/InDesign=COM으로
+  분기) 전 계층이 1차 구현에서 정확히 나왔다. Claude가 diff를 전부
+  직접 읽고 검토한 뒤 `npm test`(209/209, InDesign 스캐너 테스트
+  4건 포함)·`npx vitest run`·`npm run build`·
+  `cargo build --release`(4분 25초, Codex 자신은 120초 샌드박스
+  제한으로 확인 못 했던 것 — 실제 컴파일 오류는 없었음) 독립
+  재검증. **Claude가 diff 리뷰 중 자체 발견**: `package.json`의
+  `test`/`test:indesign` 스크립트에 신규
+  `plugins/indesign/tests/document_scanner.test.ts`가 등록 안 돼
+  `npm test`가 조용히 그 테스트를 건너뛰고 있었음(Word
+  `document_scanner.test.ts`도 이전 세션에 같은 실수가 있었던
+  전례) — Codex에게 후속 지시서로 등록시켜 해결. agy 독립 리뷰
+  (5대 항목 전부 PASS, 결함 0건).
+- **agy 활용 관련 사용자 재지적(중요, 메모리 갱신함)**: Codex가
+  자기 샌드박스 시간제한(60~120초)으로 vitest/cargo를 못 끝냈을 때,
+  Claude가 네이티브로 대신 돌리는 것까지는 문제가 아니었지만 그걸
+  다 끝낸 **다음에야** agy 리뷰를 시작하려던 습성을 사용자가
+  재지적함 — agy는 명령 실행 권한이 없어 빌드/테스트를 대신 할 순
+  없지만, **diff 독립 리뷰는 Claude의 네이티브 검증 완료를 기다릴
+  필요 없이 병렬로 바로 시작해야 한다.** T3b-2부터는 이 방식으로
+  전환해 agy 리뷰와 `npm test`/`vitest` 재검증을 동시에 돌렸다.
+  `consult-agy-codex-when-stuck` 메모리에 반영함.
+- **T3b-2(옵트인 UI) — 1차 구현 결함 없음**: `scanFullDocument`/
+  `enumerateDocumentParagraphs`에 `options?: { includeUnplacedStories?: boolean }`
+  추가, `lastScanSummary`가 `EnumerateDocumentSummary`를 흡수하도록
+  확장, `Header.tsx`에 "미배치 스토리 N개 제외됨 + 포함 재스캔"
+  배너(옵트인 재스캔 완료 시 `includeUnplacedStories: true`로 전환돼
+  배너가 사라짐 — 무한 재프롬프트 루프 없음, agy가 별도로 재확인).
+  **`mergeScannedParagraphs` 함수는 이번에도 단 한 줄도 안 건드림**
+  (설계 단계에서 이미 "무수정 재사용" 결론이 남, agy가 diff에서
+  116~187번째 줄 무변경을 직접 확인). Word 스캔 결과(`summary`에
+  `unplacedStories` 필드 자체가 없음)에서도 옵셔널 체이닝으로 안전.
+  Claude diff 검토 + agy 병렬 리뷰(결함 0건) + `npm test`(209/209)·
+  `npx vitest run`(**433/433**) 독립 재검증 후 커밋.
+- **T3b 완료로 트랙 C의 T3(문서 전체 스캔) 전체가 끝났다.** Word
+  (T3a)/InDesign(T3b) 둘 다 "전체 문서 스캔 → 비파괴적 병합 →
+  XLIFF 내보내기"가 이론상 end-to-end로 동작한다. **단, 이 PC에
+  Word/InDesign이 없어 전부 목 기반 자동 테스트로만 검증됐다** — 실제
+  라이브 검증은 여전히 안 됨(Word는 이전 세션들처럼 사용자가 실사용
+  중 확인하는 방식, InDesign은 사용자 방침상 "실사용 중 발견 시
+  대응"으로 대체, 둘 다 백로그에 올리지 않음).
+- **다음 세션이 참고할 것 — 사용자가 "차례대로 진행해줘"로 지시한
+  나머지 순서**: T5(XLIFF import/merge, 순수 대시보드 로직이라
+  Word/InDesign 무관하게 바로 착수 가능) → T4(태그 보존 XLIFF) →
+  T6(새 번역 문서 생성) → 문장 단위 CAT 정합성 Phase 0(데이터 계약
+  스파이크, SDLTM 샘플 `SD.sdltm` 이미 프로젝트 루트에 있음) →
+  Kiwi 스파이크 Step 2 VM 상태 확인. 이 세션이 끝나기 전에 어디까지
+  갔는지는 이 문서의 이후 절(있다면)을 확인할 것.
+
+---
+
+## 이전 세션 완료(9차 후속) — 트랙 C T3a-2: 대시보드 병합 로직 + UI (T3a 완료)
 
 **커밋 3개(`d9d697e` 설계 자문+재조율 문서, `9cc657d` 구현 지시서,
 `74cc5d9` 구현+후속 수정 — 아직 원격 push 안 함, 로컬이 원격보다
