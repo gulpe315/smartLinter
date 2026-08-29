@@ -1,9 +1,51 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐ 마지막 업데이트: 2026-08-29 트랙 A(QA 카드 Mode A) 세션. 아래 이 절을 먼저
-읽을 것.**
+**⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 B Stage A(TM 자동 치환
+관찰 스파이크) 착수·완료. 아래 이 절을 먼저 읽을 것.**
 
-## 이번 세션 완료 — 트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용) 착수·완료
+## 이번 세션 완료(후속) — 트랙 B Stage A: TM 자동 치환 관찰 스파이크
+
+**커밋 2개(`9bd818f` 설계 자문 문서, `16e95ab` 구현 — 아직 원격 push 안 함,
+로컬이 원격보다 12개 커밋 앞섬).** 트랙 A 완료 직후 사용자가 "진행해줘"로
+바로 이어서 지시. `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
+"1. 자동 치환" 로드맵의 첫 단계(Codex: Stage A/agy: Phase 1A, "문서 변경 없이
+exact TM 후보를 관찰만")를 완료했다.
+
+- **설계**: 두 자문 문서가 쓰인 시점 이후 트랙 A(Stage 1c)가 이미
+  문단 감지마다 문장별 TM 후보(`tmStore.ts`의 `sentenceMatches`)를
+  자동 계산해두는 인프라를 만들어놨다는 걸 발견 — 이를 반영해
+  `DESIGN_REQUEST_TM_AUTO_APPLY_STAGE_A.md`로 범위를 좁혀 재자문. Codex/agy
+  둘 다 "현재 활성 문단만 관찰(문서 전체 스캔은 별도 백로그 `start_batch_scan`
+  선행 필요, 이번 범위 아님)"으로 수렴했으나, "정확 일치·유일" 판정 방법에서
+  갈렸다 — agy는 "topN≥2면 충돌 감지에 안전"이라 했고 Codex는 "topN 절삭이
+  근본적으로 충돌을 놓칠 수 있다"며 topN 무관 전수조회 `searchExactAll` 신설을
+  주장. **Claude가 직접 코드(`tmMatcher.ts`의 exact fast-path)를 읽어 Codex
+  주장이 사실임을 검증**한 뒤 agy에게 재조율 요청 → agy가 자기 코드로도
+  재확인하고 자신의 원안을 전격 철회, Codex 안 채택. 최종 스펙은
+  `RECONCILED_TM_AUTO_APPLY_STAGE_A.md`.
+- **구현**: Codex 1차 구현에서 이번엔 요구한 테스트가 전부 포함돼 있었다
+  (트랙 A 피드백이 반영된 것으로 보임). 다만 Claude diff 검토에서 결함 1건
+  발견 — `TMMatchPanel.tsx` footer의 기존 "후보: N건" 표시를 새 관찰 요약으로
+  **대체**해버려서(추가가 아니라 교체) 정보가 사라짐, 이걸 잡아줄 기존
+  테스트가 없어서 전체 테스트는 통과한 채 넘어갔었다. 후속 지시로 복원.
+  agy 독립 코드 리뷰에서 사소한 방어 코드 미비 1건(`getOrigin`의 `tuId`
+  undefined 동등성 비교) 추가 발견 → 재수정. **이번에도 Claude가 직접
+  고치지 않고 매번 Codex에게 되돌려 수정시켰다**(사용자가 트랙 A에서 명시한
+  "너 혼자 하려고 말고 더욱 요청 자문해서 함께 해결해" 원칙 유지,
+  `consult-agy-codex-when-stuck` 메모리 참고).
+- **검증**: Claude가 매 라운드 `npm test`(197/197)·`npx vitest run`(최종
+  353/353)·`npm run build` 독립 재실행.
+- **범위 확정 사항(다음 세션이 트랙 B를 이어갈 때 참고)**: 이번 Stage A는
+  순수 관찰이라 `qaStore.ts`/`rollback_guard.ts`/`stale_conflict_resolver.ts`
+  /에디터 플러그인/Rust를 전혀 안 건드렸다. Stage B(수동 일괄 적용, 실제
+  문서 변경 시작)부터는 이 경로들을 건드리게 되므로 그때 다시 별도 설계
+  자문부터 시작할 것 — `RECONCILED_TM_AUTO_APPLY_STAGE_A.md` §5의
+  `TmAutoApplyPlan`/`TmAutoApplyObservation` 타입이 Stage B의 실행 페이로드로
+  그대로 재사용되도록 이미 설계돼 있다.
+
+---
+
+## 이전 세션 완료 — 트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용) 착수·완료
 
 **커밋 2개(`923d62d` 설계 자문 문서, `5543aca` 구현 — 둘 다 아직 원격 push 안 함):**
 지난 세션이 남긴 "다음 세션 남은 것" 3트랙(A/B/C, 우선순위는 사용자가
@@ -59,15 +101,15 @@
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `5543aca`(Add QA card Mode A:
-   sentence one-click unified apply)인지 확인.** 아니면 그 이후 커밋을
-   먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이 원격보다 9개
-   커밋 앞섬(`8e567d8`~`5543aca`) — 전부 push 안 함, 사용자가 "로컬 커밋만
+1. **`git log --oneline -1`로 최신 커밋이 `16e95ab`(Add TM auto-apply Stage A:
+   exact-match observation spike)인지 확인.** 아니면 그 이후 커밋을
+   먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이 원격보다 12개
+   커밋 앞섬(`8e567d8`~`16e95ab`) — 전부 push 안 함, 사용자가 "로컬 커밋만
    계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고 명시적으로 정함
    (다음 세션에서도 매번 push 여부를 다시 묻지 말 것, 사용자가 먼저 요청할
    때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(30 files / **345**/345),
+   확인: `npm test`(197/197), `npx vitest run`(31 files / **353**/353),
    `npm run build`(성공). `cargo test --release`는 **107/109**가 정상 —
    실패하는 1건(`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은
    라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.**
@@ -265,16 +307,25 @@ SENTENCE_UNIT_CAT_PARITY.md` 로드맵)의 다음 단계 이름이었다. 이번
 
 ## 다음 세션 남은 것
 
-사용자가 "위 ABC 차례대로 진행"으로 순서를 확정했다. **트랙 A는 완료됨
-(`923d62d`/`5543aca`, 위 세션 요약 참고) — 다음 세션은 트랙 B부터 시작.**
+사용자가 "위 ABC 차례대로 진행"으로 순서를 확정했다. **트랙 A 완료
+(`923d62d`/`5543aca`). 트랙 B는 Stage A만 완료(`9bd818f`/`16e95ab`) — 다음
+세션은 트랙 B의 Stage B(수동 일괄 적용)부터 시작.**
 
 - ~~트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)~~ — **완료.**
-- **트랙 B(다음 세션 시작점): TM 자동 치환** — `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
-  "1. 자동 치환" 절의 단계별 권고(A. 관찰 스파이크 → B. 수동 일괄 적용 → C. 세션
-  로그·되돌리기 → D. 명시적 자동 모드 → E. 문단 이탈 자동화)를 그대로 따를 것. 트랙 A와
-  마찬가지로 **착수 전 설계 자문(Codex/agy) → 재조율(필요 시) → Codex 구현 → Claude
-  diff 검토+독립 테스트 → agy 독립 리뷰 → 커밋** 순서를 지킬 것. 실시간 키스트로크
-  자동 치환은 **절대 금지**(두 자문 공통).
+- **트랙 B: TM 자동 치환 — Stage A(관찰 스파이크)만 완료, Stage B부터가
+  다음 세션 시작점.** `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
+  "1. 자동 치환" 절의 단계별 권고(A. 관찰 스파이크[완료] → B. 수동 일괄 적용
+  → C. 세션 로그·되돌리기 → D. 명시적 자동 모드 → E. 문단 이탈 자동화)를
+  그대로 따를 것. **Stage B부터는 실제로 문서를 바꾸므로**(Stage A는 순수
+  관찰이라 `qaStore.ts`/`rollback_guard.ts`/에디터 플러그인을 전혀 안
+  건드렸음) 착수 전 **반드시 새 설계 자문(Codex/agy)부터 다시 시작할 것** —
+  `RECONCILED_TM_AUTO_APPLY_STAGE_A.md` §5의 `TmAutoApplyPlan`을 그대로
+  재사용할 수 있지만, 실행 트랜잭션(hash 검증/pending command/rollback
+  경로 재사용 여부)은 트랙 A의 `acceptSentenceGroup`이 거쳤던 것과 같은
+  수준의 검토가 필요하다. 순서는 트랙 A/트랙 B Stage A와 동일하게
+  **설계 자문 → 재조율(필요 시) → Codex 구현 → Claude diff 검토+독립 테스트
+  → agy 독립 리뷰 → 커밋**을 지킬 것. 실시간 키스트로크 자동 치환은
+  **절대 금지**(두 자문 공통).
 - **트랙 C: [번역 모드]+XLIFF** — 같은 문서 "2. 번역 모드와 XLIFF" 절의 T0~T7 단계.
   T0(요구사항 고정: sidecar vs 새 문서 생성 vs bilingual 편집 중 확정)부터 시작할 것.
   XLIFF는 항상 사이드카로, 에디터 원본 문서에 직접 쓰는 방식(T7)은 최후순위·기본
@@ -283,7 +334,7 @@ SENTENCE_UNIT_CAT_PARITY.md` 로드맵)의 다음 단계 이름이었다. 이번
   다뤄짐 — 별도로 먼저 착수할 필요 없음.
 - **원격 push는 사용자가 전체 작업 마무리를 선언할 때만** — 매 세션/커밋마다 다시 묻지
   말 것(사용자가 명시적으로 확정, `smartlinter-defer-remote-push` 메모리 참고). 지금
-  로컬이 원격보다 9개 커밋 앞서 있음(트랙 A 커밋 2개 추가).
+  로컬이 원격보다 12개 커밋 앞서 있음.
 
 ## 새 PC 이관 (2026-08-29) — 다른 PC에서 이어받을 때 반드시 읽을 것
 
