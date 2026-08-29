@@ -1,9 +1,57 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 B Stage A(TM 자동 치환
-관찰 스파이크) 착수·완료. 아래 이 절을 먼저 읽을 것.**
+**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 B Stage B(TM 자동 치환
+수동 일괄 적용) 착수·완료. 아래 이 절을 먼저 읽을 것.**
 
-## 이번 세션 완료(후속) — 트랙 B Stage A: TM 자동 치환 관찰 스파이크
+## 이번 세션 완료(3차 후속) — 트랙 B Stage B: TM 자동 치환 수동 일괄 적용
+
+**커밋 2개(`541dcfb` 설계 자문 문서, `0f3cae3` 구현 — 아직 원격 push 안 함,
+로컬이 원격보다 15개 커밋 앞섬).** Stage A 완료 직후 사용자가 "계속 진행"
+으로 바로 이어서 지시. Stage A가 계산해둔 현재 활성 문단의 `TmAutoApplyPlan`
+을 실제로 실행하는 단계 — "이 문단 TM 일괄 적용" 버튼 한 번으로 `eligible`
+문장 전부를 문서에 반영한다(문서를 처음 바꾸는 단계, 이전 Stage A는 순수
+관찰이었음).
+
+- **설계**: `DESIGN_REQUEST_TM_AUTO_APPLY_STAGE_B.md`로 자문 — 핵심 질문은
+  "N개 문장을 순차로 각각 적용" vs "하나의 원자적 다중 hunk 트랜잭션으로
+  한 번에 적용". **Codex와 agy가 5개 질문 전부에서 처음부터 완전히
+  수렴**했다(재조율 라운드 불필요, 이번 세션 3번의 설계 자문 중 처음으로
+  이견 없이 한 번에 끝남): 순차 적용은 첫 항목 적용이 문단 길이를 바꿔
+  나머지 항목의 Stage A 오프셋이 틀어지는 문제가 있어 기각, 트랙 A
+  Mode A와 같은 원칙(baseline 재검증 → overlap 검사 → 문장별 최소 diff →
+  문단 오프셋 승격 → 이중 검증 → 단일 명령)의 TM 전용 planner를 새로
+  만들기로 확정. 실패 시 all-or-nothing, 모달 없이 버튼 즉시 실행,
+  Stage C(영속 되돌리기)는 범위 밖이되 toast+`lastAppliedBatchResult`
+  수준의 최소 안전망은 포함, 성공 후 텔레메트리로 Stage B가 자동
+  재호출되지 않게 함 — 전부 합의. 최종 스펙은
+  `RECONCILED_TM_AUTO_APPLY_STAGE_B.md`.
+- **구현**: Codex 1차 구현은 핵심 로직(라이브 스냅샷 재검증, overlap
+  검사, 이중 hunk 검증, all-or-nothing)이 코드 읽기로 확인한 결과 정확
+  했으나 요청한 store 레벨 실패 경로 테스트 7개 중 3개(planner 실패
+  연동/host FAILED·STALE_REJECTED/dispatch 예외)가 빠져 있어 1차 후속으로
+  추가시킴. agy 독립 코드 리뷰에서 결함 3건 추가 발견 — Medium 1건(단일
+  문장 문단에서 일괄 적용 성공해도 `state.candidates`가 안 바뀌어 "적용됨"
+  표시가 안 뜸, 이건 **Claude 자신도 diff 검토 중 같은 지점을 의심했었고
+  agy가 독립적으로 재확인**), Low 2건(문단 전환 시 이전 배치 완료 메시지
+  잔존, 배치 진행 중 개별 카드 적용이 안 막힘) → 2차 후속으로 수정. 이번
+  라운드에도 **Claude가 직접 고치지 않고 매번 Codex에게 되돌려 수정**했다.
+- **참고(재현 실패 아님)**: 1차 후속 검증 중 `tmMatcher.test.ts`의 "10,000
+  TU 벤치마크 <50ms" 성능 테스트가 1회 51.8ms로 실패했으나, 이 세션이
+  Codex/agy 백그라운드 프로세스를 다수 동시 실행하던 중이라 시스템 부하로
+  인한 타이밍 플레이크로 판단(해당 라운드는 `tmMatcher.ts`를 건드리지도
+  않았음, 격리 실행·전체 재실행 둘 다 즉시 통과 확인) — 코드 회귀 아님.
+- **검증**: Claude가 매 라운드 `npm test`(197/197)·`npx vitest run`(최종
+  366/366)·`npm run build` 독립 재실행.
+- **다음 세션이 참고할 것**: Stage B까지 완료로 Codex 로드맵의 "우선순위
+  A와 B만으로도 상당한 사용성 가치" 지점에 도달했다. 다음은 Stage C(세션
+  로그·개별/일괄 되돌리기 UI) 또는 트랙 C(번역 모드+XLIFF) 착수 — 어느 쪽을
+  먼저 할지는 사용자가 정할 것(자동 결정 금지 원칙 유지). Stage D(명시적
+  자동 모드)/E(문단 이탈 자동화)는 라이브 Word/InDesign 검증 전엔 출시하지
+  않는 게 맞다는 게 원 설계 자문의 결론.
+
+---
+
+## 이전 세션 완료(2차 후속) — 트랙 B Stage A: TM 자동 치환 관찰 스파이크
 
 **커밋 2개(`9bd818f` 설계 자문 문서, `16e95ab` 구현 — 아직 원격 push 안 함,
 로컬이 원격보다 12개 커밋 앞섬).** 트랙 A 완료 직후 사용자가 "진행해줘"로
@@ -101,16 +149,19 @@ exact TM 후보를 관찰만")를 완료했다.
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `16e95ab`(Add TM auto-apply Stage A:
-   exact-match observation spike)인지 확인.** 아니면 그 이후 커밋을
-   먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이 원격보다 12개
-   커밋 앞섬(`8e567d8`~`16e95ab`) — 전부 push 안 함, 사용자가 "로컬 커밋만
-   계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고 명시적으로 정함
-   (다음 세션에서도 매번 push 여부를 다시 묻지 말 것, 사용자가 먼저 요청할
-   때만 push).**
+1. **`git log --oneline -1`로 최신 커밋이 `0f3cae3`(Add TM auto-apply Stage B:
+   manual batch apply for the current paragraph)인지 확인.** 아니면 그
+   이후 커밋을 먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이
+   원격보다 15개 커밋 앞섬(`8e567d8`~`0f3cae3`) — 전부 push 안 함, 사용자가
+   "로컬 커밋만 계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고
+   명시적으로 정함(다음 세션에서도 매번 push 여부를 다시 묻지 말 것,
+   사용자가 먼저 요청할 때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(31 files / **353**/353),
-   `npm run build`(성공). `cargo test --release`는 **107/109**가 정상 —
+   확인: `npm test`(197/197), `npx vitest run`(32 files / **366**/366 —
+   `tmMatcher.test.ts`의 "10,000 TU 벤치마크 <50ms" 벤치마크 테스트는
+   시스템 부하 시 타이밍 플레이크가 날 수 있음, 재현 안 되면 무시하고
+   재실행할 것, 코드 무관), `npm run build`(성공). `cargo test --release`는
+   **107/109**가 정상 —
    실패하는 1건(`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은
    라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.**
    (참고1: `Windows Credential Manager` roundtrip 테스트가 다른 무거운
@@ -308,24 +359,21 @@ SENTENCE_UNIT_CAT_PARITY.md` 로드맵)의 다음 단계 이름이었다. 이번
 ## 다음 세션 남은 것
 
 사용자가 "위 ABC 차례대로 진행"으로 순서를 확정했다. **트랙 A 완료
-(`923d62d`/`5543aca`). 트랙 B는 Stage A만 완료(`9bd818f`/`16e95ab`) — 다음
-세션은 트랙 B의 Stage B(수동 일괄 적용)부터 시작.**
+(`923d62d`/`5543aca`). 트랙 B는 Stage A(`9bd818f`/`16e95ab`)와 Stage
+B(`541dcfb`/`0f3cae3`)까지 완료** — Codex 로드맵 기준 "A와 B만으로도 상당한
+사용성 가치" 지점에 도달했다.
 
 - ~~트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)~~ — **완료.**
-- **트랙 B: TM 자동 치환 — Stage A(관찰 스파이크)만 완료, Stage B부터가
-  다음 세션 시작점.** `CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md`
-  "1. 자동 치환" 절의 단계별 권고(A. 관찰 스파이크[완료] → B. 수동 일괄 적용
-  → C. 세션 로그·되돌리기 → D. 명시적 자동 모드 → E. 문단 이탈 자동화)를
-  그대로 따를 것. **Stage B부터는 실제로 문서를 바꾸므로**(Stage A는 순수
-  관찰이라 `qaStore.ts`/`rollback_guard.ts`/에디터 플러그인을 전혀 안
-  건드렸음) 착수 전 **반드시 새 설계 자문(Codex/agy)부터 다시 시작할 것** —
-  `RECONCILED_TM_AUTO_APPLY_STAGE_A.md` §5의 `TmAutoApplyPlan`을 그대로
-  재사용할 수 있지만, 실행 트랜잭션(hash 검증/pending command/rollback
-  경로 재사용 여부)은 트랙 A의 `acceptSentenceGroup`이 거쳤던 것과 같은
-  수준의 검토가 필요하다. 순서는 트랙 A/트랙 B Stage A와 동일하게
-  **설계 자문 → 재조율(필요 시) → Codex 구현 → Claude diff 검토+독립 테스트
-  → agy 독립 리뷰 → 커밋**을 지킬 것. 실시간 키스트로크 자동 치환은
-  **절대 금지**(두 자문 공통).
+- **트랙 B: TM 자동 치환 — Stage A/B 완료.** 다음 세션 시작 시 **Stage
+  C(세션 로그·개별/일괄 되돌리기 UI) 또는 트랙 C(번역 모드+XLIFF) 중
+  어느 쪽을 먼저 할지 사용자에게 물어볼 것**(자동 결정 금지 원칙 유지 —
+  세 트랙째 이 원칙을 지켜왔고 매번 효과가 있었다). Stage C를 하게 되면
+  `RECONCILED_TM_AUTO_APPLY_STAGE_B.md`의 `lastAppliedBatchResult`/
+  `applyAutoApplyPlan`이 이미 영속 로그의 원장 후보로 쓰일 수 있게
+  설계돼 있다. Stage D(명시적 자동 모드)/E(문단 이탈 자동화)는 라이브
+  Word/InDesign 검증 전엔 착수하지 않는 게 원 설계 자문의 결론이었다.
+  실시간 키스트로크 자동 치환은 **절대 금지**(두 자문 공통, 앞으로도
+  유효).
 - **트랙 C: [번역 모드]+XLIFF** — 같은 문서 "2. 번역 모드와 XLIFF" 절의 T0~T7 단계.
   T0(요구사항 고정: sidecar vs 새 문서 생성 vs bilingual 편집 중 확정)부터 시작할 것.
   XLIFF는 항상 사이드카로, 에디터 원본 문서에 직접 쓰는 방식(T7)은 최후순위·기본
@@ -334,7 +382,7 @@ SENTENCE_UNIT_CAT_PARITY.md` 로드맵)의 다음 단계 이름이었다. 이번
   다뤄짐 — 별도로 먼저 착수할 필요 없음.
 - **원격 push는 사용자가 전체 작업 마무리를 선언할 때만** — 매 세션/커밋마다 다시 묻지
   말 것(사용자가 명시적으로 확정, `smartlinter-defer-remote-push` 메모리 참고). 지금
-  로컬이 원격보다 12개 커밋 앞서 있음.
+  로컬이 원격보다 15개 커밋 앞서 있음.
 
 ## 새 PC 이관 (2026-08-29) — 다른 PC에서 이어받을 때 반드시 읽을 것
 
