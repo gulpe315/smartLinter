@@ -8,6 +8,23 @@
 /** Supported native editor host platforms */
 export type EditorType = 'Word' | 'InDesign';
 
+/** Inline formatting tokens used to preserve character styles during translation. */
+export type InlineTokenKind = 'bold' | 'italic' | 'underline';
+
+export type InlineToken =
+    | { type: 'text'; value: string }
+    | { type: 'open'; id: string; kind: InlineTokenKind }
+    | { type: 'close'; id: string; kind: InlineTokenKind }
+    | { type: 'placeholder'; id: string; kind: string };
+
+/** Tagged source/target data for one translation segment. */
+export interface TaggedSegmentData {
+    sourceTokens: InlineToken[];
+    targetTokens?: InlineToken[];
+    tagStatus: 'valid' | 'fallback-plain' | 'broken';
+    fallbackReason?: string;
+}
+
 /** Text replacement execution outcomes */
 export type ReplacementStatus = 'SUCCESS' | 'STALE_REJECTED' | 'FAILED' | 'ROLLED_BACK' | 'ROLLBACK_ABORTED';
 
@@ -205,6 +222,30 @@ export type BridgeMessage =
 
 export function isEditorType(val: unknown): val is EditorType {
     return val === 'Word' || val === 'InDesign';
+}
+
+export function isInlineTokenKind(val: unknown): val is InlineTokenKind {
+    return val === 'bold' || val === 'italic' || val === 'underline';
+}
+
+export function isInlineToken(val: unknown): val is InlineToken {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    if (obj.type === 'text') return typeof obj.value === 'string';
+    if (obj.type === 'open' || obj.type === 'close') {
+        return typeof obj.id === 'string' && isInlineTokenKind(obj.kind);
+    }
+    return obj.type === 'placeholder' && typeof obj.id === 'string' && typeof obj.kind === 'string';
+}
+
+export function isTaggedSegmentData(val: unknown): val is TaggedSegmentData {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return Array.isArray(obj.sourceTokens)
+        && obj.sourceTokens.every(isInlineToken)
+        && (obj.targetTokens === undefined || (Array.isArray(obj.targetTokens) && obj.targetTokens.every(isInlineToken)))
+        && (obj.tagStatus === 'valid' || obj.tagStatus === 'fallback-plain' || obj.tagStatus === 'broken')
+        && (obj.fallbackReason === undefined || typeof obj.fallbackReason === 'string');
 }
 
 export function isReplacementStatus(val: unknown): val is ReplacementStatus {
