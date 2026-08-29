@@ -28,18 +28,24 @@ export interface QACardListProps {
   className?: string;
 }
 
-type ActiveCardGroup = { paragraphId: string; segmentIndex: number; excerpt: string; cards: QACardData[] } | { card: QACardData };
+type SentenceCardGroup = { paragraphId: string; segmentIndex: number; excerpt: string; cards: QACardData[] };
+type ActiveCardGroup = SentenceCardGroup | { card: QACardData };
 
 const groupActiveCards = (cards: QACardData[]): ActiveCardGroup[] => {
   const groups: ActiveCardGroup[] = [];
+  const groupsBySentence = new Map<string, SentenceCardGroup>();
   for (const card of cards) {
     if (card.segmentIndex === undefined) { groups.push({ card }); continue; }
-    const previous = groups.at(-1);
-    if (previous && 'cards' in previous && previous.paragraphId === card.paragraphId && previous.segmentIndex === card.segmentIndex) {
-      previous.cards.push(card); continue;
+    const key = `${card.paragraphId}\u0000${card.segmentIndex}`;
+    const existingGroup = groupsBySentence.get(key);
+    if (existingGroup) {
+      existingGroup.cards.push(card);
+      continue;
     }
     const text = splitIntoSentences(card.paragraphText)[card.segmentIndex]?.text ?? '';
-    groups.push({ paragraphId: card.paragraphId, segmentIndex: card.segmentIndex, excerpt: text.length > 120 ? `${text.slice(0, 117)}...` : text, cards: [card] });
+    const group = { paragraphId: card.paragraphId, segmentIndex: card.segmentIndex, excerpt: text.length > 120 ? `${text.slice(0, 117)}...` : text, cards: [card] };
+    groupsBySentence.set(key, group);
+    groups.push(group);
   }
   return groups;
 };
@@ -53,6 +59,7 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
     markCardObsolete,
     acceptCard,
     acceptMatchingCards,
+    acceptSentenceGroup,
     dismissAll,
     getFilteredCards,
     getCardCountBySeverity,
@@ -68,6 +75,8 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
   const [view, setView] = useState<'active' | 'history'>('active');
   const [locateFailureNotice, setLocateFailureNotice] = useState<string | null>(null);
   const [lastLocatedCardId, setLastLocatedCardId] = useState<string | null>(null);
+  const [applyingSentenceGroups, setApplyingSentenceGroups] = useState<Set<string>>(() => new Set());
+  const [sentenceGroupErrors, setSentenceGroupErrors] = useState<Map<string, string>>(() => new Map());
   const cardRefs = useRef(new Map<string, HTMLDivElement>());
   const liveValidationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -75,6 +84,35 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
 
   const filteredCards = getFilteredCards();
   const activeCardGroups = useMemo(() => groupActiveCards(filteredCards), [filteredCards]);
+  const eligibleSentenceCardIds = useMemo(() => new Set(
+    cards.filter((card) => card.status === 'pending'
+      && card.validationState !== 'restoring'
+      && card.isStale !== true
+      && card.isLocked !== true
+      && card.segmentIndex !== undefined).map((card) => card.id),
+  ), [cards]);
+
+  const applySentenceGroup = async (paragraphId: string, segmentIndex: number) => {
+    const key = `${paragraphId}-${segmentIndex}`;
+    setApplyingSentenceGroups((current) => new Set(current).add(key));
+    setSentenceGroupErrors((current) => {
+      const next = new Map(current);
+      next.delete(key);
+      return next;
+    });
+    const result = await acceptSentenceGroup(paragraphId, segmentIndex);
+    if (!result || result.status !== 'SUCCESS') {
+      const message = useQaStore.getState().cards
+        .find((card) => card.paragraphId === paragraphId && card.segmentIndex === segmentIndex)?.errorMessage
+        || result?.message || '문장 전체 적용에 실패했습니다.';
+      setSentenceGroupErrors((current) => new Map(current).set(key, message));
+    }
+    setApplyingSentenceGroups((current) => {
+      const next = new Set(current);
+      next.delete(key);
+      return next;
+    });
+  };
   const focusedCardIds = useMemo(
     () => new Set(
       filteredCards
@@ -293,8 +331,25 @@ export const QACardList: React.FC<QACardListProps> = ({ className = '' }) => {
             {activeCardGroups.map((group) => 'cards' in group ? (
               <section key={`${group.paragraphId}-${group.segmentIndex}-${group.cards[0].id}`} className="space-y-2">
                 <div data-testid={`qa-sentence-group-${group.paragraphId}-${group.segmentIndex}`} className="px-2 py-1 border-l-2 border-indigo-700/70 text-[10px] text-slate-400 bg-slate-900/50 rounded-r">
+                  {(() => {
+                    const groupKey = `${group.paragraphId}-${group.segmentIndex}`;
+                    const allEligibleIds = new Set(cards.filter((card) => card.paragraphId === group.paragraphId && card.segmentIndex === group.segmentIndex && eligibleSentenceCardIds.has(card.id)).map((card) => card.id));
+                    if (allEligibleIds.size < 2) return null;
+                    const visibleEligibleIds = group.cards.filter((card) => eligibleSentenceCardIds.has(card.id));
+                    const isFilterComplete = visibleEligibleIds.length === allEligibleIds.size;
+                    const isApplying = applyingSentenceGroups.has(groupKey) || group.cards.some((card) => card.status === 'applying');
+                    return <button
+                      type="button"
+                      data-testid={`qa-accept-sentence-group-btn-${group.paragraphId}-${group.segmentIndex}`}
+                      disabled={!isFilterComplete || isApplying}
+                      title={!isFilterComplete ? '필터를 해제하면 문장 전체 적용을 사용할 수 있습니다.' : undefined}
+                      onClick={() => void applySentenceGroup(group.paragraphId, group.segmentIndex)}
+                      className="mr-2 px-2 py-0.5 rounded border border-indigo-700/70 text-indigo-200 hover:bg-indigo-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >{isApplying ? '적용 중…' : `문장 전체 적용 (${allEligibleIds.size}건)`}</button>;
+                  })()}
                   <span className="font-semibold text-indigo-300">문장 {group.segmentIndex + 1}</span>{group.excerpt && <span className="ml-1.5 font-mono">{group.excerpt}</span>}
                 </div>
+                {sentenceGroupErrors.get(`${group.paragraphId}-${group.segmentIndex}`) && <div role="alert" className="px-2 text-[10px] text-rose-300">{sentenceGroupErrors.get(`${group.paragraphId}-${group.segmentIndex}`)}</div>}
                 <div className="space-y-3">{group.cards.map((card) => (
                   <div key={card.id} ref={(element) => { if (element) cardRefs.current.set(card.id, element); else cardRefs.current.delete(card.id); }} className="animate-in fade-in slide-in-from-top-2 duration-300 fill-mode-forwards">
                     <QACardItem card={card} isFocused={focusedCardIds.has(card.id)} onAccept={(id) => acceptCard(id, undefined, { autoResolveStale: true })} onAcceptMatching={(id) => acceptMatchingCards(id)} onDismiss={(id) => dismissCard(id)} onMarkObsolete={(id) => markCardObsolete(id)} onLocateFailure={setLocateFailureNotice} onLocateStart={() => setLastLocatedCardId(card.id)} />

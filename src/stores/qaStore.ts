@@ -16,6 +16,7 @@ import {
   extractDiffHunks,
   sortHunksReverse,
 } from '../../shared/engine/diff_engine.ts';
+import { planSentenceGroupReplacement } from '../utils/sentenceReplacement.ts';
 import { computeParagraphHash } from '../../shared/engine/hash_util.ts';
 import {
   type AcceptedCorrectionPromptItem,
@@ -54,8 +55,12 @@ export interface AcceptCardOptions {
 
 export interface PendingCommand {
   cardId: string;
+  /** All cards affected by an atomic sentence command (Mode A only). */
+  cardIds?: string[];
   paragraphId: string;
   baseHash: string;
+  /** Bound to the command at dispatch time; callers cannot override it later. */
+  autoResolveStale: boolean;
 }
 
 interface QaRestoreContext {
@@ -202,6 +207,7 @@ export interface QAState {
     succeeded: string[];
     failed: Array<{ cardId: string; reason: string }>;
   }>;
+  acceptSentenceGroup: (paragraphId: string, segmentIndex: number, service?: IBridgeService) => Promise<ReplacementResult | null>;
   processReplacementResult: (result: ReplacementResult, service?: IBridgeService, options?: AcceptCardOptions) => Promise<boolean>;
   retryCard: (cardId: string) => void;
   removeCard: (cardId: string) => void;
@@ -537,6 +543,7 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
           cardId,
           paragraphId: card.paragraphId,
           baseHash,
+          autoResolveStale: options?.autoResolveStale ?? false,
         });
         return { pendingCommands };
       });
@@ -651,7 +658,113 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
     return { succeeded, failed };
   },
 
-  processReplacementResult: async (result, service, options) => {
+  acceptSentenceGroup: async (paragraphId, segmentIndex, service) => {
+    const cards = get().cards.filter((card) =>
+      card.paragraphId === paragraphId
+        && card.segmentIndex === segmentIndex
+        && card.status === 'pending'
+        && card.validationState !== 'restoring'
+        && card.isStale !== true
+        && card.isLocked !== true
+    );
+    if (cards.length === 0) return null;
+    if (cards.length === 1) return get().acceptCard(cards[0].id, service, { autoResolveStale: false });
+
+    const failGroup = (message: string) => {
+      const cardIds = new Set(cards.map((card) => card.id));
+      set((state) => ({
+        cards: state.cards.map((card) => cardIds.has(card.id)
+          ? { ...card, status: 'failed', errorMessage: message }
+          : card),
+      }));
+    };
+    const first = cards[0];
+    if (cards.some((card) =>
+      card.paragraphId !== first.paragraphId
+        || card.paragraphHash !== first.paragraphHash
+        || card.paragraphText !== first.paragraphText
+        || card.segmentIndex !== first.segmentIndex
+    )) {
+      failGroup('문장 그룹 카드의 문단 기준 정보가 서로 일치하지 않습니다.');
+      return null;
+    }
+
+    const plan = planSentenceGroupReplacement(first.paragraphText, segmentIndex, cards);
+    if (!plan.ok) {
+      const message = plan.reason === 'AMBIGUOUS_ORIGINAL_SEGMENT'
+        ? '원본 텍스트가 이 문장에 여러 번 있어 안전한 위치를 판단할 수 없습니다.'
+        : plan.reason === 'OVERLAPPING_ISSUES'
+          ? '일부 수정 항목이 겹쳐 문장 전체를 한 번에 안전하게 적용할 수 없습니다.'
+          : '문장이 예상한 원본과 일치하지 않아 안전하게 적용할 수 없습니다.';
+      failGroup(message);
+      return null;
+    }
+
+    const bridgeService = service || getBridgeService();
+    const baseHash = first.paragraphHash || computeParagraphHash(first.paragraphText);
+    let dispatchedCommandId: string | null = null;
+    try {
+      const snapshots = await bridgeService.getLiveParagraphSnapshots([paragraphId]);
+      const snapshot = snapshots.find((candidate) => candidate.paragraphId === paragraphId);
+      if (snapshot?.status !== 'FOUND' || snapshot.currentHash !== baseHash) {
+        failGroup(snapshot?.status === 'FOUND'
+          ? '문단이 변경되어 있습니다.'
+          : '실시간 문단을 확인할 수 없습니다.');
+        return null;
+      }
+
+      set((state) => ({
+        cards: state.cards.map((card) => cards.some((candidate) => candidate.id === card.id)
+          ? { ...card, status: 'applying', errorMessage: undefined }
+          : card),
+      }));
+      const command: ReplacementCommand = {
+        commandId: `cmd-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        paragraphId,
+        baseHash,
+        expectedHash: computeParagraphHash(plan.expectedFullText),
+        hunks: plan.hunks,
+      };
+      dispatchedCommandId = command.commandId;
+      set((state) => {
+        const pendingCommands = new Map(state.pendingCommands);
+        pendingCommands.set(command.commandId, {
+          cardId: first.id,
+          cardIds: cards.map((card) => card.id),
+          paragraphId,
+          baseHash,
+          autoResolveStale: false,
+        });
+        return { pendingCommands };
+      });
+      const result = await bridgeService.sendReplacementCommand(command);
+      if (result.commandId !== command.commandId && get().pendingCommands.has(command.commandId)) {
+        set((state) => {
+          const pendingCommands = new Map(state.pendingCommands);
+          const pending = pendingCommands.get(command.commandId);
+          if (pending) {
+            pendingCommands.delete(command.commandId);
+            pendingCommands.set(result.commandId, pending);
+          }
+          return { pendingCommands };
+        });
+      }
+      await get().processReplacementResult(result, bridgeService);
+      return result;
+    } catch (err: any) {
+      if (dispatchedCommandId) {
+        set((state) => {
+          const pendingCommands = new Map(state.pendingCommands);
+          pendingCommands.delete(dispatchedCommandId!);
+          return { pendingCommands };
+        });
+      }
+      failGroup('문장 전체 적용 중 예외가 발생했습니다.');
+      return null;
+    }
+  },
+
+  processReplacementResult: async (result, service, _options) => {
     const pendingCommand = get().pendingCommands.get(result.commandId);
     if (!pendingCommand) {
       console.warn('Ignoring replacement result without a pending command:', result.commandId);
@@ -666,14 +779,17 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
       return { pendingCommands };
     });
 
-    const card = get().cards.find((candidate) => candidate.id === pendingCommand.cardId);
-    if (!card) {
+    const cardIds = pendingCommand.cardIds ?? [pendingCommand.cardId];
+    const cards = cardIds
+      .map((cardId) => get().cards.find((candidate) => candidate.id === cardId))
+      .filter((card): card is QACardData => Boolean(card));
+    if (cards.length === 0) {
       console.warn('Ignoring replacement result whose target card is no longer active:', result.commandId);
       return false;
     }
 
     const bridgeService = service || getBridgeService();
-    if (result.status === 'STALE_REJECTED' && options?.autoResolveStale === true) {
+    if (result.status === 'STALE_REJECTED' && pendingCommand.autoResolveStale) {
       await getStaleConflictResolver().resolveStaleConflict({
         cardId: pendingCommand.cardId,
         paragraphId: pendingCommand.paragraphId,
@@ -684,14 +800,16 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
       return true;
     }
 
-    await getRollbackGuard().handleReplacementResult({
-      cardId: pendingCommand.cardId,
-      result,
-      suggestedText: card.suggestedSegment,
-      originalText: card.originalSegment,
-      paragraphId: pendingCommand.paragraphId,
-      service: bridgeService,
-    });
+    for (const card of cards) {
+      await getRollbackGuard().handleReplacementResult({
+        cardId: card.id,
+        result,
+        suggestedText: card.selectedSuggestionSegment ?? card.suggestedSegment,
+        originalText: card.originalSegment,
+        paragraphId: pendingCommand.paragraphId,
+        service: bridgeService,
+      });
+    }
     return true;
   },
 

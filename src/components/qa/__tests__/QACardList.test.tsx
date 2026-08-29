@@ -118,6 +118,26 @@ describe('QACardList Component', () => {
     expect(screen.queryByTestId('qa-sentence-group-paragraph-grouped-undefined')).not.toBeInTheDocument();
   });
 
+  it('keeps separated cards for the same sentence in one group with a sentence apply action', () => {
+    const shared = {
+      paragraphId: 'paragraph-separated-group', paragraphHash: 'separated-hash',
+      paragraphText: 'First sentence. Second sentence.', category: 'Grammar',
+      suggestedSegment: 'fixed', reason: 'Fix', severity: 'LOW' as const,
+    };
+    // addCard prepends, yielding segment 0, segment 1, segment 0 in render order.
+    useQaStore.getState().addCard({ ...shared, id: 'segment-zero-later', originalSegment: 'sentence', segmentIndex: 0 });
+    useQaStore.getState().addCard({ ...shared, id: 'segment-one-between', originalSegment: 'Second', segmentIndex: 1 });
+    useQaStore.getState().addCard({ ...shared, id: 'segment-zero-first', originalSegment: 'First', segmentIndex: 0 });
+
+    render(<QACardList />);
+
+    const firstGroup = screen.getByTestId('qa-sentence-group-paragraph-separated-group-0').parentElement!;
+    expect(within(firstGroup).getByTestId('qa-card-item-segment-zero-first')).toBeInTheDocument();
+    expect(within(firstGroup).getByTestId('qa-card-item-segment-zero-later')).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^qa-sentence-group-/)).toHaveLength(2);
+    expect(screen.getByTestId('qa-accept-sentence-group-btn-paragraph-separated-group-0')).toHaveTextContent('문장 전체 적용 (2건)');
+  });
+
   it('highlights every rendered card for the active paragraph without changing card order', () => {
     useQaStore.getState().addCard({ id: 'older-other', paragraphId: 'para-other', category: 'Grammar', originalSegment: 'bad', suggestedSegment: 'good', reason: 'Other', severity: 'LOW' });
     useQaStore.getState().addCard({ id: 'focused-two', paragraphId: 'para-focused', category: 'Style', originalSegment: 'very', suggestedSegment: '', reason: 'Wordy', severity: 'LOW' });
@@ -357,5 +377,70 @@ describe('QACardList Component', () => {
     expect(useQaStore.getState().dismissedCards).toEqual([
       expect.objectContaining({ id: 'missing-paragraph-card', status: 'stale_obsolete' }),
     ]);
+  });
+
+  describe('sentence group apply action', () => {
+    const addSentenceCards = (count: number, severity: 'HIGH' | 'MEDIUM' = 'MEDIUM') => {
+      for (let index = 0; index < count; index += 1) {
+        useQaStore.getState().addCard({
+          id: `sentence-action-${severity}-${index}`,
+          paragraphId: 'sentence-action-paragraph',
+          paragraphHash: 'sentence-action-hash',
+          paragraphText: 'First sentence.',
+          segmentIndex: 0,
+          category: 'Grammar',
+          originalSegment: `issue-${severity}-${index}`,
+          suggestedSegment: `fix-${severity}-${index}`,
+          reason: 'Fix',
+          severity,
+        });
+      }
+    };
+
+    it('shows the sentence apply button when at least two cards are eligible', () => {
+      addSentenceCards(2);
+      render(<QACardList />);
+      expect(screen.getByTestId('qa-accept-sentence-group-btn-sentence-action-paragraph-0')).toHaveTextContent('문장 전체 적용 (2건)');
+    });
+
+    it('does not show the sentence apply button when fewer than two cards are eligible', () => {
+      addSentenceCards(1);
+      render(<QACardList />);
+      expect(screen.queryByTestId('qa-accept-sentence-group-btn-sentence-action-paragraph-0')).not.toBeInTheDocument();
+    });
+
+    it('disables the button with guidance when a filter hides pending cards in the group', () => {
+      addSentenceCards(2, 'HIGH');
+      addSentenceCards(1, 'MEDIUM');
+      useQaStore.getState().setSeverityFilter('HIGH');
+      render(<QACardList />);
+
+      const button = screen.getByTestId('qa-accept-sentence-group-btn-sentence-action-paragraph-0');
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', '필터를 해제하면 문장 전체 적용을 사용할 수 있습니다.');
+    });
+
+    it('calls acceptSentenceGroup with the rendered paragraph and segment', async () => {
+      addSentenceCards(2);
+      const acceptSpy = vi.spyOn(useQaStore.getState(), 'acceptSentenceGroup').mockResolvedValue({ commandId: 'group-command', status: 'SUCCESS', currentHash: 'new-hash' });
+      render(<QACardList />);
+
+      fireEvent.click(screen.getByTestId('qa-accept-sentence-group-btn-sentence-action-paragraph-0'));
+      await waitFor(() => expect(acceptSpy).toHaveBeenCalledWith('sentence-action-paragraph', 0));
+    });
+
+    it('shows an applying label and disables the button while group acceptance is pending', async () => {
+      addSentenceCards(2);
+      let resolveAcceptance!: (result: any) => void;
+      vi.spyOn(useQaStore.getState(), 'acceptSentenceGroup').mockImplementation(() => new Promise((resolve) => { resolveAcceptance = resolve; }));
+      render(<QACardList />);
+      const button = screen.getByTestId('qa-accept-sentence-group-btn-sentence-action-paragraph-0');
+
+      fireEvent.click(button);
+      expect(await screen.findByText('적용 중…')).toBeInTheDocument();
+      expect(button).toBeDisabled();
+
+      await act(async () => { resolveAcceptance({ commandId: 'group-command', status: 'SUCCESS', currentHash: 'new-hash' }); });
+    });
   });
 });

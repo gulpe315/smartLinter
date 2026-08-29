@@ -4,6 +4,7 @@ import { useTmStore } from '../tmStore.ts';
 import { useConfigStore } from '../configStore.ts';
 import { useBridgeStore } from '../bridgeStore.ts';
 import { MockBridgeService, setBridgeService } from '../../services/tauriBridge.ts';
+import { getStaleConflictResolver } from '../../services/stale_conflict_resolver.ts';
 import { type QaReport } from '../../../shared/protocol/types.ts';
 
 describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
@@ -893,6 +894,166 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     const card = useQaStore.getState().cards.find((c) => c.id === cardId);
     expect(card?.status).toBe('failed');
     expect(card?.errorMessage).toContain('Paragraph was modified');
+  });
+
+  describe('acceptSentenceGroup', () => {
+    const paragraphText = 'Fix alpha and beta now.';
+    const paragraphId = 'sentence-group-paragraph';
+    const paragraphHash = 'sentence-group-hash';
+    const addGroup = (overrides: Array<Record<string, unknown>> = []) => ['alpha', 'beta'].map((originalSegment, index) =>
+      useQaStore.getState().addCard({
+        id: `sentence-group-${index}`,
+        paragraphId,
+        paragraphHash,
+        paragraphText,
+        segmentIndex: 0,
+        category: 'Grammar',
+        originalSegment,
+        suggestedSegment: index === 0 ? 'ALPHA' : 'BETA',
+        reason: 'Sentence fix',
+        severity: 'MEDIUM',
+        ...overrides[index],
+      }),
+    );
+    const mockLiveHash = () => vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([
+      { paragraphId, status: 'FOUND', currentHash: paragraphHash },
+    ]);
+
+    it('moves every group card to applied history after one successful host command', async () => {
+      const ids = addGroup();
+      mockLiveHash();
+      const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(sendSpy).toHaveBeenCalledOnce();
+      expect(useQaStore.getState().cards).toHaveLength(0);
+      expect(useQaStore.getState().appliedCards.map((card) => card.id)).toEqual(expect.arrayContaining(ids));
+    });
+
+    it.each([
+      ['FAILED', 'failed'],
+      ['ROLLED_BACK', 'rolled_back'],
+      ['ROLLBACK_ABORTED', 'rollback_aborted'],
+    ] as const)('fans out host %s to every group card', async (hostStatus, cardStatus) => {
+      addGroup();
+      mockLiveHash();
+      vi.spyOn(mockBridge, 'sendReplacementCommand').mockImplementation(async (command) => ({
+        commandId: command.commandId, status: hostStatus, currentHash: 'result-hash', message: hostStatus,
+      }));
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(useQaStore.getState().cards).toHaveLength(2);
+      expect(useQaStore.getState().cards.every((card) => card.status === cardStatus)).toBe(true);
+      expect(useQaStore.getState().cards.some((card) => card.status === 'applying')).toBe(false);
+    });
+
+    it('cleans pending commands and fails the whole group when dispatch rejects', async () => {
+      addGroup();
+      mockLiveHash();
+      vi.spyOn(mockBridge, 'sendReplacementCommand').mockRejectedValue(new Error('bridge down'));
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(useQaStore.getState().pendingCommands.size).toBe(0);
+      expect(useQaStore.getState().cards.every((card) => card.status === 'failed')).toBe(true);
+    });
+
+    it('fails the group without dispatch when baseline slices overlap', async () => {
+      addGroup([{ startOffset: 4, endOffset: 9 }, { startOffset: 6, endOffset: 10, originalSegment: 'pha ' }]);
+      const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(sendSpy).not.toHaveBeenCalled();
+      expect(useQaStore.getState().cards.every((card) => card.status === 'failed')).toBe(true);
+    });
+
+    it('fails without dispatch when an offset-free original is ambiguous in its sentence', async () => {
+      const repeatedText = 'word word.';
+      useQaStore.getState().addCard({ id: 'ambiguous-a', paragraphId, paragraphHash, paragraphText: repeatedText, segmentIndex: 0, category: 'Grammar', originalSegment: 'word', suggestedSegment: 'term', reason: 'Fix', severity: 'MEDIUM' });
+      useQaStore.getState().addCard({ id: 'ambiguous-b', paragraphId, paragraphHash, paragraphText: repeatedText, segmentIndex: 0, category: 'Grammar', originalSegment: 'word', suggestedSegment: 'token', reason: 'Fix', severity: 'MEDIUM' });
+      const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(sendSpy).not.toHaveBeenCalled();
+      expect(useQaStore.getState().cards.every((card) => card.status === 'failed')).toBe(true);
+    });
+
+    it('fails without dispatch when a group card has a different paragraph hash', async () => {
+      addGroup([{}, { paragraphHash: 'other-hash' }]);
+      const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(sendSpy).not.toHaveBeenCalled();
+      expect(useQaStore.getState().cards.every((card) => card.status === 'failed')).toBe(true);
+    });
+
+    it('fails without dispatch when the live paragraph hash differs', async () => {
+      addGroup();
+      vi.spyOn(mockBridge, 'getLiveParagraphSnapshots').mockResolvedValue([{ paragraphId, status: 'FOUND', currentHash: 'changed-hash' }]);
+      const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(sendSpy).not.toHaveBeenCalled();
+      expect(useQaStore.getState().cards.every((card) => card.status === 'failed')).toBe(true);
+    });
+
+    it('delegates a one-card group to the existing single-card path', async () => {
+      const id = useQaStore.getState().addCard({ id: 'only-card', paragraphId, paragraphHash, paragraphText, segmentIndex: 0, category: 'Grammar', originalSegment: 'alpha', suggestedSegment: 'ALPHA', reason: 'Fix', severity: 'MEDIUM' });
+      const acceptSpy = vi.spyOn(useQaStore.getState(), 'acceptCard');
+
+      await useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+
+      expect(acceptSpy).toHaveBeenCalledWith(id, mockBridge, { autoResolveStale: false });
+    });
+
+    it('uses dispatch-time stale options and never auto-resolves stale sentence groups', async () => {
+      const resolverSpy = vi.spyOn(getStaleConflictResolver(), 'resolveStaleConflict').mockResolvedValue({ status: 'failed', message: 'stale' } as never);
+      const singleId = useQaStore.getState().addCard({ id: 'stale-single', paragraphId: 'single', paragraphHash: 'single-hash', paragraphText: 'alpha', category: 'Grammar', originalSegment: 'alpha', suggestedSegment: 'ALPHA', reason: 'Fix', severity: 'MEDIUM' });
+      let singleCommand: any;
+      let resolveSingle!: (result: any) => void;
+      vi.spyOn(mockBridge, 'sendReplacementCommand').mockImplementation((command) => {
+        singleCommand = command;
+        return new Promise((resolve) => { resolveSingle = resolve; });
+      });
+      const singleAcceptance = useQaStore.getState().acceptCard(singleId, mockBridge, { autoResolveStale: true });
+      await Promise.resolve();
+      await useQaStore.getState().processReplacementResult({ commandId: singleCommand.commandId, status: 'STALE_REJECTED', currentHash: 'new-hash' }, mockBridge, { autoResolveStale: false });
+      expect(resolverSpy).toHaveBeenCalledOnce();
+      resolveSingle({ commandId: singleCommand.commandId, status: 'STALE_REJECTED', currentHash: 'new-hash' });
+      await singleAcceptance;
+
+      const ids = addGroup();
+      mockLiveHash();
+      let groupCommand: any;
+      let resolveGroup!: (result: any) => void;
+      vi.spyOn(mockBridge, 'sendReplacementCommand').mockImplementation((command) => {
+        groupCommand = command;
+        return new Promise((resolve) => { resolveGroup = resolve; });
+      });
+      const groupAcceptance = useQaStore.getState().acceptSentenceGroup(paragraphId, 0, mockBridge);
+      await Promise.resolve();
+      await Promise.resolve();
+      await useQaStore.getState().processReplacementResult({ commandId: groupCommand.commandId, status: 'STALE_REJECTED', currentHash: 'new-hash' }, mockBridge, { autoResolveStale: true });
+      expect(resolverSpy).toHaveBeenCalledOnce();
+      expect(useQaStore.getState().cards.filter((card) => ids.includes(card.id)).every((card) => card.status === 'failed')).toBe(true);
+      resolveGroup({ commandId: groupCommand.commandId, status: 'STALE_REJECTED', currentHash: 'new-hash' });
+      await groupAcceptance;
+    });
+
+    it('processes remaining cards safely when one group card was dismissed before the result arrives', async () => {
+      const ids = addGroup();
+      useQaStore.setState({ cards: useQaStore.getState().cards.map((card) => ids.includes(card.id) ? { ...card, status: 'applying' } : card), pendingCommands: new Map([['partial-command', { cardId: ids[0], cardIds: ids, paragraphId, baseHash: paragraphHash, autoResolveStale: false }]]) });
+      useQaStore.getState().dismissCard(ids[0]);
+
+      await expect(useQaStore.getState().processReplacementResult({ commandId: 'partial-command', status: 'SUCCESS', currentHash: 'new-hash' }, mockBridge)).resolves.toBe(true);
+      expect(useQaStore.getState().appliedCards).toEqual([expect.objectContaining({ id: ids[1], status: 'applied' })]);
+    });
   });
 
   it('filters cards by severity, category, and search query', () => {
