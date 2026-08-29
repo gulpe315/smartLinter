@@ -1,10 +1,105 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 새 세션(콜드스타트 후속), T2가
-"구현 재량으로 넘어간" 항목 중 코드 변경이 필요한 2건(originalFileName
-연결, sourceLang 선택기)을 마무리 — 아래 이 절을 먼저 읽을 것.**
+**⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 C T3(문서 전체
+스캔) 설계 자문·재조율 완료 + T3a-1(Word 왕복 배선) 구현·리뷰·데드락
+2건 수정까지 완료 — 아래 이 절을 먼저 읽을 것.**
 
-## 이번 세션 완료(7차 후속) — T2 남은 항목 마무리(originalFileName·sourceLang 선택기)
+## 이번 세션 완료(8차 후속) — 트랙 C T3 설계 확정 + T3a-1(Word 문서 전체 스캔 왕복 배선)
+
+**커밋 6개(`8c25de6` T3 설계 자문 문서, `103d428` T3 답변+재조율 요청,
+`568ec44` T3 최종 확정 스펙, `4c0721b` T3a-1 구현 지시서, `2ad6b6f`
+T3a-1 후속 지시서 2건, `352c060` T3a-1 구현 — 아직 원격 push 안 함,
+로컬이 원격보다 44개 커밋 앞섬).** T2 남은 항목 마무리(7차 후속) 직후
+사용자 승인으로 T3(문서 전체 스캔) 착수. T3는 트랙 C에서 처음으로
+에디터 플러그인(`plugins/word/`)과 Rust(`src-tauri/`)를 건드린
+단계였다.
+
+- **설계**: `DESIGN_REQUEST_TRANSLATION_MODE_T3.md`로 자문하며 Claude가
+  사전에 코드를 읽어 확인한 사실관계(Word엔 이미 전체 문서 열거
+  인프라 `queryLiveParagraphSnapshots`가 있지만 InDesign엔 전무, 두
+  호스트의 `paragraphId` 스킴이 근본적으로 다름, `start_batch_scan`은
+  현재 프런트엔드 시뮬레이션뿐)를 명시해 자문 품질을 높였다. 7개
+  질문 중 6개(paragraphId를 위치+해시 합성 ID로 통일, Word 스캔은
+  신규 분리 함수, 비파괴적 병합으로 `targetDraft` 절대 보존, export
+  시점 온디맨드 재검증, Word 선행→InDesign 후속)는 두 자문이 처음부터
+  수렴(특히 paragraphId 포맷은 `word-para-body-<index>-<hash>`를 서로
+  독립적으로 동일하게 제시). InDesign의 오버셋/미배치 스토리 처리만
+  갈려 `RECONCILE_TRANSLATION_MODE_T3.md`로 재조율 → agy가 스스로
+  "오버셋은 포함해야 한다"고 원안을 정정했고, "미배치 스토리"는
+  agy(제외+통지만) vs Codex(제외+통지+사용자 옵트인) 중 Codex 안이
+  agy 안의 상위 호환(같은 기본 동작 + agy 자신이 지적한 "완전 은닉"
+  잔여 위험까지 해소)이라 판단해 Claude가 채택했다. 최종 스펙은
+  `RECONCILED_TRANSLATION_MODE_T3.md`(T3a Word 우선, T3b InDesign
+  후속으로 명확히 분리).
+- **구현 범위를 의도적으로 좁힘**: T3a를 다시 "왕복 배선만"(T3a-1)과
+  "대시보드 병합+UI"(T3a-2, 다음 세션)로 나눠, 이번엔 프로토콜
+  (`shared/protocol/types.ts`)+Rust(세션 매니저/커맨드/WS 핸들러)+Word
+  플러그인(`document_scanner.ts` 신규)만 구현시켰다 — 기존
+  `LIVE_SNAPSHOT_REQUEST`/`RESPONSE` 왕복 패턴을 4계층 전부에서 그대로
+  미러링하도록 정확한 파일/줄 번호까지 지시서에 명시.
+- **1차 구현은 지시서를 정확히 따랐으나 Claude 자신의 독립 검증
+  과정에서 실제 데드락 버그를 발견**: `npm test`/`npx vitest run`/
+  `npm run build`는 1차 구현에서 바로 통과했지만, `cargo test --release`
+  를 Claude가 네이티브로 돌렸더니 **1시간 넘게 멈췄다**(Codex 자신의
+  샌드박스는 60초 실행 제한 때문에 이 라운드에서 전체 완료를 확인 못
+  하고 넘어갔었음). 원인은 신규 `complete_document_scan`이
+  `match self.pending_document_scans.lock().await.remove(...) { ... }`
+  처럼 `match` 스크루티니 안에서 뮤텍스를 잠갔는데, Rust에서 스크루티니의
+  `MutexGuard` 임시값이 **match 블록 전체가 끝날 때까지 살아있어서**,
+  "다른 세션에서 온 응답이라 재삽입해야 하는" 분기 안에서 같은
+  뮤텍스를 또 `lock().await`하려다 자기 자신과 영구 데드락에 걸린
+  것 — 기존(정상 동작하는) `complete_live_snapshot`은 락+`remove`를
+  별도 `let` 문으로 분리해서 이 문제가 애초에 없었는데, 신규 함수가
+  이 분리 단계를 생략해서 생긴 결함이었다. Codex에게 정확한 원인과
+  수정 코드를 담은 후속 지시서를 보내 고치게 했고, 이번엔 Codex가
+  `cargo test --release` 전체(373초, 110/2/1 — 실패 2건은 라이브
+  Ollama 타임아웃 + 이 세션 동시 부하로 인한 Windows Credential
+  Manager 1회성 플레이크, 둘 다 기존에 문서화된 것)를 스스로 끝까지
+  돌려서 확인했다.
+- **agy 독립 리뷰에서 같은 종류의 결함을 하나 더 발견(High, 이번 diff와
+  무관한 기존 코드)**: `complete_locate`(에디터에서 문단 위치 보기용
+  기존 기능)가 정확히 같은 match-스크루티니 데드락 패턴을 그대로 갖고
+  있었다 — 실사용에서 다른 세션의 locate 응답이 도착하면 서버가
+  영구 정지하는 실제 위험. Codex에게 같은 방식으로 고치도록 후속
+  지시서를 보내 수정·회귀 테스트 추가(`locate_ignores_responses_from_another_session`,
+  이번엔 처음부터 1초 타임아웃으로 감시해서 재발 시 즉시 실패하게 함)
+  까지 완료시켰다. Medium 1건(`document_scanner.ts`의 새 `paragraphId`
+  포맷 `word-para-body-<index>-<hash>`이 기존 `locate`/`snapshot`
+  provider의 `word-para-<hash>` 포맷과 안 맞아서, T3a-2에서 스캔 결과로
+  위치 보기/재검증을 호출하면 `NOT_FOUND`가 날 것)은 T3a-2 설계 시
+  반드시 반영할 참고사항으로 기록만 하고 이번엔 안 고쳤다. Low 2건
+  (문서 제목 fallback, 세션 해제 시 취소 회귀 테스트 추가 권장)은
+  선택 사항이라 스킵.
+- **검증**: Claude가 매 라운드 `npm test`(201/201, package.json에
+  신규 `document_scanner.test.ts` 등록 누락도 별도로 발견해 수정시킴)·
+  `npx vitest run`·`npm run build` 독립 재실행. Rust는 이번엔 전체
+  재실행 대신 문제였던 테스트만 정밀 타겟팅해서 가볍게 재확인(예:
+  `cargo test --release document_scan`으로 4개 테스트 10초 내 통과,
+  `cargo test --release locate_ignores_responses_from_another_session`
+  로 0.04초 통과 확인) — 사용자가 "Codex가 막히면 Claude가 직접
+  깊게 파고들지 말고 agy에게 넘기고, 재검증도 전체를 다시 돌리기보다
+  가볍게 좁혀서 할 것"이라고 명시적으로 지적한 뒤로 이 방식으로
+  전환했다(아래 "작업 원칙" 및 `consult-agy-codex-when-stuck` 메모리
+  참고).
+- **이번 세션에 사용자가 명시적으로 재확인한 협업 원칙(중요, 메모리에도
+  반영함)**: ① Codex가 자기 문제(샌드박스 제약 등)로 못 끝내면, 먼저
+  Codex 자신에게 다시 기회를 주는 후속 지시서를 보내고, 그래도 안
+  풀리면 **Claude가 직접 네이티브로 깊게 파고들지 말고 agy에게 진단을
+  넘길 것.** ② 사용자가 요청한 "주기적 중간 점검 보고"(예: 백그라운드
+  작업 실행 중 몇 분 간격 상태 보고)와 "문제 해결을 누가 맡을지"는
+  서로 다른 축이니 혼동하지 말 것 — Claude가 한 번 혼동해서 모니터링
+  자체를 꺼버렸다가 재지적당함.
+- **다음 세션이 참고할 것**: T3a-1(Word 왕복 배선)까지 완료 —
+  대시보드에서 `enumerateDocumentParagraphs()`를 호출하면 실제
+  Word 문서 전체 문단(순서 인덱스 포함)을 받아올 수 있다. **다음은
+  T3a-2(대시보드 `translationSessionStore`의 비파괴적 병합 로직 + UI
+  버튼/진행률/`partial-coverage` 배너)** — `RECONCILED_TRANSLATION_MODE_T3.md`
+  §4~§6에 이미 병합 규칙·stale 모델·UX가 확정돼 있으니 그대로 구현
+  지시하면 된다. InDesign(T3b)은 그 다음 단계.
+
+---
+
+## 이전 세션 완료(7차 후속) — T2 남은 항목 마무리(originalFileName·sourceLang 선택기)
 
 **커밋 2개(`6fb7b5d` FOLLOWUP3 지시서, `095a37b` 구현 — 그 전에 `7657312`
 FOLLOWUP2 지시서도 이번 세션에 커밋함, 전부 아직 원격 push 안 함, 로컬이
@@ -418,22 +513,26 @@ exact TM 후보를 관찰만")를 완료했다.
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `095a37b`(Complete Translation
-   Mode T2 remaining items: sourceLang selector and originalFileName
-   wiring)인지 확인.** 아니면 그 이후 커밋을 먼저 훑을 것. 세션 종료
-   시점 상태: **작업 트리 깨끗, 로컬이 원격보다 36개 커밋 앞섬(가장 오래된
-   `8e567d8`~`095a37b`) — 전부 push 안 함, 사용자가 "로컬 커밋만 계속
-   쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고 명시적으로 정함
-   (다음 세션에서도 매번 push 여부를 다시 묻지 말 것, 사용자가 먼저
-   요청할 때만 push).**
+1. **`git log --oneline -1`로 최신 커밋이 `352c060`(Add Translation Mode
+   T3a-1: Word document scan wire path)인지 확인.** 아니면 그 이후 커밋을
+   먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이 원격보다
+   44개 커밋 앞섬(가장 오래된 `8e567d8`~`352c060`) — 전부 push 안 함,
+   사용자가 "로컬 커밋만 계속 쌓고, 전체 작업이 마무리됐을 때 한 번만
+   push"라고 명시적으로 정함(다음 세션에서도 매번 push 여부를 다시
+   묻지 말 것, 사용자가 먼저 요청할 때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(37 files / **410**/410 —
+   확인: `npm test`(**201/201** — T3a-1로 `document_scanner.test.ts` 4개가
+   추가됨), `npx vitest run`(37 files / **413**/413 —
    `tmMatcher.test.ts`의 "10,000 TU 벤치마크 <50ms" 벤치마크 테스트는
    시스템 부하 시 타이밍 플레이크가 날 수 있음, 재현 안 되면 무시하고
    재실행할 것, 코드 무관), `npm run build`(성공). `cargo test --release`는
-   **107/109**가 정상 —
+   **111/113**이 정상(T3a-1로 `document_scan_*` 4개 + `locate_ignores_responses_from_another_session`
+   1개가 추가됨) —
    실패하는 1건(`test_live_ollama_analyze_paragraph_and_execute_ai_command`)은
-   라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.**
+   라이브 Ollama 타임아웃이라 **코드 회귀가 아니다.** (이번 세션엔
+   동시 부하로 Windows Credential Manager 테스트가 1회 더 실패해서
+   110/113으로 보인 적도 있음 — 참고1 그대로 적용, 재실행하면 보통
+   통과한다.)
    (참고1: `Windows Credential Manager` roundtrip 테스트가 다른 무거운
    프로세스와 동시 실행될 때 1회성으로 실패한 적 있음 — 단독/재실행 시 항상
    통과, 코드 무관한 리소스 경합 플레이크이니 재현되면 그냥 재실행할 것.
@@ -465,6 +564,21 @@ exact TM 후보를 관찰만")를 완료했다.
   확인(파일 1~2개, 로그 한 번) 후 **즉시 Codex와 agy 양쪽에 공유**할 것.
   사용자가 여러 세션에 걸쳐 반복 강조한 사항이다(Codex 샌드박스 고장을
   혼자 다 진단한 사례 — 진단이 맞았어도 절차 위반이었음).
+- **우선순위 순서(2026-08-29 저녁, 몇 번이고 재지적됨): ① 먼저 Codex
+  자신에게 기회를 준다**(자기 문제 — 샌드박스 제약, 검증 미완료 등 —
+  를 후속 지시서로 재시도시킴). **② 그래도 안 풀리면 Claude가 직접
+  네이티브로 깊게 파고들지 말고 agy에게 진단/검증을 넘긴다.** 실제
+  사례: T3a-1에서 Codex가 자기 샌드박스 60초 제한으로 `cargo test
+  --release` 완료를 확인 못 했다고 보고했을 때, Claude가 "그럼 내가
+  대신 네이티브로 돌리겠다"고 나섰다가 실제 데드락에 걸려 1시간 넘게
+  방치됐고, 그 원인을 Claude가 혼자 diff를 깊이 파고들어 찾아냈다 —
+  사용자가 이걸 "네 습성"이라고 지적하며 진단 역할 자체를 agy에게
+  넘겼어야 한다고 정정함. Claude가 직접 오래 걸리는 네이티브 재검증이나
+  깊은 추론에 스스로 뛰어드는 것 자체가 지양 대상이다. **단, 사용자가
+  요청한 진행상황 중간보고(몇 분 간격 상태 알림)는 이 규칙과 별개다**
+  — 문제 해결 주체를 정하는 것과 진행상황을 계속 보여주는 것은 서로
+  다른 축이니 혼동하지 말 것(`consult-agy-codex-when-stuck` 메모리
+  참고).
 - **두 모델이 갈리면 임의로 편들지 말 것.** 상충 자체와 근거를 양쪽에
   똑같이 보여주는 재조율 라운드를 거칠 것. 트랙 A/트랙 B Stage A 양쪽에서
   실제로 효과를 봤다 — Codex가 스스로 판정을 뒤집은 적도, agy가 자기
@@ -505,40 +619,50 @@ exact TM 후보를 관찰만")를 완료했다.
 
 ## 다음 세션 남은 것
 
-**트랙 A 완료(`923d62d`/`5543aca`). 트랙 B는 Stage A/B/C 전부 완료**
-— 사용자가 정한 범위(Stage D/E 제외) 내에서 완결됐다. **트랙 C(번역
-모드+XLIFF)는 T0(`9b755d7`)/T1(`3ee4d99`/`e1590ea`/`c98ac52`)/
-T2(`12c97be`/`47e1fa7`/`0066f6f`/`5e13189`, 남은 항목까지
-`7657312`/`6fb7b5d`/`095a37b`로 마무리)까지 완료.**
+**트랙 A 완료. 트랙 B는 Stage A/B/C 전부 완료. 트랙 C는 T0/T1/T2
+완료(T2 남은 항목까지 마무리) + T3 설계 확정 + T3a-1(Word 왕복 배선)
+구현·데드락 2건 수정까지 완료.**
 
 - ~~트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)~~ — **완료.**
 - ~~트랙 B: TM 자동 치환 — Stage A/B/C~~ — **완료.** Stage D/E는
   라이브 Word/InDesign 검증 전엔 착수하지 않는다는 결론 유지. 실시간
   키스트로크 자동 치환은 **절대 금지**.
-- **트랙 C: 번역 모드+XLIFF — T0/T1/T2 완료(T2의 코드 변경 후속
-  항목까지 전부 마무리).** 로드맵 단계는 T0(요구사항 고정) →
-  T1(세션 스파이크) → T2(plain-text XLIFF export, 완료) →
-  **T3(문서 전체 스캔)** → T4(태그 보존) → T5(XLIFF import/merge) →
-  T6(새 문서 생성) → T7(bilingual 편집, 기본 비활성)
+- **트랙 C: 번역 모드+XLIFF — T0/T1/T2 완료, T3 진행 중.** 로드맵
+  단계는 T0 → T1 → T2(완료) → **T3(문서 전체 스캔, 진행 중)** →
+  T4(태그 보존) → T5(XLIFF import/merge) → T6(새 문서 생성) →
+  T7(bilingual 편집, 기본 비활성)
   (`CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md` 표 참고).
-  T2로 "번역 모드 ON → 문단 방문 시 세션 누적 → XLIFF 내보내기"
-  전체 흐름이 처음으로 실제 UI에서 동작 가능해졌다. **T2에서 유일하게
-  남은 항목은 실제 Tauri/WebView2 빌드에서의 XLIFF 다운로드 수동
-  검증**(코드 변경 아님, Claude가 `run` 스킬로 앱을 띄워 확인하면 됨) —
-  다음 세션이 시간 여유가 있으면 이걸 먼저 해도 되고, 곧바로 T3로 가도
-  된다(사용자에게 물어볼 것). **다음 세션은 T3(문서 전체 스캔)
-  착수 여부를 사용자에게 물어볼 것** — T3는 "방문한 문단만"이 아니라
-  문서 전체(또는 명시 범위)를 스캔하는 새 API가 Word/InDesign 양쪽에
-  필요해서 지금까지의 트랙 C 태스크보다 스코프가 크다(에디터
-  플러그인 쪽 코드도 처음 건드리게 될 가능성이 높음 — 지금까지 T0/T1/T2
-  전부 대시보드 쪽 TS 코드만 건드렸다).
-- **다음 세션 시작 시 T3 착수를 사용자에게 확인할 것**(자동 결정 금지
-  원칙 유지 — 여섯 트랙째 이 원칙을 지켜왔고 매번 효과가 있었다). T3
-  외에 사용자가 다른 우선순위(예: 트랙 B Stage D/E 재검토, 실제
-  Word/InDesign 라이브 검증, T2의 남은 "아직 안 끝난 것" 항목들 마무리
-  등)를 줄 수도 있음. XLIFF는 앞으로도 항상 사이드카로 — 에디터 원본
-  문서에 직접 쓰는 방식(T7)은 최후순위·기본 비활성이라는 원 방향은
-  변함없다.
+  T3는 다시 T3a(Word 우선, `RECONCILED_TRANSLATION_MODE_T3.md`)와
+  T3b(InDesign 후속)로 나뉘고, T3a도 다시 T3a-1(왕복 배선, **완료**)과
+  **T3a-2(대시보드 병합 로직+UI, 다음 세션 시작할 것)**로 나뉜다.
+  - **T3a-1로 이미 된 것**: 대시보드가 `enumerateDocumentParagraphs()`를
+    호출하면 실제 Word 문서 전체 문단(순서 인덱스+해시 포함)을 받아올
+    수 있다. `complete_document_scan`/`complete_locate` 데드락 2건도
+    수정 완료.
+  - **T3a-2에서 할 것(다음 세션 시작 지점)**:
+    `translationSessionStore`에 `scanFullDocument()` 액션을 추가해
+    스캔 결과를 기존 세션과 비파괴적으로 병합(`RECONCILED_TRANSLATION_MODE_T3.md`
+    §4의 병합 매트릭스 그대로 구현 — `targetDraft` 절대 보존이 핵심),
+    export 시점 stale 재검증 연결(§5), 그리고 UI(스캔 트리거 버튼 +
+    진행률/요약 피드백, 기존 `BatchProgressBar`는 재사용하지 않고
+    번역 모드 전용 상태로 분리, §6). **agy가 이번 리뷰에서 지적한
+    Medium 1건도 T3a-2 설계에 반드시 반영할 것**: `document_scanner.ts`
+    의 새 `paragraphId` 포맷(`word-para-body-<index>-<hash>`)이 기존
+    `locate_provider.ts`/`snapshot_provider.ts`의 포맷(`word-para-<hash>`)
+    과 달라서, 스캔 결과로 위치 보기(`locateWordParagraph`)나 재검증
+    (`queryLiveParagraphSnapshots`)을 호출하면 `NOT_FOUND`가 난다 —
+    이걸 어떻게 풀지(provider들이 두 포맷 다 인식하게 할지, 등) T3a-2
+    설계 자문에서 반드시 다룰 것.
+  - T3b(InDesign)는 T3a-2 완료 후 별도 설계 자문부터 다시 시작.
+- **T2에서 유일하게 남았던 실제 Tauri/WebView2 빌드 XLIFF 다운로드
+  수동 검증은 이번 세션에 완료함**(실제 Chromium으로 Vite dev 서버
+  구동해 Blob+`.xlf` 다운로드 파이프라인 확인 — 진짜 Tauri 셸은
+  아니지만 WebView2도 Chromium 기반이라 근접한 검증).
+- **원격 push는 사용자가 전체 작업 마무리를 선언할 때만** — 매 세션/
+  커밋마다 다시 묻지 말 것(`smartlinter-defer-remote-push` 메모리
+  참고). 로컬-원격 커밋 차이 개수는 위 "새 세션 시작 절차" 1번의
+  최신 값을 볼 것(이 절 여기저기 나오는 숫자는 그때그때 스냅샷이라
+  바로 위 것만 최신이다).
 - **원격 push는 사용자가 전체 작업 마무리를 선언할 때만** — 매 세션/
   커밋마다 다시 묻지 말 것(`smartlinter-defer-remote-push` 메모리
   참고). 로컬-원격 커밋 차이 개수는 위 "새 세션 시작 절차" 1번의
