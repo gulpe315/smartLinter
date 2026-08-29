@@ -33,6 +33,7 @@ import {
     isLiveSnapshotResponse,
     isLocateRequest,
     isLocateResponse,
+    isEnumerateDocumentResponse,
 } from '../types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -221,6 +222,15 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
             assert.equal(isBridgeMessage({ type: 'LOCATE_REQUEST', payload: request }), true);
             assert.equal(isBridgeMessage({ type: 'LOCATE_RESPONSE', payload: response }), true);
             assert.equal(isLocateRequest({ requestId: 'x', paragraphId: 'p', startOffset: 2, endOffset: 1 }), false);
+        });
+
+        it('accepts document scans with and without an optional error message', () => {
+            const response = {
+                requestId: 'scan-1', sourceDocumentName: 'document.docx', paragraphs: [],
+            };
+            assert.equal(isEnumerateDocumentResponse(response), true);
+            assert.equal(isEnumerateDocumentResponse({ ...response, error: 'Office.js document scan error: busy' }), true);
+            assert.equal(isEnumerateDocumentResponse({ ...response, error: 123 }), false);
         });
         it('should validate HeartbeatPayload structure', () => {
             const heartbeat = rawFixtures.heartbeatPayload as HeartbeatPayload;

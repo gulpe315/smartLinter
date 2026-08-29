@@ -28,7 +28,12 @@ export async function enumerateAllDocumentParagraphs(
             }
         });
         return { requestId: request.requestId, sourceDocumentName, paragraphs };
-    } catch {
-        return { requestId: request.requestId, sourceDocumentName: '', paragraphs: [] };
+    } catch (error: any) {
+        return {
+            requestId: request.requestId,
+            sourceDocumentName: '',
+            paragraphs: [],
+            error: `Office.js document scan error: ${error?.message || String(error)}`,
+        };
     }
 }

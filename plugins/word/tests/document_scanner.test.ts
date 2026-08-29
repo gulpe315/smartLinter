@@ -30,10 +30,14 @@ describe('Word document scanner', () => {
     it('returns an empty array for an empty document', async () => {
         const response = await enumerateAllDocumentParagraphs({ requestId: 'scan-empty' }, runnerFor([]));
         assert.deepEqual(response.paragraphs, []);
+        assert.equal(response.error, undefined);
     });
 
     it('does not throw when Word.run fails', async () => {
         const response = await enumerateAllDocumentParagraphs({ requestId: 'scan-error' }, async () => { throw new Error('Word busy'); });
-        assert.deepEqual(response, { requestId: 'scan-error', sourceDocumentName: '', paragraphs: [] });
+        assert.deepEqual(response, {
+            requestId: 'scan-error', sourceDocumentName: '', paragraphs: [],
+            error: 'Office.js document scan error: Word busy',
+        });
     });
 });

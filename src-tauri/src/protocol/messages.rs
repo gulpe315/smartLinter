@@ -182,6 +182,8 @@ pub struct EnumerateDocumentResponse {
     pub request_id: String,
     pub source_document_name: String,
     pub paragraphs: Vec<ScannedParagraphEntry>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub error: Option<String>,
 }
 
 /// A dashboard request to reveal a paragraph in the active editor.

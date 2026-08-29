@@ -23,6 +23,7 @@ import { useConfigStore } from '../../stores/configStore.ts';
 import { useQaStore } from '../../stores/qaStore.ts';
 import { PinToggleButton } from './PinToggleButton.tsx';
 import { BatchProgressBar } from '../config/BatchProgressBar.tsx';
+import { TranslationScanProgressBar } from '../translation/TranslationScanProgressBar.tsx';
 import { EditorConnectionControl } from './EditorConnectionControl.tsx';
 import { useTranslationSessionStore } from '../../stores/translationSessionStore.ts';
 import { buildXliffDocument } from '../../utils/xliffExport.ts';
@@ -46,10 +47,10 @@ export const Header: React.FC = () => {
 
   const { openSettingsModal, openGuidelineViewer, sourceLang, targetLang } = useConfigStore();
   const resetQaCards = useQaStore((state) => state.resetQaCards);
-  const { isTranslationModeActive, segments } = useTranslationSessionStore();
+  const { isTranslationModeActive, segments, isScanning, scanError } = useTranslationSessionStore();
   const exportableSegmentCount = segments.filter((segment) => segment.status !== 'needs-validation').length;
   const needsValidationCount = segments.length - exportableSegmentCount;
-  const isTranslationExportDisabled = segments.length === 0 || needsValidationCount > 0;
+  const isTranslationExportDisabled = segments.length === 0 || needsValidationCount > 0 || isScanning;
 
   useEffect(() => {
     if (needsValidationCount === 0) {
@@ -58,6 +59,7 @@ export const Header: React.FC = () => {
   }, [needsValidationCount]);
 
   const handleTranslationExport = () => {
+    if (useTranslationSessionStore.getState().isScanning) return;
     const result = buildXliffDocument(segments, {
       sourceLang,
       targetLang,
@@ -192,6 +194,16 @@ export const Header: React.FC = () => {
           </div>
           <button
             type="button"
+            data-testid="translation-scan-btn"
+            disabled={isScanning}
+            onClick={() => useTranslationSessionStore.getState().scanFullDocument()}
+            className="px-2.5 py-1 rounded-md bg-indigo-900/50 hover:bg-indigo-800/60 disabled:bg-slate-800 disabled:text-slate-500 disabled:border-slate-700 border border-indigo-700/70 text-indigo-200 text-xs font-medium transition-colors"
+            title="Word 문서 전체를 스캔해 번역 세션에 병합합니다"
+          >
+            {isScanning ? '스캔 중...' : '전체 문서 스캔'}
+          </button>
+          <button
+            type="button"
             data-testid="translation-export-btn"
             disabled={isTranslationExportDisabled}
             onClick={handleTranslationExport}
@@ -280,7 +292,12 @@ export const Header: React.FC = () => {
 
       {/* Top Real-time Batch Progress Bar */}
       <BatchProgressBar />
-      {translationExportMessage && <p role="status" className="px-4 pb-2 text-xs text-amber-300">{translationExportMessage}</p>}
+      <TranslationScanProgressBar />
+      {scanError ? (
+        <p role="status" className="px-4 pb-2 text-xs text-amber-300">{scanError}</p>
+      ) : needsValidationCount > 0 && translationExportMessage ? (
+        <p role="status" className="px-4 pb-2 text-xs text-amber-300">{translationExportMessage}</p>
+      ) : null}
     </header>
   );
 };

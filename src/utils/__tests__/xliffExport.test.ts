@@ -77,4 +77,22 @@ describe('buildXliffDocument', () => {
       expect(result.xml.indexOf('id="a1"')).toBeLessThan(result.xml.indexOf('id="b0"'));
     }
   });
+
+  it('uses scanned document order when both paragraphs provide it', () => {
+    const result = buildXliffDocument([
+      segment({ segmentId: 'later', paragraphId: 'later', sourceText: 'Later', documentOrderIndex: 4, detectedAt: 1 }),
+      segment({ segmentId: 'first', paragraphId: 'first', sourceText: 'First', documentOrderIndex: 1, detectedAt: 999 }),
+    ], { sourceLang: 'en', targetLang: 'ko' });
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) expect(result.xml.indexOf('id="first"')).toBeLessThan(result.xml.indexOf('id="later"'));
+  });
+
+  it('retains first-seen ordering when no scanned order is present', () => {
+    const result = buildXliffDocument([
+      segment({ segmentId: 'first', paragraphId: 'first', detectedAt: 1 }),
+      segment({ segmentId: 'later', paragraphId: 'later', detectedAt: 2 }),
+    ], { sourceLang: 'en', targetLang: 'ko' });
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) expect(result.xml.indexOf('id="first"')).toBeLessThan(result.xml.indexOf('id="later"'));
+  });
 });

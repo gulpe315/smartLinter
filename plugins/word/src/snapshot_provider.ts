@@ -28,11 +28,13 @@ export async function queryLiveParagraphSnapshots(
             paragraphs.load('text');
             await context.sync();
 
-            for (const paragraph of paragraphs.items || []) {
+            for (const [documentOrderIndex, paragraph] of (paragraphs.items || []).entries()) {
                 const text = paragraph.text || '';
                 const hash = computeParagraphHash(text);
-                const paragraphId = `word-para-${hash.slice(0, 12)}`;
-                if (targetIds.has(paragraphId)) candidateMap.get(paragraphId)!.push({ text, hash });
+                const legacyId = `word-para-${hash.slice(0, 12)}`;
+                const scannedId = `word-para-body-${documentOrderIndex}-${hash.slice(0, 12)}`;
+                if (targetIds.has(legacyId)) candidateMap.get(legacyId)!.push({ text, hash });
+                if (targetIds.has(scannedId)) candidateMap.get(scannedId)!.push({ text, hash });
             }
         });
 

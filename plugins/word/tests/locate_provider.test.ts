@@ -84,6 +84,15 @@ describe('Word locate provider', () => {
         assert.equal((await locateWordParagraph(requestFor('Missing'), runnerFor(['Other']))).status, 'NOT_FOUND');
         assert.equal((await locateWordParagraph(requestFor('Same'), runnerFor(['Same', 'Same']))).status, 'AMBIGUOUS');
     });
+    it('locates the exact duplicate-text paragraph requested by a scanned body ID', async () => {
+        let selected = 0;
+        const text = 'Same';
+        const hash = computeParagraphHash(text);
+        const response = await locateWordParagraph({
+            requestId: 'locate-scanned', paragraphId: `word-para-body-1-${hash.slice(0, 12)}`,
+        }, runnerFor([text, text], () => { selected++; }));
+        assert.equal(response.status, 'FOUND'); assert.equal(selected, 1);
+    });
     it('uses baseHash and reports selection failures', async () => {
         assert.equal((await locateWordParagraph(requestFor('Target', computeParagraphHash('Target')), runnerFor(['Target']))).status, 'FOUND');
         assert.equal((await locateWordParagraph(requestFor('Target'), runnerFor(['Target'], () => { throw new Error('unsupported'); }))).status, 'SELECTION_FAILED');

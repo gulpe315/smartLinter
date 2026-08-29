@@ -781,6 +781,7 @@ mod tests {
             request_id: request.request_id,
             source_document_name: "test.docx".to_string(),
             paragraphs: vec![],
+            error: None,
         }).await;
         assert_eq!(request_task.await.unwrap().unwrap().source_document_name, "test.docx");
     }
@@ -799,11 +800,11 @@ mod tests {
         let request_task = tokio::spawn({ let manager = manager.clone(); async move { manager.request_document_scan().await } });
         let BridgeMessage::EnumerateDocumentRequest(request) = receiver.recv().await.unwrap() else { panic!("expected document scan request"); };
         manager.complete_document_scan("other-session", EnumerateDocumentResponse {
-            request_id: request.request_id.clone(), source_document_name: "wrong.docx".to_string(), paragraphs: vec![],
+            request_id: request.request_id.clone(), source_document_name: "wrong.docx".to_string(), paragraphs: vec![], error: None,
         }).await;
         assert!(!request_task.is_finished());
         manager.complete_document_scan(&session_id, EnumerateDocumentResponse {
-            request_id: request.request_id, source_document_name: "right.docx".to_string(), paragraphs: vec![],
+            request_id: request.request_id, source_document_name: "right.docx".to_string(), paragraphs: vec![], error: None,
         }).await;
         assert_eq!(request_task.await.unwrap().unwrap().source_document_name, "right.docx");
     }

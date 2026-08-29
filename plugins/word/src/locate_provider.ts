@@ -1,7 +1,7 @@
 import { computeParagraphHash } from '../../../shared/engine/hash_util.ts';
 import type { LocateRequest, LocateResponse } from '../../../shared/protocol/types.ts';
 
-interface Candidate { paragraph: any; hash: string; }
+interface Candidate { paragraph: any; hash: string; index?: number; }
 
 /** Activating the host window is optional: older Word clients may not expose it. */
 function activateWordWindow(context: any): void {
@@ -31,8 +31,12 @@ export async function locateWordParagraph(request: LocateRequest, wordRunner: (c
             paragraphs.load('text');
             await context.sync();
             candidates = (paragraphs.items || [])
-                .map((paragraph: any) => ({ paragraph, hash: computeParagraphHash(paragraph.text || '') }))
-                .filter((candidate: Candidate) => `word-para-${candidate.hash.slice(0, 12)}` === request.paragraphId);
+                .map((paragraph: any, index: number) => ({ paragraph, hash: computeParagraphHash(paragraph.text || ''), index }))
+                .filter((candidate: Candidate & { index: number }) => {
+                    const legacyId = `word-para-${candidate.hash.slice(0, 12)}`;
+                    const scannedId = `word-para-body-${candidate.index}-${candidate.hash.slice(0, 12)}`;
+                    return legacyId === request.paragraphId || scannedId === request.paragraphId;
+                });
             if (request.baseHash) candidates = candidates.filter((candidate) => candidate.hash === request.baseHash);
             if (candidates.length !== 1) return;
             try {

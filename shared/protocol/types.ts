@@ -112,6 +112,7 @@ export interface EnumerateDocumentResponse {
     requestId: string;
     sourceDocumentName: string;
     paragraphs: ScannedParagraphEntry[];
+    error?: string;
 }
 
 /** Request to reveal a paragraph in the active editor. Offsets are reserved for future span selection. */
@@ -302,6 +303,7 @@ export function isEnumerateDocumentResponse(val: unknown): val is EnumerateDocum
     return typeof obj.requestId === 'string'
         && typeof obj.sourceDocumentName === 'string'
         && Array.isArray(obj.paragraphs)
+        && (obj.error === undefined || typeof obj.error === 'string')
         && obj.paragraphs.every(isScannedParagraphEntry);
 }
 

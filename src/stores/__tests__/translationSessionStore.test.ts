@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type ParagraphPayload } from '../../../shared/protocol/types.ts';
+import { type ParagraphPayload, type ScannedParagraphEntry } from '../../../shared/protocol/types.ts';
 import { MockBridgeService } from '../../services/tauriBridge.ts';
 import { useConfigStore } from '../configStore.ts';
-import { useTranslationSessionStore } from '../translationSessionStore.ts';
+import { mergeScannedParagraphs, type TranslationSessionSegment, useTranslationSessionStore } from '../translationSessionStore.ts';
+import { getGlobalTmMatcher } from '../../utils/tmMatcher.ts';
 
 const paragraph = (overrides: Partial<ParagraphPayload> = {}): ParagraphPayload => ({
   paragraphId: 'paragraph-1',
@@ -13,6 +14,33 @@ const paragraph = (overrides: Partial<ParagraphPayload> = {}): ParagraphPayload 
   editorType: 'Word',
   ...overrides,
 });
+
+const scanned = (paragraphId: string, hash: string, documentOrderIndex: number, text = 'Scanned sentence.'): ScannedParagraphEntry => ({
+  paragraphId, hash, documentOrderIndex, text,
+});
+
+const existing = (paragraphId: string, hash: string, overrides: Partial<TranslationSessionSegment> = {}): TranslationSessionSegment => ({
+  segmentId: `${paragraphId}_0_${hash}`,
+  paragraphId,
+  segmentIndex: 0,
+  sourceText: 'Existing sentence.',
+  sourceHash: hash,
+  startOffset: 0,
+  endOffset: 18,
+  targetDraft: 'Saved draft',
+  origin: 'empty',
+  isUserEdited: true,
+  status: 'draft',
+  detectedAt: 1,
+  updatedAt: 1,
+  ...overrides,
+});
+
+const tmContext = () => {
+  const matcher = getGlobalTmMatcher();
+  matcher.loadEntries([]);
+  return { tmEntries: [], userTmOverlayEntries: [], matcher };
+};
 
 describe('translationSessionStore', () => {
   beforeEach(() => {
@@ -182,5 +210,86 @@ describe('translationSessionStore', () => {
       isUserEdited: false,
       status: 'suggested',
     });
+  });
+
+  it('preserves drafts for an unchanged scanned paragraph ID', () => {
+    const merged = mergeScannedParagraphs(
+      [existing('word-para-body-0-hash', 'hash')],
+      [scanned('word-para-body-0-hash', 'hash', 0)], 10, tmContext(),
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ targetDraft: 'Saved draft', status: 'draft', documentOrderIndex: 0 });
+  });
+
+  it('retains changed source snapshots for validation and creates a new group', () => {
+    const merged = mergeScannedParagraphs(
+      [existing('word-para-body-0-position', 'old')],
+      [scanned('word-para-body-0-position', 'new', 0, 'New sentence.')], 10, tmContext(),
+    );
+    expect(merged).toHaveLength(2);
+    expect(merged[0]).toMatchObject({ sourceHash: 'old', status: 'needs-validation' });
+    expect(merged[1]).toMatchObject({ sourceHash: 'new', paragraphId: 'word-para-body-0-position' });
+  });
+
+  it('promotes one uniquely matching legacy paragraph while preserving its draft', () => {
+    const merged = mergeScannedParagraphs(
+      [existing('word-para-hash', 'hash')],
+      [scanned('word-para-body-3-hash', 'hash', 3)], 10, tmContext(),
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({
+      paragraphId: 'word-para-body-3-hash', targetDraft: 'Saved draft', documentOrderIndex: 3,
+    });
+  });
+
+  it('does not promote a mixed-hash legacy group and preserves its drafts', () => {
+    const legacyParagraphId = 'word-para-mixed';
+    const merged = mergeScannedParagraphs(
+      [
+        existing(legacyParagraphId, 'stale-hash', { status: 'needs-validation', targetDraft: 'Older draft' }),
+        existing(legacyParagraphId, 'current-hash', {
+          segmentId: `${legacyParagraphId}_1_current-hash`, segmentIndex: 1, targetDraft: 'Current draft',
+        }),
+      ],
+      [scanned('word-para-body-4-stale', 'stale-hash', 4)], 10, tmContext(),
+    );
+
+    expect(merged).toHaveLength(3);
+    expect(merged.filter((segment) => segment.paragraphId === legacyParagraphId)).toMatchObject([
+      { sourceHash: 'stale-hash', status: 'needs-validation', targetDraft: 'Older draft' },
+      { sourceHash: 'current-hash', status: 'needs-validation', targetDraft: 'Current draft' },
+    ]);
+    expect(merged).toContainEqual(expect.objectContaining({
+      paragraphId: 'word-para-body-4-stale', sourceHash: 'stale-hash', targetDraft: '', status: 'untranslated',
+    }));
+  });
+
+  it('does not auto-match duplicate legacy and scanned hashes (2 to 2)', () => {
+    const merged = mergeScannedParagraphs(
+      [existing('word-para-hash-a', 'hash'), existing('word-para-hash-b', 'hash')],
+      [scanned('word-para-body-0-hash', 'hash', 0), scanned('word-para-body-1-hash', 'hash', 1)], 10, tmContext(),
+    );
+    expect(merged).toHaveLength(4);
+    expect(merged.filter((segment) => segment.paragraphId.startsWith('word-para-body-'))).toHaveLength(2);
+    expect(merged.filter((segment) => segment.paragraphId.startsWith('word-para-') && !segment.paragraphId.startsWith('word-para-body-'))
+      .every((segment) => segment.status === 'needs-validation')).toBe(true);
+  });
+
+  it.each([
+    ['one legacy to two scanned', [existing('word-para-hash', 'hash')], [scanned('word-para-body-0-hash', 'hash', 0), scanned('word-para-body-1-hash', 'hash', 1)]],
+    ['two legacy to one scanned', [existing('word-para-hash-a', 'hash'), existing('word-para-hash-b', 'hash')], [scanned('word-para-body-0-hash', 'hash', 0)]],
+  ])('does not auto-match %s duplicate hashes', (_label, session, scan) => {
+    const merged = mergeScannedParagraphs(session, scan, 10, tmContext());
+    expect(merged.filter((segment) => segment.paragraphId.startsWith('word-para-body-')).every((segment) => segment.targetDraft === '')).toBe(true);
+    expect(merged.some((segment) => segment.paragraphId.startsWith('word-para-') && !segment.paragraphId.startsWith('word-para-body-'))).toBe(true);
+  });
+
+  it('preserves removed user-edited paragraphs for validation and prunes untouched ones', () => {
+    const merged = mergeScannedParagraphs([
+      existing('word-para-edited', 'edited'),
+      existing('word-para-prunable', 'prunable', { isUserEdited: false, status: 'untranslated', targetDraft: '' }),
+    ], [], 10, tmContext());
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ paragraphId: 'word-para-edited', status: 'needs-validation' });
   });
 });

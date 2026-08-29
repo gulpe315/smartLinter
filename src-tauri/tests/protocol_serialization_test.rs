@@ -68,6 +68,24 @@ fn test_paragraph_payload_optional_target_omitted() {
 }
 
 #[test]
+fn test_enumerate_document_response_optional_error_serialization() {
+    let response = EnumerateDocumentResponse {
+        request_id: "scan-1".to_string(),
+        source_document_name: "document.docx".to_string(),
+        paragraphs: vec![],
+        error: None,
+    };
+    let without_error = serde_json::to_value(&response).expect("Serialization failed");
+    assert!(without_error.get("error").is_none());
+    assert_eq!(serde_json::from_value::<EnumerateDocumentResponse>(without_error).unwrap(), response);
+
+    let with_error = EnumerateDocumentResponse { error: Some("Office.js document scan error: busy".to_string()), ..response };
+    let serialized = serde_json::to_value(&with_error).expect("Serialization failed");
+    assert_eq!(serialized["error"], "Office.js document scan error: busy");
+    assert_eq!(serde_json::from_value::<EnumerateDocumentResponse>(serialized).unwrap(), with_error);
+}
+
+#[test]
 fn test_replacement_command_with_multi_hunks() {
     let cmd = ReplacementCommand {
         command_id: "cmd-123".to_string(),

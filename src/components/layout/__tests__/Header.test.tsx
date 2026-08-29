@@ -39,6 +39,30 @@ describe('Header Component', () => {
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('starts a full-document scan from the translation scan button', () => {
+    const scan = vi.fn(async () => {});
+    useTranslationSessionStore.setState({ scanFullDocument: scan });
+    render(<Header />);
+    fireEvent.click(screen.getByTestId('translation-scan-btn'));
+    expect(scan).toHaveBeenCalledOnce();
+  });
+
+  it('disables XLIFF export while the full-document scan is running', () => {
+    useTranslationSessionStore.setState({ isScanning: true, segments: [{
+      segmentId: 'segment', paragraphId: 'paragraph', segmentIndex: 0, sourceText: 'Source', sourceHash: 'hash',
+      startOffset: 0, endOffset: 6, targetDraft: '', origin: 'empty', isUserEdited: false,
+      status: 'untranslated', detectedAt: 1, updatedAt: 1,
+    }] });
+    render(<Header />);
+    expect(screen.getByTestId('translation-export-btn')).toBeDisabled();
+  });
+
+  it('shows a scan error in the status banner', () => {
+    useTranslationSessionStore.setState({ scanError: 'Scan failed' });
+    render(<Header />);
+    expect(screen.getByRole('status')).toHaveTextContent('Scan failed');
+  });
+
   it('exports session segments through a Blob download', () => {
     const segment: TranslationSessionSegment = {
       segmentId: 'paragraph_0_hash', paragraphId: 'paragraph', segmentIndex: 0,
@@ -119,7 +143,7 @@ describe('Header Component', () => {
 
     render(<Header />);
     fireEvent.click(screen.getByTestId('translation-export-btn'));
-    expect(screen.getByRole('status')).toHaveTextContent('검증 필요 세그먼트 1개');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
     act(() => {
       useTranslationSessionStore.setState({ segments: [{ ...segment, status: 'needs-validation' }] });

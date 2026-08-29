@@ -25,20 +25,32 @@ const escapeXml = (value: string): string => value
   .replace(/'/g, '&apos;');
 
 const sortSegments = (segments: TranslationSessionSegment[]): TranslationSessionSegment[] => {
-  const paragraphs = new Map<string, { firstSeenAt: number; firstSeenOrdinal: number }>();
+  const paragraphs = new Map<string, { firstSeenAt: number; firstSeenOrdinal: number; documentOrderIndex?: number }>();
   segments.forEach((segment, index) => {
     const existing = paragraphs.get(segment.paragraphId);
     if (!existing) {
-      paragraphs.set(segment.paragraphId, { firstSeenAt: segment.detectedAt, firstSeenOrdinal: index });
+      paragraphs.set(segment.paragraphId, {
+        firstSeenAt: segment.detectedAt,
+        firstSeenOrdinal: index,
+        documentOrderIndex: segment.documentOrderIndex,
+      });
       return;
     }
     if (segment.detectedAt < existing.firstSeenAt) existing.firstSeenAt = segment.detectedAt;
+    if (existing.documentOrderIndex === undefined && segment.documentOrderIndex !== undefined) {
+      existing.documentOrderIndex = segment.documentOrderIndex;
+    }
   });
 
   return [...segments].sort((left, right) => {
     const leftParagraph = paragraphs.get(left.paragraphId)!;
     const rightParagraph = paragraphs.get(right.paragraphId)!;
-    return leftParagraph.firstSeenAt - rightParagraph.firstSeenAt
+    const bothHaveDocumentOrder = leftParagraph.documentOrderIndex !== undefined
+      && rightParagraph.documentOrderIndex !== undefined;
+    return (bothHaveDocumentOrder
+      ? leftParagraph.documentOrderIndex! - rightParagraph.documentOrderIndex!
+      : 0)
+      || leftParagraph.firstSeenAt - rightParagraph.firstSeenAt
       || leftParagraph.firstSeenOrdinal - rightParagraph.firstSeenOrdinal
       || left.paragraphId.localeCompare(right.paragraphId)
       || left.segmentIndex - right.segmentIndex;

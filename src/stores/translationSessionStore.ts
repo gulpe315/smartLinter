@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type ParagraphPayload } from '../../shared/protocol/types.ts';
+import { type ParagraphPayload, type ScannedParagraphEntry } from '../../shared/protocol/types.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
 import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
@@ -17,6 +17,7 @@ import { deriveTmAutoApplyPlan } from '../utils/tmAutoApplyObservation.ts';
 import { getGlobalTmMatcher } from '../utils/tmMatcher.ts';
 
 const TRANSLATION_SESSION_STORAGE_KEY = 'smartlinter_translation_session';
+let scanRequestToken = 0;
 
 export type TranslationSegmentStatus =
   | 'untranslated'
@@ -38,13 +39,163 @@ export interface TranslationSessionSegment {
   status: TranslationSegmentStatus;
   detectedAt: number;
   updatedAt: number;
+  /** Present only for paragraphs obtained through a full-document T3a scan. */
+  documentOrderIndex?: number;
+}
+
+type SegmentParagraph = Pick<ParagraphPayload, 'paragraphId' | 'text' | 'hash'> & {
+  documentOrderIndex?: number;
+};
+
+export type TranslationTmContext = {
+  tmEntries: ReturnType<typeof useConfigStore.getState>['tmEntries'];
+  userTmOverlayEntries: ReturnType<typeof useConfigStore.getState>['userTmOverlayEntries'];
+  matcher: ReturnType<typeof getGlobalTmMatcher>;
+};
+
+/** Creates the sentence-level session records for one source paragraph. */
+export function createSegmentsFromParagraph(
+  paragraph: SegmentParagraph,
+  now: number,
+  tmContext: TranslationTmContext,
+): TranslationSessionSegment[] {
+  const sentenceMatches = splitIntoSentences(paragraph.text).map((sentence, segmentIndex) => ({
+    segmentIndex,
+    sourceText: sentence.text,
+    startOffset: sentence.start,
+    endOffset: sentence.end,
+    candidates: [],
+  }));
+  const plan = deriveTmAutoApplyPlan(paragraph, sentenceMatches, tmContext.matcher, tmContext.userTmOverlayEntries);
+  const eligibleByIndex = new Map(
+    plan?.observations
+      .filter((observation) => observation.kind === 'eligible')
+      .map((observation) => [observation.segmentIndex, observation]) ?? [],
+  );
+
+  return sentenceMatches.map((sentence) => {
+    const eligible = eligibleByIndex.get(sentence.segmentIndex);
+    return {
+      segmentId: `${paragraph.paragraphId}_${sentence.segmentIndex}_${paragraph.hash}`,
+      paragraphId: paragraph.paragraphId,
+      segmentIndex: sentence.segmentIndex,
+      sourceText: sentence.sourceText,
+      sourceHash: paragraph.hash,
+      startOffset: sentence.startOffset,
+      endOffset: sentence.endOffset,
+      targetDraft: eligible?.candidate.target ?? '',
+      origin: eligible ? 'tm-exact' : 'empty',
+      isUserEdited: false,
+      status: eligible ? 'suggested' : 'untranslated',
+      detectedAt: now,
+      updatedAt: now,
+      ...(paragraph.documentOrderIndex === undefined ? {} : { documentOrderIndex: paragraph.documentOrderIndex }),
+    } satisfies TranslationSessionSegment;
+  });
+}
+
+const groupSegmentsByParagraph = (segments: TranslationSessionSegment[]) => {
+  const groups = new Map<string, TranslationSessionSegment[]>();
+  for (const segment of segments) {
+    const group = groups.get(segment.paragraphId);
+    if (group) group.push(segment);
+    else groups.set(segment.paragraphId, [segment]);
+  }
+  return groups;
+};
+
+const isLegacyWordParagraphId = (paragraphId: string) => (
+  /^word-para-[^-]+$/.test(paragraphId) && !paragraphId.startsWith('word-para-body-')
+);
+
+/**
+ * Atomically reconciles one full-document Word scan with the persisted session.
+ * Matching is deliberately paragraph-granular so duplicate text never causes a
+ * segment-level cross-match.
+ */
+export function mergeScannedParagraphs(
+  existingSegments: TranslationSessionSegment[],
+  scannedParagraphs: ScannedParagraphEntry[],
+  now: number,
+  tmContext: TranslationTmContext,
+): TranslationSessionSegment[] {
+  const existingGroups = groupSegmentsByParagraph(existingSegments);
+  const matchedExistingIds = new Set<string>();
+  const matchedScannedIds = new Set<string>();
+  const result: TranslationSessionSegment[] = [];
+
+  for (const scanned of scannedParagraphs) {
+    const existing = existingGroups.get(scanned.paragraphId);
+    if (!existing) continue;
+    matchedExistingIds.add(scanned.paragraphId);
+    matchedScannedIds.add(scanned.paragraphId);
+    if (existing.every((segment) => segment.sourceHash === scanned.hash)) {
+      result.push(...existing.map((segment) => ({ ...segment, documentOrderIndex: scanned.documentOrderIndex })));
+    } else {
+      result.push(...existing.map((segment) => ({ ...segment, status: 'needs-validation' as const, updatedAt: now })));
+      result.push(...createSegmentsFromParagraph(scanned, now, tmContext));
+    }
+  }
+
+  const unmatchedLegacyGroups = [...existingGroups.entries()].filter(([paragraphId]) => (
+    !matchedExistingIds.has(paragraphId) && isLegacyWordParagraphId(paragraphId)
+  ));
+  const unmatchedScanned = scannedParagraphs.filter((paragraph) => !matchedScannedIds.has(paragraph.paragraphId));
+  const legacyByHash = new Map<string, Array<[string, TranslationSessionSegment[]]>>();
+  for (const group of unmatchedLegacyGroups) {
+    const firstHash = group[1][0]?.sourceHash;
+    if (!firstHash) continue;
+    if (!group[1].every((segment) => segment.sourceHash === firstHash)) continue;
+    const entries = legacyByHash.get(firstHash) || [];
+    entries.push(group);
+    legacyByHash.set(firstHash, entries);
+  }
+  const scannedByHash = new Map<string, ScannedParagraphEntry[]>();
+  for (const scanned of unmatchedScanned) {
+    const entries = scannedByHash.get(scanned.hash) || [];
+    entries.push(scanned);
+    scannedByHash.set(scanned.hash, entries);
+  }
+
+  for (const [hash, legacyGroups] of legacyByHash) {
+    const scans = scannedByHash.get(hash) || [];
+    if (legacyGroups.length !== 1 || scans.length !== 1) continue;
+    const [[legacyId, legacySegments]] = legacyGroups;
+    const [scanned] = scans;
+    matchedExistingIds.add(legacyId);
+    matchedScannedIds.add(scanned.paragraphId);
+    result.push(...legacySegments.map((segment) => ({
+      ...segment,
+      paragraphId: scanned.paragraphId,
+      segmentId: `${scanned.paragraphId}_${segment.segmentIndex}_${segment.sourceHash}`,
+      documentOrderIndex: scanned.documentOrderIndex,
+    })));
+  }
+
+  for (const scanned of scannedParagraphs) {
+    if (!matchedScannedIds.has(scanned.paragraphId)) {
+      result.push(...createSegmentsFromParagraph(scanned, now, tmContext));
+    }
+  }
+  for (const [paragraphId, existing] of existingGroups) {
+    if (matchedExistingIds.has(paragraphId)) continue;
+    if (existing.some((segment) => segment.isUserEdited)) {
+      result.push(...existing.map((segment) => ({ ...segment, status: 'needs-validation' as const, updatedAt: now })));
+    }
+  }
+  return result;
 }
 
 export interface TranslationSessionState {
   isTranslationModeActive: boolean;
   segments: TranslationSessionSegment[];
+  isScanning: boolean;
+  scanError: string | null;
+  lastScanSummary: { totalCount: number; scannedAt: number } | null;
   setTranslationMode: (active: boolean) => void;
   upsertParagraphSegments: (paragraph: ParagraphPayload) => void;
+  scanFullDocument: (service?: IBridgeService) => Promise<void>;
+  cancelScan: () => void;
   updateSegmentTarget: (segmentId: string, text: string) => void;
   removeSegment: (segmentId: string) => void;
   clearSession: () => void;
@@ -55,6 +206,9 @@ export interface TranslationSessionState {
 const initialState = {
   isTranslationModeActive: false,
   segments: [] as TranslationSessionSegment[],
+  isScanning: false,
+  scanError: null as string | null,
+  lastScanSummary: null as { totalCount: number; scannedAt: number } | null,
 };
 
 export const useTranslationSessionStore = create<TranslationSessionState>()(persist((set, get) => ({
@@ -71,49 +225,16 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
     if (currentSegments.length > 0 && currentSegments.every((segment) => segment.sourceHash === paragraph.hash)) return;
 
     const now = Date.now();
-    const sentenceMatches = splitIntoSentences(paragraph.text).map((sentence, segmentIndex) => ({
-      segmentIndex,
-      sourceText: sentence.text,
-      startOffset: sentence.start,
-      endOffset: sentence.end,
-      candidates: [],
-    }));
     const { tmEntries, userTmOverlayEntries } = useConfigStore.getState();
     const matcher = getGlobalTmMatcher();
     matcher.loadEntries([...tmEntries, ...userTmOverlayEntries]);
-    const plan = deriveTmAutoApplyPlan(paragraph, sentenceMatches, matcher, userTmOverlayEntries);
-    const eligibleByIndex = new Map(
-      plan?.observations
-        .filter((observation) => observation.kind === 'eligible')
-        .map((observation) => [observation.segmentIndex, observation]) ?? [],
-    );
-
-    const nextSegments = sentenceMatches.map((sentence) => {
-      const eligible = eligibleByIndex.get(sentence.segmentIndex);
-      return {
-        // A paragraph can retain older snapshots for validation, so the
-        // snapshot hash is part of the identity as well as the sentence index.
-        segmentId: `${paragraph.paragraphId}_${sentence.segmentIndex}_${paragraph.hash}`,
-        paragraphId: paragraph.paragraphId,
-        segmentIndex: sentence.segmentIndex,
-        sourceText: sentence.sourceText,
-        sourceHash: paragraph.hash,
-        startOffset: sentence.startOffset,
-        endOffset: sentence.endOffset,
-        targetDraft: eligible?.candidate.target ?? '',
-        origin: eligible ? 'tm-exact' : 'empty',
-        isUserEdited: false,
-        status: eligible ? 'suggested' : 'untranslated',
-        detectedAt: now,
-        updatedAt: now,
-      } satisfies TranslationSessionSegment;
-    });
+    const nextSegments = createSegmentsFromParagraph(paragraph, now, { tmEntries, userTmOverlayEntries, matcher });
 
     set((state) => {
       const existingSegmentIds = new Set(state.segments.map((segment) => segment.segmentId));
-      const retainedSegments = state.segments.map((segment) => (
+      const retainedSegments: TranslationSessionSegment[] = state.segments.map((segment) => (
           segment.paragraphId === paragraph.paragraphId && segment.sourceHash !== paragraph.hash
-            ? { ...segment, status: 'needs-validation', updatedAt: now }
+            ? { ...segment, status: 'needs-validation' as const, updatedAt: now }
             : segment
       ));
       const replacementSegments = new Map(nextSegments.map((segment) => [segment.segmentId, segment]));
@@ -146,6 +267,41 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
         ],
       };
     });
+  },
+
+  scanFullDocument: async (service) => {
+    if (!get().isTranslationModeActive || get().isScanning) return;
+    const requestToken = ++scanRequestToken;
+    set({ isScanning: true, scanError: null });
+    try {
+      const bridgeService = service || getBridgeService();
+      const response = await Promise.race([
+        bridgeService.enumerateDocumentParagraphs(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SCAN_TIMEOUT')), 10_000)),
+      ]);
+      if (requestToken !== scanRequestToken) return;
+      if (response.error) {
+        set({ isScanning: false, scanError: response.error });
+        return;
+      }
+      const { tmEntries, userTmOverlayEntries } = useConfigStore.getState();
+      const matcher = getGlobalTmMatcher();
+      matcher.loadEntries([...tmEntries, ...userTmOverlayEntries]);
+      const now = Date.now();
+      const merged = mergeScannedParagraphs(get().segments, response.paragraphs, now, { tmEntries, userTmOverlayEntries, matcher });
+      if (requestToken !== scanRequestToken) return;
+      set({ segments: merged, isScanning: false, scanError: null, lastScanSummary: { totalCount: response.paragraphs.length, scannedAt: now } });
+    } catch (error: any) {
+      if (requestToken !== scanRequestToken) return;
+      set({ isScanning: false, scanError: error?.message === 'SCAN_TIMEOUT'
+        ? '스캔 응답 시간이 초과되었습니다 (10초)'
+        : `문서 스캔 실패: ${error?.message || String(error)}` });
+    }
+  },
+
+  cancelScan: () => {
+    scanRequestToken += 1;
+    set({ isScanning: false, scanError: null });
   },
 
   updateSegmentTarget: (segmentId, text) => set((state) => {

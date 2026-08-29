@@ -35,6 +35,26 @@ describe('Word live snapshot provider', () => {
         assert.equal(response.results[0].status, 'AMBIGUOUS');
     });
 
+    it('resolves a scanned body ID to its exact duplicate-text position', async () => {
+        const text = 'Repeated';
+        const hash = computeParagraphHash(text);
+        const response = await queryLiveParagraphSnapshots({
+            requestId: 'snapshot-scanned',
+            paragraphIds: [`word-para-body-1-${hash.slice(0, 12)}`, `word-para-${hash.slice(0, 12)}`],
+        }, runnerFor([text, text]));
+        assert.equal(response.results[0].status, 'FOUND');
+        assert.equal(response.results[1].status, 'AMBIGUOUS');
+    });
+
+    it('does not resolve a scanned body ID after its index shifts', async () => {
+        const text = 'Target';
+        const hash = computeParagraphHash(text);
+        const response = await queryLiveParagraphSnapshots({
+            requestId: 'snapshot-shifted', paragraphIds: [`word-para-body-0-${hash.slice(0, 12)}`],
+        }, runnerFor(['Inserted', text]));
+        assert.equal(response.results[0].status, 'NOT_FOUND');
+    });
+
     it('uses baseHash to retain exactly one full-hash candidate', async () => {
         const response = await queryLiveParagraphSnapshots(requestFor('Target', computeParagraphHash('Target')), runnerFor(['Target']));
         assert.equal(response.results[0].status, 'FOUND');
