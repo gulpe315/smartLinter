@@ -1,12 +1,54 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션 후속 —
-트랙 C T4 전체 완료 + T6(새 번역 문서 생성) 설계 라운드 완료
-(`RECONCILED_TRANSLATION_MODE_T6.md` 확정). 다음은 T6a(Word
-파이프라인) 구현 지시서를 Codex에게 전달하는 것부터 시작.** 로컬이
-원격보다 24개 커밋 앞섬(아직 push 안 함,
-`smartlinter-defer-remote-push` 메모리 참고 — 전체 작업 마무리
-선언 전엔 push하지 말 것). 아래 이 절을 먼저 읽을 것.
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 세션 종료 —
+사용자가 "이 작업이 끝나면 세션 마무리해"로 명시적 종료 요청,
+트랙 C T4 전체 완료 + T6 설계 라운드 완료 + **T6a(Word 파이프라인)
+구현·검증·커밋까지 완료, 원격 push 완료.** 다음 세션은 T6b(InDesign
+파이프라인)부터 시작할 것.** 아래 이 절을 먼저 읽을 것.
+
+## 이번 세션 완료 — T6a: Word 숨은 복제 문서 생성 파이프라인 (T6a 전체 완료)
+
+**커밋 5개(`e2096ed` T6a 지시서, `3db7a36` 타임아웃 후속 지시서,
+`d5bb083` T6a 구현+타임아웃 수정 반영, `9901d0b` package.json 등록
+후속 지시서, `aced94e` package.json 등록 수정 — 전부 원격 push
+완료).**
+
+- **구현**: `Word.Application.createDocument()`로 활성 문서의 숨은
+  복제본을 만들어(원본은 `getFileAsync`로 읽기만) 번역 세션의 target
+  텍스트를 문단 단위로 써넣고 `.open()`으로 새 창에 표시. 프로토콜
+  (`GenerateTranslatedDocumentRequest`/`Response`, 기존
+  `EnumerateDocumentRequest` 패턴 그대로), Rust 세션 매니저/WS 라우팅,
+  `replacement_executor.ts`의 `WordDocumentPort`화(문서 루트를
+  `context.document`에서 `documentRoot` 파라미터로 주입 가능하게
+  리팩터링, 기존 Task 8 동작 100% 보존), 신규
+  `plugins/word/src/document_generator.ts`(멀티슬라이스 `getFileAsync`,
+  전체 문단 핑거프린트 사전검증 후에만 교체 시작 — fail-closed),
+  세션스토어의 `prepareDocumentGeneration`/`generateTranslatedDocument`
+  (T5의 analyze/apply 2단계 분리 패턴), `Header.tsx` 확인 모달까지
+  1차 구현에서 지시서 그대로 나왔다.
+- **Claude diff 리뷰 + agy 병렬 리뷰가 같은 결함을 각자 독립적으로
+  발견(교차검증)**: `request_generate_translated_document`가 가벼운
+  스캔용 `DOCUMENT_SCAN_TIMEOUT`(10초)을 그대로 재사용해, 번역
+  문단이 많은 문서에서 실제 생성이 10초를 넘으면 Rust는 타임아웃
+  실패 처리하지만 Word 플러그인은 계속 진행해 결국 새 문서가
+  열려버리는 "거짓 실패" 결함. 관례대로 Claude가 직접 안 고치고
+  후속 지시서로 Codex에게 되돌려 `DOCUMENT_GENERATION_TIMEOUT`(60초)
+  + `SessionError::GenerationTimeout` 분리 신설 + 프론트엔드 레이스
+  타임아웃 70초로 상향시켜 해결. agy 2차 리뷰(결함 0건)로 재확인.
+- **Claude가 `npm test` 실제 실행 로그를 직접 확인해 자체 발견**:
+  신규 `plugins/word/tests/document_generator.test.ts`(원본 쓰기
+  API 미호출/핑거프린트 불일치 fail-closed/미지원 호스트 단락 —
+  이번 라운드에서 가장 안전 관련성이 큰 테스트 3개)가
+  `package.json`의 `test`/`test:word` 스크립트에 등록이 안 돼
+  조용히 건너뛰어지고 있었다(T3a-1/T3b-1과 똑같은 실수 반복). 이번에도
+  Claude가 직접 안 고치고 Codex에게 후속 지시서로 등록시켜 해결,
+  `npm test`가 228→231로 늘고 전부 통과함을 재확인.
+- **최종 검증**: `npm test`(231/231)·`npx vitest run`(471/471)·
+  `npm run build`·`cargo check --release` 전부 통과.
+- **T6a 완료로 Word 경로의 "새 번역 문서 생성" 최소 기능이 끝났다.**
+  서식(굵게/기울임/밑줄) 재적용은 여전히 범위 밖(T6c), InDesign도
+  범위 밖(T6b). 이 PC에 Word가 없어 전부 mock 기반으로만 검증됐다 —
+  실제 Word 라이브 검증은 안 됨(기존 패턴과 동일한 한계).
 
 ## 이번 세션 완료 — T6(새 번역 문서 생성) 설계 라운드 전체
 
@@ -113,45 +155,49 @@
 
 ## ⭐ 다음 세션 시작 시 즉시 할 일
 
-1. **T6a(Word 파이프라인 + 공통 인프라) 구현 지시서 작성 → Codex
-   전달**. 설계는 이미 전부 확정됐다(`RECONCILED_TRANSLATION_MODE_T6.md`
-   §1/§3~§6) — 새로 설계 자문할 필요 없음. `TASK_REQUEST_TRANSLATION_MODE_T6A.md`
-   를 작성해 커밋한 뒤 Codex에게 그대로 전달. 지시서에 반드시 포함할
-   것: (a) `replacement_executor.ts`의 `WordDocumentPort`
-   리팩터링(§1-4, 기존 Task 8 테스트 100% 통과 유지가 최우선
-   제약), (b) 숨은 복제 문서 파이프라인(§1-1~§1-7), (c)
-   `WordApiHiddenDocument` 미지원 시(웹 Word 등) T6 비활성화 처리,
-   (d) 생성 전제조건 검증(§5 — 재스캔+fingerprint 이중 대조,
-   `needs-validation` 차단, `untranslated` 원문 유지), (e) UI
-   버튼/확인 모달(§4 고지 배너 + §5 카운트 요약), (f)
-   `mock_office_word.ts` 확장해 숨은 문서 생성 mock 추가 및 원본
-   문서 불변성(원본에 쓰기 API 호출 안 됨) 검증 테스트. **서식
-   재적용(§3)은 이번 라운드 범위 밖 — plain-text 치환만.**
+1. **T6b(InDesign 파이프라인) 구현 지시서 작성 → Codex 전달**. 설계는
+   이미 전부 확정됐다(`RECONCILED_TRANSLATION_MODE_T6.md` §2) —
+   `Document.duplicate()` 기반 완전 자동 흐름(재스캔·검증 → 복제 →
+   기존 `atomic_replacer.jsx` 재사용 → Tauri dialog로 저장 경로 선택
+   → `saveAs` → 성공 시 열어둠/실패 시 미저장 복제본 폐기). T6a가
+   만든 프로토콜/세션스토어 전제조건 로직(`prepareDocumentGeneration`
+   등)을 InDesign에도 재사용할 수 있는지 먼저 확인할 것 — 세션
+   레이어는 호스트 무관이므로 대부분 그대로 쓰되, `paragraphPlans`
+   전송 대상이 Word 세션이 아니라 InDesign 세션일 때의 라우팅
+   (`src-tauri/src/server/session.rs`의 `request_generate_translated_document`
+   가 현재 `session.editor_type != EditorType::Word`면 거부하도록
+   되어 있음 — 이 제약을 T6b에서 풀어야 함)을 지시서에 명시할 것.
+   **Tauri `tauri-plugin-dialog` 추가가 이번 라운드에서 처음
+   필요해진다** — 아직 프로젝트에 없음, 새로 의존성 추가 필요.
 2. 구현 완료 후: Claude가 diff 직접 검토 → **agy 리뷰와 Claude의
-   독립 `npm test`/`npx vitest run` 재검증을 병렬로**(순차 아님 —
+   독립 `npm test`/`npx vitest run`/`npm run build`/
+   `cargo check --release` 재검증을 병렬로**(순차 아님 —
    `consult-agy-codex-when-stuck` 메모리 참고) → 결함 있으면 Codex에게
    후속 지시서로 되돌려 수정(Claude가 직접 고치지 않음) → 전부
-   통과하면 커밋. T4-3 라운드에서 Claude와 agy가 같은 결함을 각자
-   독립적으로 찾아 교차검증된 사례가 있었다 — 이 병행 검증 방식이
-   실제로 효과적이었으니 계속 유지할 것.
-3. **자문 결과가 갈리면 임의로 편들지 말고, 가능하면 공식 문서/코드로
-   직접 검증한 뒤 재조율 라운드로 넘길 것** — 이번 T6 Q1처럼 한쪽이
-   실제로 존재하는 API를 몰라서 원안을 낸 경우가 있다. Claude가
-   WebFetch로 Microsoft 공식 문서를 직접 확인해 결정적 근거를
-   agy에게 제시했더니 agy가 스스로 원안을 철회하고 수렴했다 — 이
-   방식이 T6에서도 효과적이었다.
-4. **설계·구현 지시를 Codex/agy에게 보낸 직후엔 완료 알림만 기다리지
+   통과하면 커밋. T4-3/T6a 라운드 둘 다 Claude와 agy가 같은 결함을
+   각자 독립적으로 찾아 교차검증된 사례가 있었다 — 계속 유지할 것.
+3. **`npm test`/`npm run test:word`/`npm run test:indesign`의 실제
+   실행 로그(파일 목록이 찍히는 첫 줄)를 매번 직접 확인해, 새로
+   만든 테스트 파일이 `package.json` 스크립트에 등록됐는지 확인할
+   것** — T3a-1/T3b-1/T6a에서 세 번이나 반복된 실수다(신규 테스트
+   파일이 스크립트에 안 등록돼 조용히 건너뛰어짐, "전체 통과"
+   보고가 사실은 새 테스트를 하나도 안 돌린 것일 수 있음). 테스트
+   총 개수가 이전 라운드 대비 예상만큼 늘었는지 항상 대조할 것.
+4. **자문 결과가 갈리면 임의로 편들지 말고, 가능하면 공식 문서/코드로
+   직접 검증한 뒤 재조율 라운드로 넘길 것** — T6 Q1에서 Claude가
+   WebFetch로 Microsoft 공식 문서를 직접 확인해 agy에게 결정적
+   근거를 제시했더니 agy가 스스로 원안을 철회하고 수렴했다.
+5. **설계·구현 지시를 Codex/agy에게 보낸 직후엔 완료 알림만 기다리지
    말고 `Monitor` 도구로 5분 간격 중간보고를 걸 것**
    (`periodic-progress-updates` 메모리 참고). 완료 판정은 항상
    background task-notification으로만 확인할 것, 로그 문자열 매칭
-   금지, Monitor는 진행 상황 보고 용도로만 쓸 것.
-5. **agy에게 진행 상황이나 diff를 파일로 넘길 때는 agy가 직접
-   `git diff`를 실행하게 하지 말고(명령 실행 금지 제약, `jetski:
-   no output produced`로 실패함), Claude가 `git diff`를 텍스트
+   금지.
+6. **agy에게 진행 상황이나 diff를 파일로 넘길 때는 agy가 직접
+   `git diff`를 실행하게 하지 말고, Claude가 `git diff`를 텍스트
    파일로 저장한 뒤 그 파일 경로를 agy에게 읽게 할 것**
    (`agy-codex-cli-quirks` 메모리 참고).
-6. T6a 완료 후 T6b(InDesign 파이프라인) → T6c(서식 Materializer) →
-   T6d(백로그) 순서로 진행, 그 다음 문장단위 CAT 정합성 Phase 0 →
+7. T6b 완료 후 T6c(서식 Materializer, Word+InDesign 공통) → T6d
+   (백로그) 순서로 진행, 그 다음 문장단위 CAT 정합성 Phase 0 →
    Kiwi VM 확인(사용자가 이미 확정한 순서, 다시 물을 필요 없음).
 
 ## 이번 세션(같은 날 여러 차례 후속) 완료 요약 — T3a-2 완료부터 T4-2까지
