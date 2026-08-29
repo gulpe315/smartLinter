@@ -1,10 +1,73 @@
 # SmartLinter — 오케스트레이터 현황판
 
 **⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 같은 세션, 트랙 C(번역 모드+XLIFF)
-T0(요구사항 고정) 자문 완료 + T1(번역 세션 스파이크) 착수·완료. 아래 이
+T2(plain-text XLIFF export) 착수·완료 — 이 트랙 최초의 실제 UI. 아래 이
 절을 먼저 읽을 것.**
 
-## 이번 세션 완료(5차 후속) — 트랙 C 착수: T0(요구사항 고정) + T1(번역 세션 스파이크)
+## 이번 세션 완료(6차 후속) — 트랙 C T2: plain-text XLIFF export
+
+**커밋 3개(`12c97be` 설계 자문 문서, `47e1fa7` 구현 지시서, `0066f6f`
+구현, `5e13189` 후속 지시서 기록 — 아직 원격 push 안 함, 로컬이
+원격보다 27개 커밋 앞섬).** T1(번역 세션 스파이크)은 사용자용 화면이
+전혀 없었다 — T2는 이 트랙에서 **처음으로 실제 UI가 필요해지는 단계**
+였다: 번역 모드 토글, T1 스토어를 `App.tsx`에 배선, XLIFF 내보내기
+버튼.
+
+- **설계**: `DESIGN_REQUEST_TRANSLATION_MODE_T2.md`로 6개 질문 자문 —
+  4개(Blob+다운로드로 시작·Rust 안 건드림, App.tsx 배선+Header 최소
+  UI 범위, `configStore.sourceLang` 신설, export 범위=세션 전체를
+  단일 file/body로)는 즉시 수렴. 3개(needs-validation 세그먼트 처리,
+  상태→XLIFF `state` 매핑, 정렬 순서 정밀도)는 갈려
+  `RECONCILE_TRANSLATION_MODE_T2.md`로 재조율:
+  - **상태 매핑**: agy가 Codex 안(`draft`→`needs-review-translation`,
+    `translated`로 표시하지 않음 — T2엔 검토/확정 UI가 없으므로)에
+    전면 동의하며 수렴.
+  - **정렬 순서**: agy가 Codex의 1차 공식(`detectedAt ASC, paragraphId
+    ASC, segmentIndex ASC`)에서 **실제 결함**(같은 문단의 세그먼트가
+    재감지로 서로 다른 `detectedAt`을 가지면 문단이 다른 문단 사이에
+    끼어 쪼개질 수 있음)을 지적 → Codex가 이를 인정하고
+    `paragraphFirstSeenAt`/`paragraphFirstSeenOrdinal` 방식으로
+    정밀화해 수렴.
+  - **needs-validation 처리(가장 중요한 쟁점)**: agy는 "기본 차단 +
+    확인 후 부분 제외 내보내기" 절충안을 재조율 후에도 유지했으나,
+    Codex의 반박(① "세션 전체를 단일 file/body로"라는 이미 합의된
+    질문 6과 충돌 — 조용히 일부 뺀 결과물은 완전해 보이지만 실제로는
+    누락 있는 위험한 산출물이다, ② 부분 export를 진짜 안전하게 하려면
+    누락 표시·재추적 명세까지 필요한데 agy 안엔 그게 없다)가 더
+    완전하다고 **Claude가 판단해 Codex 안(전체 차단, 부분 제외 옵션
+    없음)을 최종 채택** — 두 자문이 재조율 후에도 못 좁힌 드문
+    경우라 임의로 편들지 않고 근거를 `RECONCILED_...` §3에 남겼다.
+- **구현 — 1라운드 agy 리뷰로 Medium 결함 2건 발견·수정**: `Blob`
+  다운로드 트리거(`anchor.click()`) 직후 같은 틱에
+  `URL.revokeObjectURL`을 동기 호출해 WebView2에서 다운로드가 실패할
+  레이스 컨디션(→ 1초 지연 해제로 수정), 검증 필요 세그먼트가 0으로
+  돌아와도 실패 안내 배너가 안 지워지던 문제(→ `useEffect`로 자동
+  정리). High는 없었음. 전부 Claude가 직접 고치지 않고 Codex에게
+  후속 지시서로 되돌려 수정시킴.
+- **핵심 안전장치**: `buildXliffDocument`(신규 `src/utils/
+  xliffExport.ts`, 순수 함수)가 `needs-validation` 세그먼트 존재 여부
+  판정을 **자체 내부에서** 하므로 UI가 버튼을 disabled로 막아도,
+  설령 우회해서 직접 호출해도 XML을 만들지 않는다(이중 방어선, agy
+  리뷰에서 우회 경로 없음을 재확인). 빈 target/문단 재감지로 인한
+  detectedAt 불일치 등 T1의 상태 모델과 정확히 맞물리게 설계됨.
+- **검증**: Claude가 매 라운드 `npm test`(197/197)·`npx vitest
+  run`(최종 37 files/**410**/410)·`npm run build`(이번엔 실제로 UI
+  자산 해시가 바뀜 — T1까지는 UI 무변경이었지만 T2는 처음으로 UI를
+  건드렸으므로 정상) 독립 재실행. 매 라운드 `git status`로 지시 범위
+  밖 파일(특히 `src-tauri/`) 변경 없음 확인.
+- **T2로 아직 안 끝난 것(다음 세션이 참고할 것)**: 실제 Tauri/WebView2
+  빌드에서 다운로드가 실제로 동작하고 `.xlf` 확장자가 붙는지 수동
+  검증은 안 함(jsdom 테스트로만 Blob URL·anchor 클릭·지연 해제 확인).
+  Settings UI에 `sourceLang` 선택기는 추가 안 함(값은 있고 기본값
+  `en`은 정확 — 구현 재량으로 UI 없이 넘어감, 필요하면 나중에 추가).
+  `buildXliffDocument` 호출 시 `originalFileName`을 안 넘겨서 XLIFF의
+  `<file original=...>`가 항상 `smartlinter_export` 고정(agy가 Low로
+  지적, 고치지 않고 넘어감 — `useBridgeStore().activeDocument`를
+  넘기면 개선 가능).
+
+---
+
+## 이전 세션 완료(5차 후속) — 트랙 C 착수: T0(요구사항 고정) + T1(번역 세션 스파이크)
 
 **커밋 4개(`9b755d7` T0 설계 자문 문서, `3ee4d99` T1 구현 지시서,
 `e1590ea` T1 구현, `c98ac52` T1 후속 지시서 3건 기록 — 아직 원격 push
@@ -278,15 +341,15 @@ exact TM 후보를 관찰만")를 완료했다.
 
 ## 🚀 새 세션 시작 절차 (이 블록부터 읽을 것)
 
-1. **`git log --oneline -1`로 최신 커밋이 `c98ac52`(Add T1 follow-up
-   task requests documenting the 3 review rounds)인지 확인.** 아니면 그
+1. **`git log --oneline -1`로 최신 커밋이 `5e13189`(Add T2 follow-up
+   task request documenting the review round)인지 확인.** 아니면 그
    이후 커밋을 먼저 훑을 것. 세션 종료 시점 상태: **작업 트리 깨끗, 로컬이
-   원격보다 23개 커밋 앞섬(`8e567d8`~`c98ac52`) — 전부 push 안 함, 사용자가
+   원격보다 27개 커밋 앞섬(`8e567d8`~`5e13189`) — 전부 push 안 함, 사용자가
    "로컬 커밋만 계속 쌓고, 전체 작업이 마무리됐을 때 한 번만 push"라고
    명시적으로 정함(다음 세션에서도 매번 push 여부를 다시 묻지 말 것,
    사용자가 먼저 요청할 때만 push).**
 2. **`npm install`** (node_modules는 커밋 안 됨). 그 다음 아래 3개로 베이스라인
-   확인: `npm test`(197/197), `npx vitest run`(36 files / **399**/399 —
+   확인: `npm test`(197/197), `npx vitest run`(37 files / **410**/410 —
    `tmMatcher.test.ts`의 "10,000 TU 벤치마크 <50ms" 벤치마크 테스트는
    시스템 부하 시 타이밍 플레이크가 날 수 있음, 재현 안 되면 무시하고
    재실행할 것, 코드 무관), `npm run build`(성공). `cargo test --release`는
@@ -358,29 +421,32 @@ exact TM 후보를 관찰만")를 완료했다.
 
 **트랙 A 완료(`923d62d`/`5543aca`). 트랙 B는 Stage A/B/C 전부 완료**
 — 사용자가 정한 범위(Stage D/E 제외) 내에서 완결됐다. **트랙 C(번역
-모드+XLIFF)는 T0(요구사항 고정, `9b755d7`)와 T1(번역 세션 스파이크,
-`3ee4d99`/`e1590ea`/`c98ac52`)까지 완료.**
+모드+XLIFF)는 T0(`9b755d7`)/T1(`3ee4d99`/`e1590ea`/`c98ac52`)/
+T2(`12c97be`/`47e1fa7`/`0066f6f`/`5e13189`)까지 완료.**
 
 - ~~트랙 A: QA 카드 Mode A(문장 원클릭 통합 적용)~~ — **완료.**
 - ~~트랙 B: TM 자동 치환 — Stage A/B/C~~ — **완료.** Stage D/E는
   라이브 Word/InDesign 검증 전엔 착수하지 않는다는 결론 유지. 실시간
   키스트로크 자동 치환은 **절대 금지**.
-- **트랙 C: 번역 모드+XLIFF — T0/T1 완료.** 로드맵 단계는 T0(요구사항
-  고정) → T1(세션 스파이크, 완료) → **T2(plain-text XLIFF export)** →
-  T3(문서 전체 스캔) → T4(태그 보존) → T5(XLIFF import/merge) →
-  T6(새 문서 생성) → T7(bilingual 편집, 기본 비활성)
+- **트랙 C: 번역 모드+XLIFF — T0/T1/T2 완료.** 로드맵 단계는
+  T0(요구사항 고정) → T1(세션 스파이크) → T2(plain-text XLIFF
+  export, 완료) → **T3(문서 전체 스캔)** → T4(태그 보존) → T5(XLIFF
+  import/merge) → T6(새 문서 생성) → T7(bilingual 편집, 기본 비활성)
   (`CODEX_ANSWER_AUTO_TRANSLATE_AND_TRANSLATION_MODE.md` 표 참고).
-  T1은 사용자용 화면이 전혀 없는 순수 데이터 스토어라서, **다음
-  세션은 T2(XLIFF export) 착수 여부를 사용자에게 물어볼 것** — 단,
-  T2를 시작하면 처음으로 사용자가 "번역 모드"를 실제로 켤 수 있는
-  진입점(UI)이 필요해지므로, T2 설계 자문에서 "T1 스토어를 실제
-  App.tsx에 연결하는 것(telemetry 배선)"과 "최소한의 export 버튼/진입점
-  UI 범위"를 함께 다뤄야 한다 — 이 부분도 자동 결정하지 말고 설계
-  자문에서 다룰 것.
-- **다음 세션 시작 시 T2 착수를 사용자에게 확인할 것**(자동 결정 금지
-  원칙 유지 — 다섯 트랙째 이 원칙을 지켜왔고 매번 효과가 있었다). T2
+  T2로 "번역 모드 ON → 문단 방문 시 세션 누적 → XLIFF 내보내기"
+  전체 흐름이 처음으로 실제 UI에서 동작 가능해졌다(단, 실제
+  Tauri/WebView2 빌드에서의 수동 다운로드 확인은 아직 안 함 — 위
+  "T2로 아직 안 끝난 것" 참고). **다음 세션은 T3(문서 전체 스캔)
+  착수 여부를 사용자에게 물어볼 것** — T3는 "방문한 문단만"이 아니라
+  문서 전체(또는 명시 범위)를 스캔하는 새 API가 Word/InDesign 양쪽에
+  필요해서 지금까지의 트랙 C 태스크보다 스코프가 크다(에디터
+  플러그인 쪽 코드도 처음 건드리게 될 가능성이 높음 — 지금까지 T0/T1/T2
+  전부 대시보드 쪽 TS 코드만 건드렸다).
+- **다음 세션 시작 시 T3 착수를 사용자에게 확인할 것**(자동 결정 금지
+  원칙 유지 — 여섯 트랙째 이 원칙을 지켜왔고 매번 효과가 있었다). T3
   외에 사용자가 다른 우선순위(예: 트랙 B Stage D/E 재검토, 실제
-  Word/InDesign 라이브 검증 등)를 줄 수도 있음.
+  Word/InDesign 라이브 검증, T2의 남은 "아직 안 끝난 것" 항목들 마무리
+  등)를 줄 수도 있음.
 - **트랙 C: [번역 모드]+XLIFF** — 같은 문서 "2. 번역 모드와 XLIFF" 절의 T0~T7 단계.
   T0(요구사항 고정: sidecar vs 새 문서 생성 vs bilingual 편집 중 확정)부터 시작할 것.
   XLIFF는 항상 사이드카로, 에디터 원본 문서에 직접 쓰는 방식(T7)은 최후순위·기본
