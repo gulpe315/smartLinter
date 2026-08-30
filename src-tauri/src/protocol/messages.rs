@@ -189,6 +189,10 @@ pub struct ScannedParagraphEntry {
     pub is_overset: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub coverage_state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub container_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub table_locator: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -218,7 +222,16 @@ pub struct EnumerateDocumentResponse {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DocumentGenerationParagraphPlan { pub paragraph_id: String, pub document_order_index: u32, pub expected_source_hash: String, pub target_text: String }
+pub struct DocumentGenerationParagraphPlan {
+    pub paragraph_id: String,
+    pub document_order_index: u32,
+    pub expected_source_hash: String,
+    pub target_text: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub container_kind: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub table_locator: Option<serde_json::Value>,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateTranslatedDocumentRequest { pub request_id: String, pub paragraph_plans: Vec<DocumentGenerationParagraphPlan>, #[serde(skip_serializing_if = "Option::is_none")] pub destination_path: Option<String> }

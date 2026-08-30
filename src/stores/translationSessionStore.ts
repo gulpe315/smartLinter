@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type DocumentGenerationParagraphPlan, type DocumentGenerationPhase, type EnumerateDocumentSummary, type GenerationDiagnostic, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { type ContainerKind, type DocumentGenerationParagraphPlan, type DocumentGenerationPhase, type EnumerateDocumentSummary, type GenerationDiagnostic, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TableLocator, type TaggedSegmentData } from '../../shared/protocol/types.ts';
 import { renderTargetTokensToRuns } from '../utils/translationFormatting.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
@@ -48,11 +48,15 @@ export interface TranslationSessionSegment {
   taggedSource?: TaggedSegmentData;
   /** Formatting tokens returned by an external CAT import, when present. */
   taggedTarget?: TaggedSegmentData;
+  containerKind?: ContainerKind;
+  tableLocator?: TableLocator;
 }
 
 type SegmentParagraph = Pick<ParagraphPayload, 'paragraphId' | 'text' | 'hash'> & {
   documentOrderIndex?: number;
   taggedSource?: TaggedSegmentData;
+  containerKind?: ContainerKind;
+  tableLocator?: TableLocator;
 };
 
 export type TranslationTmContext = {
@@ -179,6 +183,8 @@ export function createSegmentsFromParagraph(
       updatedAt: now,
       ...(paragraph.documentOrderIndex === undefined ? {} : { documentOrderIndex: paragraph.documentOrderIndex }),
       ...(sentence.taggedSource === undefined ? {} : { taggedSource: sentence.taggedSource }),
+      ...(paragraph.containerKind ? { containerKind: paragraph.containerKind } : {}),
+      ...(paragraph.tableLocator ? { tableLocator: paragraph.tableLocator } : {}),
     } satisfies TranslationSessionSegment;
   });
 }
@@ -231,7 +237,12 @@ export function mergeScannedParagraphs(
     matchedExistingIds.add(scanned.paragraphId);
     matchedScannedIds.add(scanned.paragraphId);
     if (existing.every((segment) => segment.sourceHash === scanned.hash)) {
-      result.push(...existing.map((segment) => ({ ...segment, documentOrderIndex: scanned.documentOrderIndex })));
+      result.push(...existing.map((segment) => ({
+        ...segment,
+        documentOrderIndex: scanned.documentOrderIndex,
+        ...(scanned.containerKind ? { containerKind: scanned.containerKind } : {}),
+        ...(scanned.tableLocator ? { tableLocator: scanned.tableLocator } : {}),
+      })));
     } else {
       result.push(...existing.map((segment) => ({ ...segment, status: 'needs-validation' as const, updatedAt: now })));
       result.push(...createSegmentsFromParagraph(scanned, now, tmContext));
@@ -270,6 +281,8 @@ export function mergeScannedParagraphs(
       paragraphId: scanned.paragraphId,
       segmentId: `${scanned.paragraphId}_${segment.segmentIndex}_${segment.sourceHash}`,
       documentOrderIndex: scanned.documentOrderIndex,
+      ...(scanned.containerKind ? { containerKind: scanned.containerKind } : {}),
+      ...(scanned.tableLocator ? { tableLocator: scanned.tableLocator } : {}),
     })));
   }
 
@@ -524,8 +537,28 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
             }
           }
           for (const run of runs) for (const id of run.sourceFormatIds || []) if (!byFormatId[id]) return { ok: false, reason: 'InDesign format font face is missing.', diagnostic: { paragraphId, documentOrderIndex: first.documentOrderIndex, reason: 'FONT_FACE_UNAVAILABLE' }, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
-          plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText, runs, inDesignDefaultFontFace: defaultFace, inDesignFontFaceByFormatId: byFormatId });
-        } else plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText, runs });
+          plans.push({
+            paragraphId,
+            documentOrderIndex: first.documentOrderIndex,
+            expectedSourceHash: first.sourceHash,
+            targetText,
+            runs,
+            ...(first?.containerKind ? { containerKind: first.containerKind } : {}),
+            ...(first?.tableLocator ? { tableLocator: first.tableLocator } : {}),
+            inDesignDefaultFontFace: defaultFace,
+            inDesignFontFaceByFormatId: byFormatId,
+          });
+        } else {
+          plans.push({
+            paragraphId,
+            documentOrderIndex: first.documentOrderIndex,
+            expectedSourceHash: first.sourceHash,
+            targetText,
+            runs,
+            ...(first?.containerKind ? { containerKind: first.containerKind } : {}),
+            ...(first?.tableLocator ? { tableLocator: first.tableLocator } : {}),
+          });
+        }
       }
     }
     return { ok: true, plans, translatedParagraphCount: plans.length, untranslatedParagraphCount: totalParagraphCount - plans.length, totalParagraphCount };

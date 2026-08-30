@@ -23,6 +23,47 @@
         return 'BODY';
     }
 
+    function findCellAndTable(para) {
+        if (!para || !para.parent) return { cell: null, table: null };
+        var curr = para.parent;
+        var cell = null;
+        var table = null;
+        var depth = 0;
+        while (curr && depth < 16) {
+            var tn = curr.typename;
+            if (!cell && tn === 'Cell') {
+                cell = curr;
+            }
+            if (tn === 'Table') {
+                table = curr;
+                break;
+            }
+            if (tn === 'Story' || tn === 'Document' || tn === 'Application') break;
+            curr = curr.parent;
+            depth++;
+        }
+        return { cell: cell, table: table };
+    }
+
+    function getTableIndexInStory(story, table) {
+        if (!story || !story.tables || !table) return 0;
+        for (var t = 0; t < story.tables.length; t++) {
+            if (story.tables[t] === table || (table.id && story.tables[t].id === table.id)) {
+                return t;
+            }
+        }
+        if (typeof table.index === 'number') return table.index;
+        return 0;
+    }
+
+    function getParagraphIndexInCell(cell, para) {
+        if (!cell || !cell.paragraphs) return 0;
+        for (var cp = 0; cp < cell.paragraphs.length; cp++) {
+            if (cell.paragraphs[cp] === para) return cp;
+        }
+        return 0;
+    }
+
     function isStoryPlaced(story) {
         try { return Boolean(story.textContainers && story.textContainers.length > 0); }
         catch (e) { return false; }
@@ -65,7 +106,50 @@
                 for (var p = 0; p < story.paragraphs.length; p++) {
                     var para = story.paragraphs[p];
                     var kind = getParagraphContainerKind(para);
-                    if (kind === 'TABLE') { summary.skippedTablesCount++; continue; }
+                    if (kind === 'TABLE') {
+                        if (!placed && !options.includeUnplacedStories) {
+                            summary.unplacedParagraphsPendingChoice++;
+                            continue;
+                        }
+                        var ct = findCellAndTable(para);
+                        var cell = ct.cell;
+                        var table = ct.table;
+                        var tableIndex = getTableIndexInStory(story, table);
+                        var cellIndex = (cell && typeof cell.index === 'number') ? cell.index : 0;
+                        var cellName = (cell && cell.name) ? String(cell.name) : '';
+                        var pInCell = getParagraphIndexInCell(cell, para);
+                        var rowSpan = (cell && typeof cell.rowSpan === 'number' && cell.rowSpan >= 1) ? cell.rowSpan : 1;
+                        var columnSpan = (cell && typeof cell.columnSpan === 'number' && cell.columnSpan >= 1) ? cell.columnSpan : 1;
+
+                        var text = String(para.contents || '');
+                        var extraction = SmartLinterInlineTagExtractor.extractParagraphTokens(para);
+                        var taggedSource = extraction.ok
+                            ? { sourceTokens: extraction.tokens, tagStatus: 'valid', inDesignFontFaces: extraction.inDesignFontFaces }
+                            : { sourceTokens: [{ type: 'text', value: text }], tagStatus: 'fallback-plain', fallbackReason: extraction.reason };
+
+                        response.paragraphs.push({
+                            paragraphId: 'indesign-tablepara-' + storyId + '-' + tableIndex + '-' + cellIndex + '-' + pInCell,
+                            text: text,
+                            hash: hashUtil.computeParagraphHash(text, true),
+                            documentOrderIndex: order++,
+                            storyId: storyId,
+                            isOverset: overset,
+                            coverageState: placed ? 'included' : 'requires-user-choice',
+                            taggedSource: taggedSource,
+                            containerKind: 'TABLE',
+                            tableLocator: {
+                                tableIndex: tableIndex,
+                                cellIndex: cellIndex,
+                                cellName: cellName,
+                                paragraphIndexInCell: pInCell,
+                                rowSpan: rowSpan,
+                                columnSpan: columnSpan
+                            }
+                        });
+                        summary.scannedParagraphs++;
+                        if (overset) summary.oversetParagraphsIncluded++;
+                        continue;
+                    }
                     if (kind === 'FOOTNOTE') { summary.skippedFootnotesCount++; continue; }
                     if (kind === 'ENDNOTE' || kind === 'NOTE') { summary.skippedUnsupportedCount++; continue; }
                     if (!placed && !options.includeUnplacedStories) {

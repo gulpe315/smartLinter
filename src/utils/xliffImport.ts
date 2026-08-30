@@ -1,5 +1,5 @@
 import { type TranslationSessionSegment } from '../stores/translationSessionStore.ts';
-import { type InlineToken, type InlineTokenKind, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { type ContainerKind, type InlineToken, type InlineTokenKind, type TableLocator, type TaggedSegmentData, isTableLocator } from '../../shared/protocol/types.ts';
 import { sameInlineCodeStructure, textFromTokens } from './translationFormatting.ts';
 
 export interface ParsedTransUnit {
@@ -10,11 +10,13 @@ export interface ParsedTransUnit {
   sourceTokens?: InlineToken[];
   targetTokens?: InlineToken[];
   inlineCodeIssue?: 'INLINE_CODE_MISMATCH' | 'UNEXPECTED_INLINE_CODE';
+  containerKind?: ContainerKind;
+  tableLocator?: TableLocator;
 }
 
 export type XliffParseResult =
   | { ok: true; units: ParsedTransUnit[]; toolId: string | null }
-  | { ok: false; reason: 'XML_PARSE_ERROR' | 'UNSUPPORTED_STRUCTURE'; message: string };
+  | { ok: false; reason: 'XML_PARSE_ERROR' | 'UNSUPPORTED_STRUCTURE' | 'INVALID_TABLE_LOCATOR'; message: string };
 
 export interface XliffMergeItem { segment: TranslationSessionSegment; incoming: ParsedTransUnit; }
 export interface XliffConflictItem { segment: TranslationSessionSegment; incoming: ParsedTransUnit; }
@@ -103,23 +105,59 @@ export function parseXliffImport(xmlContent: string): XliffParseResult {
 
   const tool = descendantsByLocalName(root, 'header')
     .flatMap((header) => descendantsByLocalName(header, 'tool'))[0];
+  const units: ParsedTransUnit[] = [];
+  for (const unit of transUnits) {
+    const source = firstChildByLocalName(unit, 'source');
+    const target = firstChildByLocalName(unit, 'target');
+    const sourceTokens = parseInlineTokens(source);
+    const targetTokens = parseInlineTokens(target);
+
+    let containerKind: ContainerKind | undefined;
+    let tableLocator: TableLocator | undefined;
+
+    for (const note of descendantsByLocalName(unit, 'note')) {
+      const category = note.getAttribute('category');
+      const text = (note.textContent ?? '').trim();
+      if (category === 'containerKind') {
+        if (text === 'TABLE') containerKind = 'TABLE';
+        else if (text === 'BODY') containerKind = 'BODY';
+      } else if (category === 'tableLocator') {
+        try {
+          const parsed = JSON.parse(text);
+          if (isTableLocator(parsed)) {
+            tableLocator = parsed;
+          } else {
+            return { ok: false, reason: 'INVALID_TABLE_LOCATOR', message: '유효하지 않거나 누락된 표 위치자(tableLocator) 메타데이터입니다.' };
+          }
+        } catch {
+          return { ok: false, reason: 'INVALID_TABLE_LOCATOR', message: '유효하지 않거나 누락된 표 위치자(tableLocator) 메타데이터입니다.' };
+        }
+      }
+    }
+
+    if (containerKind === 'TABLE' && !tableLocator) {
+      return { ok: false, reason: 'INVALID_TABLE_LOCATOR', message: '유효하지 않거나 누락된 표 위치자(tableLocator) 메타데이터입니다.' };
+    }
+    if (tableLocator && !containerKind) {
+      containerKind = 'TABLE';
+    }
+
+    units.push({
+      id: unit.getAttribute('id') ?? '',
+      sourceText: textFromTokens(sourceTokens, source?.textContent ?? ''),
+      targetText: target ? textFromTokens(targetTokens, target.textContent ?? '') : null,
+      state: target?.getAttribute('state') ?? null,
+      ...(sourceTokens ? { sourceTokens } : {}),
+      ...(targetTokens ? { targetTokens } : {}),
+      ...(containerKind ? { containerKind } : {}),
+      ...(tableLocator ? { tableLocator } : {}),
+    });
+  }
+
   return {
     ok: true,
     toolId: tool?.getAttribute('tool-id') ?? null,
-    units: transUnits.map((unit) => {
-      const source = firstChildByLocalName(unit, 'source');
-      const target = firstChildByLocalName(unit, 'target');
-      const sourceTokens = parseInlineTokens(source);
-      const targetTokens = parseInlineTokens(target);
-      return {
-        id: unit.getAttribute('id') ?? '',
-        sourceText: textFromTokens(sourceTokens, source?.textContent ?? ''),
-        targetText: target ? textFromTokens(targetTokens, target.textContent ?? '') : null,
-        state: target?.getAttribute('state') ?? null,
-        ...(sourceTokens ? { sourceTokens } : {}),
-        ...(targetTokens ? { targetTokens } : {}),
-      };
-    }),
+    units,
   };
 }
 
@@ -188,6 +226,8 @@ export function applyXliffImport(
       origin: 'external-cat',
       isUserEdited: false,
       updatedAt: now,
+      ...(incoming.containerKind ? { containerKind: incoming.containerKind } : {}),
+      ...(incoming.tableLocator ? { tableLocator: incoming.tableLocator } : {}),
       ...(incoming.targetTokens && segment.taggedSource?.tagStatus === 'valid' ? {
         taggedTarget: {
           sourceTokens: segment.taggedSource.sourceTokens,

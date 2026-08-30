@@ -84,10 +84,18 @@ export function buildXliffDocument(
     const source = segment.taggedSource?.tagStatus === 'valid'
       ? serializeTaggedSource(segment.taggedSource.sourceTokens)
       : escapeXml(segment.sourceText);
+    const notes: string[] = [];
+    if (segment.containerKind === 'TABLE') {
+      notes.push('        <note category="containerKind">TABLE</note>');
+    }
+    if (segment.tableLocator) {
+      notes.push(`        <note category="tableLocator">${escapeXml(JSON.stringify(segment.tableLocator))}</note>`);
+    }
     return [
       `      <trans-unit id="${escapeXml(segment.segmentId)}" xml:space="preserve">`,
       `        <source>${source}</source>`,
       `        ${target}`,
+      ...notes,
       '      </trans-unit>',
     ].join('\n');
   }).join('\n');

@@ -17,6 +17,18 @@ export type InlineToken =
     | { type: 'close'; id: string; kind: InlineTokenKind }
     | { type: 'placeholder'; id: string; kind: string };
 
+export type ContainerKind = 'BODY' | 'TABLE';
+
+export interface TableLocator {
+    tableIndex: number;
+    cellIndex: number;          // InDesign: Table.cells 1D 인덱스 (0-based)
+    rowIndex?: number;          // 행 인덱스 (선택적)
+    cellName?: string;          // InDesign 전용: "col:row" 형식 (예: "0:0")
+    paragraphIndexInCell: number; // 셀 내부 문단 인덱스 (0-based)
+    rowSpan?: number;
+    columnSpan?: number;
+}
+
 /** Tagged source/target data for one translation segment. */
 export interface TaggedSegmentData {
     sourceTokens: InlineToken[];
@@ -24,6 +36,8 @@ export interface TaggedSegmentData {
     tagStatus: 'valid' | 'fallback-plain' | 'broken';
     fallbackReason?: string;
     inDesignFontFaces?: InDesignFontFaceMetadata;
+    containerKind?: ContainerKind;
+    tableLocator?: TableLocator;
 }
 
 /** Text replacement execution outcomes */
@@ -132,6 +146,8 @@ export interface ScannedParagraphEntry {
     coverageState?: CoverageState;
     /** Inline formatting preserved by the full-document scan, when available. */
     taggedSource?: TaggedSegmentData;
+    containerKind?: ContainerKind;
+    tableLocator?: TableLocator;
 }
 
 export interface EnumerateDocumentSummary {
@@ -165,6 +181,8 @@ export interface DocumentGenerationParagraphPlan {
     inDesignDefaultFontFace?: InDesignSourceFontFace;
     /** Reserved for the InDesign renderer; not populated by the Word path. */
     inDesignFontFaceByFormatId?: Record<string, InDesignSourceFontFace>;
+    containerKind?: ContainerKind;
+    tableLocator?: TableLocator;
 }
 
 export interface RenderedRun {
@@ -327,6 +345,28 @@ export function isInlineToken(val: unknown): val is InlineToken {
     return obj.type === 'placeholder' && typeof obj.id === 'string' && typeof obj.kind === 'string';
 }
 
+export function isContainerKind(val: unknown): val is ContainerKind {
+    return val === 'BODY' || val === 'TABLE';
+}
+
+export function isTableLocator(val: unknown): val is TableLocator {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.tableIndex === 'number'
+        && Number.isInteger(obj.tableIndex)
+        && obj.tableIndex >= 0
+        && typeof obj.cellIndex === 'number'
+        && Number.isInteger(obj.cellIndex)
+        && obj.cellIndex >= 0
+        && typeof obj.paragraphIndexInCell === 'number'
+        && Number.isInteger(obj.paragraphIndexInCell)
+        && obj.paragraphIndexInCell >= 0
+        && (obj.rowIndex === undefined || (typeof obj.rowIndex === 'number' && Number.isInteger(obj.rowIndex) && obj.rowIndex >= 0))
+        && (obj.cellName === undefined || typeof obj.cellName === 'string')
+        && (obj.rowSpan === undefined || (typeof obj.rowSpan === 'number' && Number.isInteger(obj.rowSpan) && obj.rowSpan >= 1))
+        && (obj.columnSpan === undefined || (typeof obj.columnSpan === 'number' && Number.isInteger(obj.columnSpan) && obj.columnSpan >= 1));
+}
+
 export function isTaggedSegmentData(val: unknown): val is TaggedSegmentData {
     if (typeof val !== 'object' || val === null) return false;
     const obj = val as Record<string, unknown>;
@@ -335,7 +375,9 @@ export function isTaggedSegmentData(val: unknown): val is TaggedSegmentData {
         && (obj.targetTokens === undefined || (Array.isArray(obj.targetTokens) && obj.targetTokens.every(isInlineToken)))
         && (obj.tagStatus === 'valid' || obj.tagStatus === 'fallback-plain' || obj.tagStatus === 'broken')
         && (obj.fallbackReason === undefined || typeof obj.fallbackReason === 'string')
-        && (obj.inDesignFontFaces === undefined || isInDesignFontFaceMetadata(obj.inDesignFontFaces));
+        && (obj.inDesignFontFaces === undefined || isInDesignFontFaceMetadata(obj.inDesignFontFaces))
+        && (obj.containerKind === undefined || isContainerKind(obj.containerKind))
+        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator));
 }
 
 export function isReplacementStatus(val: unknown): val is ReplacementStatus {
@@ -458,7 +500,9 @@ export function isScannedParagraphEntry(val: unknown): val is ScannedParagraphEn
         && (obj.storyId === undefined || typeof obj.storyId === 'string')
         && (obj.isOverset === undefined || typeof obj.isOverset === 'boolean')
         && (obj.coverageState === undefined || isCoverageState(obj.coverageState))
-        && (obj.taggedSource === undefined || isTaggedSegmentData(obj.taggedSource));
+        && (obj.taggedSource === undefined || isTaggedSegmentData(obj.taggedSource))
+        && (obj.containerKind === undefined || isContainerKind(obj.containerKind))
+        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator));
 }
 
 export function isEnumerateDocumentSummary(val: unknown): val is EnumerateDocumentSummary {
@@ -489,7 +533,9 @@ export function isDocumentGenerationParagraphPlan(val: unknown): val is Document
         && typeof obj.targetText === 'string'
         && (obj.runs === undefined || (Array.isArray(obj.runs) && obj.runs.every(isRenderedRun)))
         && (obj.inDesignDefaultFontFace === undefined || isInDesignSourceFontFace(obj.inDesignDefaultFontFace))
-        && (obj.inDesignFontFaceByFormatId === undefined || (typeof obj.inDesignFontFaceByFormatId === 'object' && obj.inDesignFontFaceByFormatId !== null && Object.values(obj.inDesignFontFaceByFormatId).every(isInDesignSourceFontFace)));
+        && (obj.inDesignFontFaceByFormatId === undefined || (typeof obj.inDesignFontFaceByFormatId === 'object' && obj.inDesignFontFaceByFormatId !== null && Object.values(obj.inDesignFontFaceByFormatId).every(isInDesignSourceFontFace)))
+        && (obj.containerKind === undefined || isContainerKind(obj.containerKind))
+        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator));
 }
 
 export function isRenderedRun(val: unknown): val is RenderedRun {

@@ -44,14 +44,15 @@ describe('InDesign document scanner', () => {
         assert.equal(included.paragraphs[0].coverageState, 'requires-user-choice');
     });
 
-    it('excludes tables, footnotes, endnotes, and notes with correct counts', () => {
+    it('excludes footnotes, endnotes, and notes with correct counts while scanning tables', () => {
         const env = new MockInDesignEnvironment(); env.stories.length = 0;
         const story = env.createStory(['Body'], { id: '30' });
         env.addTableParagraph(story.id, 'Table'); env.addFootnoteParagraph(story.id, 'Footnote'); env.addEndnoteParagraph(story.id, 'Endnote');
         const note: any = env.createParagraph('Note', story.id); note.index = story.paragraphs.length; note.parent = { typename: 'Note' }; story.paragraphs.push(note);
         const result = loadScanner().enumerateAllDocumentParagraphs(env.activeDocument, { requestId: 'scan' });
-        assert.equal(result.paragraphs.length, 1);
-        assert.deepEqual([result.summary.skippedTablesCount, result.summary.skippedFootnotesCount, result.summary.skippedUnsupportedCount], [1, 1, 2]);
+        assert.equal(result.paragraphs.length, 2);
+        assert.equal(result.paragraphs[1].containerKind, 'TABLE');
+        assert.deepEqual([result.summary.skippedTablesCount, result.summary.skippedFootnotesCount, result.summary.skippedUnsupportedCount], [0, 1, 2]);
     });
 
     it('returns an error response rather than throwing for absent or failing documents', () => {

@@ -93,6 +93,99 @@
         return { story: story, paragraphIndex: paragraphIndex };
     }
 
+    function resolveTableForParagraphId(doc, paragraphId, locator) {
+        var prefix = 'indesign-tablepara-';
+        if (!doc || typeof paragraphId !== 'string' || paragraphId.indexOf(prefix) !== 0) {
+            return null;
+        }
+
+        var idSuffix = paragraphId.substring(prefix.length);
+        var lastDash = idSuffix.lastIndexOf('-');
+        if (lastDash <= 0) return null;
+        var pInCellText = idSuffix.substring(lastDash + 1);
+        var rem1 = idSuffix.substring(0, lastDash);
+
+        var secondDash = rem1.lastIndexOf('-');
+        if (secondDash <= 0) return null;
+        var cellIndexText = rem1.substring(secondDash + 1);
+        var rem2 = rem1.substring(0, secondDash);
+
+        var thirdDash = rem2.lastIndexOf('-');
+        if (thirdDash <= 0) return null;
+        var tableIndexText = rem2.substring(thirdDash + 1);
+        var storyId = rem2.substring(0, thirdDash);
+
+        if (!/^\d+$/.test(pInCellText) || !/^\d+$/.test(cellIndexText) || !/^\d+$/.test(tableIndexText)) {
+            return null;
+        }
+
+        var pInCell = parseInt(pInCellText, 10);
+        var cellIndex = parseInt(cellIndexText, 10);
+        var tableIndex = parseInt(tableIndexText, 10);
+
+        if (!doc.stories || typeof doc.stories.itemByID !== 'function') {
+            return null;
+        }
+
+        var numericStoryId = parseInt(storyId, 10);
+        var story = isNaN(numericStoryId)
+            ? doc.stories.itemByID(storyId)
+            : doc.stories.itemByID(numericStoryId);
+        if (!story || story.isValid === false || !story.tables) {
+            return null;
+        }
+
+        if (tableIndex < 0 || tableIndex >= story.tables.length) {
+            return null;
+        }
+        var table = story.tables[tableIndex];
+        if (!table || table.isValid === false || !table.cells) {
+            return null;
+        }
+
+        var cell = null;
+        if (cellIndex >= 0 && cellIndex < table.cells.length) {
+            cell = table.cells[cellIndex];
+        }
+
+        // Structural cross-validation with locator if available
+        if (locator) {
+            if (locator.cellName) {
+                if (!cell || String(cell.name || '') !== String(locator.cellName)) {
+                    if (typeof table.cells.itemByName === 'function') {
+                        var namedCell = table.cells.itemByName(locator.cellName);
+                        if (namedCell && namedCell.isValid !== false) {
+                            cell = namedCell;
+                        } else {
+                            return null;
+                        }
+                    } else {
+                        return null;
+                    }
+                }
+            }
+            if (cell && typeof locator.rowSpan === 'number' && typeof cell.rowSpan === 'number') {
+                if (cell.rowSpan !== locator.rowSpan) return null;
+            }
+            if (cell && typeof locator.columnSpan === 'number' && typeof cell.columnSpan === 'number') {
+                if (cell.columnSpan !== locator.columnSpan) return null;
+            }
+        }
+
+        if (!cell || cell.isValid === false || !cell.paragraphs) {
+            return null;
+        }
+
+        if (pInCell < 0 || pInCell >= cell.paragraphs.length) {
+            return null;
+        }
+        var paragraph = cell.paragraphs[pInCell];
+        if (!paragraph || paragraph.isValid === false) {
+            return null;
+        }
+        return paragraph;
+    }
+
     function scanStoryForHashMatches(story, baseHash) {
         var matches = [];
         for (var i = 0; i < story.paragraphs.length; i++) {
@@ -106,8 +199,23 @@
         return matches;
     }
 
-    function findParagraphById(doc, paragraphId, baseHash) {
+    function findParagraphById(doc, paragraphId, baseHash, locator) {
         try {
+            if (typeof paragraphId === 'string' && paragraphId.indexOf('indesign-tablepara-') === 0) {
+                var tableParagraph = resolveTableForParagraphId(doc, paragraphId, locator);
+                if (!tableParagraph) {
+                    return null;
+                }
+                if (!baseHash) {
+                    return tableParagraph;
+                }
+                var currentHash = getHashUtil().computeParagraphHash(tableParagraph.contents || '', true);
+                if (currentHash.toLowerCase() === baseHash.toLowerCase()) {
+                    return tableParagraph;
+                }
+                return null;
+            }
+
             var resolved = resolveStoryForParagraphId(doc, paragraphId);
             if (!resolved) {
                 return null;
@@ -245,8 +353,12 @@
     };
 
     // Public for callers/tests that need to resolve a telemetry paragraph id.
-    SmartLinterAtomicReplacer.prototype.findParagraphById = function(doc, paragraphId, baseHash) {
-        return findParagraphById(doc, paragraphId, baseHash);
+    SmartLinterAtomicReplacer.prototype.findParagraphById = function(doc, paragraphId, baseHash, locator) {
+        return findParagraphById(doc, paragraphId, baseHash, locator);
+    };
+
+    SmartLinterAtomicReplacer.prototype.resolveTableForParagraphId = function(doc, paragraphId, locator) {
+        return resolveTableForParagraphId(doc, paragraphId, locator);
     };
 
     /**
@@ -571,15 +683,17 @@
         var targetParagraph = null;
         var currentText = '';
 
-        var hasResolvableParagraphId = typeof command.paragraphId === 'string' &&
+        var isTablePara = typeof command.paragraphId === 'string' &&
+            command.paragraphId.indexOf('indesign-tablepara-') === 0;
+        var hasResolvableParagraphId = isTablePara || (typeof command.paragraphId === 'string' &&
             command.paragraphId.indexOf('indesign-para-') === 0 &&
-            command.paragraphId.substring('indesign-para-'.length).lastIndexOf('-') > 0;
+            command.paragraphId.substring('indesign-para-'.length).lastIndexOf('-') > 0);
 
         // A command's paragraphId is authoritative.  Do not let a changed
         // cursor/selection redirect a real command to another paragraph.
         if (hasResolvableParagraphId) {
             var doc = options.doc || (inApp ? inApp.activeDocument : null);
-            targetParagraph = findParagraphById(doc, command.paragraphId, command.baseHash);
+            targetParagraph = findParagraphById(doc, command.paragraphId, command.baseHash, command.tableLocator);
             if (targetParagraph) {
                 currentText = targetParagraph.contents || '';
             }

@@ -126,4 +126,34 @@ describe('buildXliffDocument', () => {
     expect(result).toMatchObject({ ok: true });
     if (result.ok) expect(result.xml.indexOf('id="first"')).toBeLessThan(result.xml.indexOf('id="later"'));
   });
+
+  it('serializes table notes for containerKind TABLE and tableLocator', () => {
+    const locator = {
+      tableIndex: 0,
+      cellIndex: 2,
+      cellName: '1:0',
+      paragraphIndexInCell: 0,
+      rowSpan: 1,
+      columnSpan: 1,
+    };
+    const result = buildXliffDocument([
+      segment({
+        segmentId: 'table-seg-1',
+        paragraphId: 'indesign-tablepara-1-0-2-0',
+        containerKind: 'TABLE',
+        tableLocator: locator,
+        sourceText: 'Table Cell Text',
+        status: 'draft',
+        targetDraft: '표 셀 텍스트',
+      }),
+    ], { sourceLang: 'en', targetLang: 'ko' });
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.xml).toContain('<note category="containerKind">TABLE</note>');
+      expect(result.xml).toContain('<note category="tableLocator">');
+      expect(result.xml).toContain('&quot;tableIndex&quot;:0');
+      expect(result.xml).toContain('&quot;cellName&quot;:&quot;1:0&quot;');
+    }
+  });
 });

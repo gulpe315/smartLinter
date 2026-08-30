@@ -208,4 +208,100 @@ describe('applyXliffImport', () => {
     expect(result[2]).toBe(keepCurrent);
     expect(result[3]).toBe(unrelated);
   });
+
+  it('preserves incoming containerKind and tableLocator on imported segments', () => {
+    const locator = {
+      tableIndex: 0, cellIndex: 1, cellName: '0:1', paragraphIndexInCell: 0, rowSpan: 1, columnSpan: 1,
+    };
+    const current = segment({ segmentId: 'table-1', targetDraft: 'Old' });
+    const incomingUnit: ParsedTransUnit = {
+      id: 'table-1',
+      sourceText: 'Source text',
+      targetText: 'Translated cell',
+      state: 'translated',
+      containerKind: 'TABLE',
+      tableLocator: locator,
+    };
+    const result = applyXliffImport([current], [{ segment: current, incoming: incomingUnit }], [], 100);
+    expect(result[0].containerKind).toBe('TABLE');
+    expect(result[0].tableLocator).toEqual(locator);
+    expect(result[0].targetDraft).toBe('Translated cell');
+  });
+});
+
+describe('Table metadata notes and INVALID_TABLE_LOCATOR fail-closed handling', () => {
+  const locator = {
+    tableIndex: 0, cellIndex: 2, cellName: '1:0', paragraphIndexInCell: 0, rowSpan: 1, columnSpan: 1,
+  };
+
+  it('parses valid table note metadata', () => {
+    const content = xml([
+      '<trans-unit id="table-seg-1">',
+      '  <source>Table cell</source>',
+      '  <target>표 셀</target>',
+      '  <note category="containerKind">TABLE</note>',
+      `  <note category="tableLocator">${JSON.stringify(locator)}</note>`,
+      '</trans-unit>',
+    ].join('\n'));
+
+    const parsed = parseXliffImport(content);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.units[0].containerKind).toBe('TABLE');
+    expect(parsed.units[0].tableLocator).toEqual(locator);
+    expect(parsed.units[0].targetText).toBe('표 셀');
+  });
+
+  it('fails closed when containerKind is TABLE but tableLocator note is missing', () => {
+    const content = xml([
+      '<trans-unit id="table-seg-1">',
+      '  <source>Table cell</source>',
+      '  <target>표 셀</target>',
+      '  <note category="containerKind">TABLE</note>',
+      '</trans-unit>',
+    ].join('\n'));
+
+    const parsed = parseXliffImport(content);
+    expect(parsed).toEqual({
+      ok: false,
+      reason: 'INVALID_TABLE_LOCATOR',
+      message: '유효하지 않거나 누락된 표 위치자(tableLocator) 메타데이터입니다.',
+    });
+  });
+
+  it('fails closed when tableLocator note has invalid JSON', () => {
+    const content = xml([
+      '<trans-unit id="table-seg-1">',
+      '  <source>Table cell</source>',
+      '  <target>표 셀</target>',
+      '  <note category="containerKind">TABLE</note>',
+      '  <note category="tableLocator">NOT_VALID_JSON{</note>',
+      '</trans-unit>',
+    ].join('\n'));
+
+    const parsed = parseXliffImport(content);
+    expect(parsed).toEqual({
+      ok: false,
+      reason: 'INVALID_TABLE_LOCATOR',
+      message: '유효하지 않거나 누락된 표 위치자(tableLocator) 메타데이터입니다.',
+    });
+  });
+
+  it('fails closed when tableLocator note has negative index', () => {
+    const content = xml([
+      '<trans-unit id="table-seg-1">',
+      '  <source>Table cell</source>',
+      '  <target>표 셀</target>',
+      '  <note category="containerKind">TABLE</note>',
+      `  <note category="tableLocator">${JSON.stringify({ ...locator, cellIndex: -1 })}</note>`,
+      '</trans-unit>',
+    ].join('\n'));
+
+    const parsed = parseXliffImport(content);
+    expect(parsed).toEqual({
+      ok: false,
+      reason: 'INVALID_TABLE_LOCATOR',
+      message: '유효하지 않거나 누락된 표 위치자(tableLocator) 메타데이터입니다.',
+    });
+  });
 });

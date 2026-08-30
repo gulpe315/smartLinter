@@ -74,6 +74,48 @@ export interface MockParagraph {
     };
 }
 
+export interface MockCell {
+    index: number;
+    name: string;
+    rowSpan: number;
+    columnSpan: number;
+    typename: 'Cell';
+    parent: MockTable;
+    parentRow?: MockRow;
+    parentColumn?: MockColumn;
+    paragraphs: MockParagraph[];
+    texts?: Array<{ paragraphs: MockParagraph[] }>;
+    isValid?: boolean;
+}
+
+export interface MockRow {
+    index: number;
+    typename: 'Row';
+    parent: MockTable;
+    cells: MockCell[];
+    isValid?: boolean;
+}
+
+export interface MockColumn {
+    index: number;
+    typename: 'Column';
+    parent: MockTable;
+    cells: MockCell[];
+    isValid?: boolean;
+}
+
+export interface MockTable {
+    id: string;
+    index: number;
+    typename: 'Table';
+    parent: MockStory;
+    rows: MockRow[];
+    columns: MockColumn[];
+    cells: MockCell[] & { itemByName?: (name: string) => MockCell | null };
+    paragraphs?: MockParagraph[];
+    isValid?: boolean;
+}
+
 export interface MockTextFrame {
     typename: 'TextFrame';
     paragraphs: MockParagraph[];
@@ -88,6 +130,7 @@ export interface MockStory {
     typename: 'Story';
     index: number;
     paragraphs: MockParagraph[];
+    tables?: MockTable[] & { itemByID?: (id: string) => MockTable | null };
     textContainers: MockTextFrame[];
     overflows: boolean;
     isValid: boolean;
@@ -399,8 +442,174 @@ export class MockInDesignEnvironment {
         return paragraph;
     }
 
+    public createTable(
+        storyId: string,
+        rowCount: number,
+        colCount: number,
+        cellTexts?: (string | string[])[][],
+        insertAtIndex?: number
+    ): MockTable {
+        const story = this.stories.find((candidate) => candidate.id === storyId);
+        if (!story) throw new Error(`Story not found: ${storyId}`);
+
+        if (!story.tables) {
+            const tablesArray: any = [];
+            tablesArray.itemByID = (id: string) => tablesArray.find((t: any) => String(t.id) === String(id)) || null;
+            story.tables = tablesArray;
+        }
+
+        const tableIndex = story.tables.length;
+        const table: MockTable = {
+            id: `table-${tableIndex}`,
+            index: tableIndex,
+            typename: 'Table',
+            parent: story,
+            rows: [],
+            columns: [],
+            cells: [] as any,
+            isValid: true
+        };
+        (table.cells as any).itemByName = (name: string) => table.cells.find((cell) => cell.name === name) || null;
+
+        for (let r = 0; r < rowCount; r++) {
+            table.rows.push({
+                index: r,
+                typename: 'Row',
+                parent: table,
+                cells: [],
+                isValid: true
+            });
+        }
+        for (let c = 0; c < colCount; c++) {
+            table.columns.push({
+                index: c,
+                typename: 'Column',
+                parent: table,
+                cells: [],
+                isValid: true
+            });
+        }
+
+        const tableParagraphs: MockParagraph[] = [];
+
+        for (let r = 0; r < rowCount; r++) {
+            for (let c = 0; c < colCount; c++) {
+                const cellIndex = table.cells.length;
+                const cellName = `${c}:${r}`;
+                const cell: MockCell = {
+                    index: cellIndex,
+                    name: cellName,
+                    rowSpan: 1,
+                    columnSpan: 1,
+                    typename: 'Cell',
+                    parent: table,
+                    parentRow: table.rows[r],
+                    parentColumn: table.columns[c],
+                    paragraphs: [],
+                    isValid: true
+                };
+
+                const cellData = cellTexts?.[r]?.[c] ?? `Cell ${cellName}`;
+                const lines = Array.isArray(cellData) ? cellData : [cellData];
+
+                for (let pInCell = 0; pInCell < lines.length; pInCell++) {
+                    const text = lines[pInCell];
+                    const para = this.createParagraph(text, storyId);
+                    para.parent = cell;
+                    cell.paragraphs.push(para);
+                    tableParagraphs.push(para);
+                }
+
+                table.rows[r].cells.push(cell);
+                table.columns[c].cells.push(cell);
+                table.cells.push(cell);
+            }
+        }
+
+        if (typeof insertAtIndex === 'number' && insertAtIndex >= 0 && insertAtIndex <= story.paragraphs.length) {
+            story.paragraphs.splice(insertAtIndex, 0, ...tableParagraphs);
+        } else {
+            story.paragraphs.push(...tableParagraphs);
+        }
+
+        for (let i = 0; i < story.paragraphs.length; i++) {
+            story.paragraphs[i].index = i;
+        }
+
+        for (const frame of story.textContainers) {
+            frame.paragraphs = story.paragraphs;
+        }
+
+        story.tables.push(table);
+        return table;
+    }
+
+    public mergeCells(
+        table: MockTable,
+        startRow: number,
+        startCol: number,
+        rowSpan: number,
+        colSpan: number
+    ): MockCell {
+        const anchorName = `${startCol}:${startRow}`;
+        const anchorCell = table.cells.find((c) => c.name === anchorName);
+        if (!anchorCell) throw new Error(`Anchor cell not found: ${anchorName}`);
+
+        anchorCell.rowSpan = rowSpan;
+        anchorCell.columnSpan = colSpan;
+
+        const cellsToRemove = new Set<MockCell>();
+        for (let r = startRow; r < startRow + rowSpan; r++) {
+            for (let c = startCol; c < startCol + colSpan; c++) {
+                if (r === startRow && c === startCol) continue;
+                const name = `${c}:${r}`;
+                const cell = table.cells.find((candidate) => candidate.name === name);
+                if (cell) cellsToRemove.add(cell);
+            }
+        }
+
+        const removedParagraphs = new Set<MockParagraph>();
+        for (const cell of cellsToRemove) {
+            for (const p of cell.paragraphs) {
+                removedParagraphs.add(p);
+            }
+        }
+
+        const filteredCells = table.cells.filter((c) => !cellsToRemove.has(c));
+        table.cells.length = 0;
+        table.cells.push(...filteredCells);
+
+        for (let i = 0; i < table.cells.length; i++) {
+            table.cells[i].index = i;
+        }
+
+        const story = table.parent;
+        story.paragraphs = story.paragraphs.filter((p) => !removedParagraphs.has(p));
+        for (let i = 0; i < story.paragraphs.length; i++) {
+            story.paragraphs[i].index = i;
+        }
+        for (const frame of story.textContainers) {
+            frame.paragraphs = story.paragraphs;
+        }
+
+        return anchorCell;
+    }
+
+    public insertTableAt(
+        storyId: string,
+        paragraphIndex: number,
+        rowCount: number,
+        colCount: number,
+        cellTexts?: (string | string[])[][]
+    ): MockTable {
+        return this.createTable(storyId, rowCount, colCount, cellTexts, paragraphIndex);
+    }
+
     public addTableParagraph(storyId: string, text: string): MockParagraph {
-        return this.addContainerParagraph(storyId, text, { typename: 'Cell', parent: { typename: 'Story' } });
+        const story = this.stories.find((candidate) => candidate.id === storyId);
+        if (!story) throw new Error(`Story not found: ${storyId}`);
+        const table = this.createTable(storyId, 1, 1, [[text]]);
+        return table.cells[0].paragraphs[0];
     }
 
     public addFootnoteParagraph(storyId: string, text: string): MockParagraph {
@@ -612,6 +821,8 @@ export class MockInDesignEnvironment {
                 }
             },
 
+            open: (file: any) => self.openCopiedDocument(file),
+
             addEventListener(eventName: string, handler: (event: any) => void) {
                 if (!self.appListeners.has(eventName)) {
                     self.appListeners.set(eventName, []);
@@ -629,10 +840,134 @@ export class MockInDesignEnvironment {
         };
     }
 
+    public open(file: any): MockDocument {
+        return this.openCopiedDocument(file);
+    }
+
     /** Deep copied document factory used by T6b tests; source and copy paragraphs never alias. */
     public openCopiedDocument(file: any): MockDocument {
         const source = this.activeDocument!;
-        const copiedStories: any = this.stories.map((story) => ({ ...story, paragraphs: story.paragraphs.map((p) => ({ ...p, contents: p.contents })) }));
+        const copiedStories: any = this.stories.map((story) => {
+            const copiedStory: MockStory = {
+                id: story.id,
+                typename: 'Story',
+                index: story.index,
+                paragraphs: [],
+                tables: [] as any,
+                textContainers: [],
+                overflows: story.overflows,
+                isValid: story.isValid
+            };
+            (copiedStory.tables as any).itemByID = (id: any) =>
+                (copiedStory.tables as any).find((t: any) => String(t.id) === String(id)) || null;
+
+            const cellMap = new Map<MockCell, MockCell>();
+
+            if (story.tables) {
+                for (const table of story.tables) {
+                    const copiedTable: MockTable = {
+                        id: table.id,
+                        index: table.index,
+                        typename: 'Table',
+                        parent: copiedStory,
+                        rows: [],
+                        columns: [],
+                        cells: [] as any,
+                        isValid: table.isValid
+                    };
+                    (copiedTable.cells as any).itemByName = (name: string) =>
+                        copiedTable.cells.find((c: any) => c.name === name) || null;
+
+                    for (const row of table.rows) {
+                        copiedTable.rows.push({
+                            index: row.index,
+                            typename: 'Row',
+                            parent: copiedTable,
+                            cells: [],
+                            isValid: row.isValid
+                        });
+                    }
+                    for (const col of table.columns) {
+                        copiedTable.columns.push({
+                            index: col.index,
+                            typename: 'Column',
+                            parent: copiedTable,
+                            cells: [],
+                            isValid: col.isValid
+                        });
+                    }
+
+                    for (const cell of table.cells) {
+                        const copiedCell: MockCell = {
+                            index: cell.index,
+                            name: cell.name,
+                            rowSpan: cell.rowSpan,
+                            columnSpan: cell.columnSpan,
+                            typename: 'Cell',
+                            parent: copiedTable,
+                            parentRow: cell.parentRow ? copiedTable.rows[cell.parentRow.index] : undefined,
+                            parentColumn: cell.parentColumn ? copiedTable.columns[cell.parentColumn.index] : undefined,
+                            paragraphs: [],
+                            isValid: cell.isValid
+                        };
+
+                        for (const para of cell.paragraphs) {
+                            const copiedPara = this.createParagraph(para.contents, copiedStory.id, {
+                                paragraphStyle: para.appliedParagraphStyle?.name,
+                                characterRuns: para.characterRuns ? JSON.parse(JSON.stringify(para.characterRuns)) : undefined,
+                                hyperlinks: para.hyperlinks ? JSON.parse(JSON.stringify(para.hyperlinks)) : undefined,
+                            });
+                            copiedPara.index = para.index;
+                            copiedPara.parent = copiedCell;
+                            copiedCell.paragraphs.push(copiedPara);
+                        }
+
+                        if (copiedCell.parentRow) copiedCell.parentRow.cells.push(copiedCell);
+                        if (copiedCell.parentColumn) copiedCell.parentColumn.cells.push(copiedCell);
+                        copiedTable.cells.push(copiedCell);
+                        cellMap.set(cell, copiedCell);
+                    }
+                    copiedStory.tables!.push(copiedTable);
+                }
+            }
+
+            for (const p of story.paragraphs) {
+                if (p.parent && p.parent.typename === 'Cell') {
+                    const copiedCell = cellMap.get(p.parent as MockCell);
+                    if (copiedCell) {
+                        const existingInCell = copiedCell.paragraphs.find((cp) => cp.index === p.index)
+                            || copiedCell.paragraphs[0];
+                        if (existingInCell) {
+                            copiedStory.paragraphs.push(existingInCell);
+                            continue;
+                        }
+                    }
+                }
+                const copiedPara = this.createParagraph(p.contents, copiedStory.id, {
+                    paragraphStyle: p.appliedParagraphStyle?.name,
+                    characterRuns: p.characterRuns ? JSON.parse(JSON.stringify(p.characterRuns)) : undefined,
+                    hyperlinks: p.hyperlinks ? JSON.parse(JSON.stringify(p.hyperlinks)) : undefined,
+                });
+                copiedPara.index = p.index;
+                copiedPara.parent = { typename: 'Story' };
+                copiedStory.paragraphs.push(copiedPara);
+            }
+
+            for (const frame of story.textContainers) {
+                const copiedFrame: MockTextFrame = {
+                    typename: 'TextFrame',
+                    paragraphs: copiedStory.paragraphs,
+                    texts: [{ paragraphs: copiedStory.paragraphs }],
+                    parentStory: { id: copiedStory.id },
+                    overflows: frame.overflows,
+                    isValid: frame.isValid
+                };
+                copiedStory.textContainers.push(copiedFrame);
+            }
+
+            return copiedStory;
+        });
+
         copiedStories.itemByID = (id: any) => copiedStories.find((story: any) => String(story.id) === String(id)) || null;
         const doc: MockDocument = {
             id: source.id + '-copy', name: file && file.fsName ? file.fsName : 'copy.indd', stories: copiedStories,

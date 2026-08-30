@@ -36,6 +36,10 @@ import {
     isEnumerateDocumentResponse,
     isDocumentGenerationProgress,
     isCancelTranslatedDocumentRequest,
+    isContainerKind,
+    isTableLocator,
+    isScannedParagraphEntry,
+    isDocumentGenerationParagraphPlan,
 } from '../types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -295,6 +299,71 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
             assert.equal(isCancelTranslatedDocumentRequest({ requestId: 'same-request' }), true);
             assert.equal(isBridgeMessage({ type: 'DOCUMENT_GENERATION_PROGRESS', payload: { requestId: 'same-request', phase: 'copying' } }), true);
             assert.equal(isBridgeMessage({ type: 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE', payload: { requestId: 'same-request', status: 'CANCELLED' } }), true);
+        });
+    });
+
+    describe('ContainerKind and TableLocator protocol validation', () => {
+        it('validates ContainerKind correctly', () => {
+            assert.equal(isContainerKind('BODY'), true);
+            assert.equal(isContainerKind('TABLE'), true);
+            assert.equal(isContainerKind('FOOTNOTE'), false);
+            assert.equal(isContainerKind(''), false);
+            assert.equal(isContainerKind(null), false);
+        });
+
+        it('validates TableLocator structure and integer bounds', () => {
+            const valid: import('../types.ts').TableLocator = {
+                tableIndex: 0,
+                cellIndex: 1,
+                cellName: '0:1',
+                paragraphIndexInCell: 0,
+                rowSpan: 1,
+                columnSpan: 2,
+            };
+            assert.equal(isTableLocator(valid), true);
+            assert.equal(isTableLocator({ ...valid, rowIndex: 0 }), true);
+            assert.equal(isTableLocator({ tableIndex: 0, cellIndex: 0, paragraphIndexInCell: 0 }), true);
+
+            // Reject negative or non-integer indices
+            assert.equal(isTableLocator({ ...valid, tableIndex: -1 }), false);
+            assert.equal(isTableLocator({ ...valid, cellIndex: 1.5 }), false);
+            assert.equal(isTableLocator({ ...valid, paragraphIndexInCell: -1 }), false);
+            assert.equal(isTableLocator({ ...valid, rowSpan: 0 }), false);
+            assert.equal(isTableLocator({ ...valid, columnSpan: -2 }), false);
+            assert.equal(isTableLocator(null), false);
+            assert.equal(isTableLocator({}), false);
+        });
+
+        it('validates ScannedParagraphEntry and DocumentGenerationParagraphPlan with table metadata', () => {
+            const locator: import('../types.ts').TableLocator = {
+                tableIndex: 0,
+                cellIndex: 2,
+                cellName: '1:0',
+                paragraphIndexInCell: 0,
+                rowSpan: 1,
+                columnSpan: 1,
+            };
+            const entry = {
+                paragraphId: 'indesign-tablepara-10-0-2-0',
+                text: 'Cell text',
+                hash: 'hash-val',
+                documentOrderIndex: 2,
+                containerKind: 'TABLE' as const,
+                tableLocator: locator,
+            };
+            assert.equal(isScannedParagraphEntry(entry), true);
+            assert.equal(isScannedParagraphEntry({ ...entry, tableLocator: { ...locator, cellIndex: -1 } }), false);
+
+            const plan = {
+                paragraphId: 'indesign-tablepara-10-0-2-0',
+                documentOrderIndex: 2,
+                expectedSourceHash: 'hash-val',
+                targetText: '번역 텍스트',
+                containerKind: 'TABLE' as const,
+                tableLocator: locator,
+            };
+            assert.equal(isDocumentGenerationParagraphPlan(plan), true);
+            assert.equal(isDocumentGenerationParagraphPlan({ ...plan, containerKind: 'INVALID' as any }), false);
         });
     });
 });
