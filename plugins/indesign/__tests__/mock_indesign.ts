@@ -29,9 +29,22 @@ export interface MockStyledRun {
     characterStyle: string;
 }
 
+export class MockFont {
+    public fontFamily: string;
+    public fontStyleName: string;
+    public isValid: boolean;
+    constructor(fontFamily: string, fontStyleName: string, isValid = true) {
+        this.fontFamily = fontFamily;
+        this.fontStyleName = fontStyleName;
+        this.isValid = isValid;
+    }
+}
+
 export interface MockCharacterRange {
     contents: string[];
     appliedCharacterStyle?: MockCharacterStyle;
+    appliedFont?: MockFont;
+    underline?: boolean;
     texts: {
         everyItem: () => {
             getElements: () => Array<{
@@ -195,6 +208,9 @@ export class MockInDesignEnvironment {
     public removedFiles: string[] = [];
     public closedDocuments: any[] = [];
     public scriptPreferences = { userInteractionLevel: 'INTERACT_WITH_ALL' };
+    public fontEnumerationCount = 0;
+    public fonts: MockFont[] = [new MockFont('Minion Pro', 'Regular'), new MockFont('Minion Pro', 'Bold')];
+    public rangeWriteHistory: Array<{ start: number; end: number; appliedFont?: MockFont; underline?: boolean }> = [];
 
     public socketInstances: MockSocket[] = [];
     public socketHandler?: (req: string) => string;
@@ -273,7 +289,7 @@ export class MockInDesignEnvironment {
                     }
                 }
 
-                return {
+                const range: any = {
                     get contents() {
                         // ExtendScript returns an array when `.contents` is read
                         // from the plural Characters specifier returned by itemByRange.
@@ -331,6 +347,9 @@ export class MockInDesignEnvironment {
                         })
                     }
                 };
+                Object.defineProperty(range, 'appliedFont', { get: () => range._appliedFont, set: (font) => { range._appliedFont = font; this.rangeWriteHistory.push({ start, end, appliedFont: font, underline: range._underline }); } });
+                Object.defineProperty(range, 'underline', { get: () => range._underline, set: (underline) => { range._underline = underline; this.rangeWriteHistory.push({ start, end, appliedFont: range._appliedFont, underline }); } });
+                return range;
             }
         };
 
@@ -497,6 +516,7 @@ export class MockInDesignEnvironment {
             get activeDocument() { return self.activeDocument; },
             get selection() { return self.selection; },
             get scriptPreferences() { return self.scriptPreferences; },
+            fonts: { everyItem: () => ({ getElements: () => { self.fontEnumerationCount++; return self.fonts; } }) },
             open(file: any) { return self.openCopiedDocument(file); },
 
             doScript(

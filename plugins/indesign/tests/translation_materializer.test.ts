@@ -1,0 +1,12 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { fileURLToPath } from 'node:url';
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+function load(fonts: any[]) { const source = fs.readFileSync(path.resolve(dirname, '../extendscript/translation_materializer.jsx'), 'utf8').replace(/^\s*#targetengine[^\n]*\n/gm, ''); const sandbox: any = { module: { exports: {} }, Array, String, Object, app: { fonts: { everyItem: () => ({ getElements: () => fonts }) } } }; sandbox.global = sandbox; sandbox.globalThis = sandbox; vm.runInNewContext(source, sandbox); return sandbox.SmartLinterInDesignTranslationMaterializer; }
+describe('InDesign translation materializer', () => {
+  it('uses exact cached Fonts and underline without fontStyle', () => { const regular = { fontFamily: 'Minion Pro', fontStyleName: 'Regular', isValid: true }, bold = { fontFamily: 'Minion Pro', fontStyleName: 'Bold', isValid: true }; const M = load([regular, bold]); const writes: any[] = []; const p: any = { contents: 'old', characters: { itemByRange: (s: number, e: number) => ({ set appliedFont(v: any) { writes.push(['font', s, e, v]); }, set underline(v: any) { writes.push(['underline', s, e, v]); } }) } }; const result = new M().apply(p, { paragraphId: 'p', documentOrderIndex: 0, targetText: 'A B', runs: [{ text: 'A', bold: false, italic: false, underline: false }, { text: ' B', bold: true, italic: false, underline: true, sourceFormatIds: ['1'] }], inDesignDefaultFontFace: { fontFamily: 'Minion Pro', fontStyleName: 'Regular' }, inDesignFontFaceByFormatId: { '1': { fontFamily: 'Minion Pro', fontStyleName: 'Bold' } } }); assert.equal(result.ok, true); assert.equal(p.contents, 'A B'); assert.equal(writes[0][3], regular); assert.equal(writes[2][3], bold); });
+  it('fails face misses before mutating', () => { const M = load([]); const p: any = { contents: 'old', characters: { itemByRange: () => ({}) } }; const result = new M().apply(p, { paragraphId: 'p', targetText: 'new', runs: [{ text: 'new', bold: false, italic: false, underline: false }], inDesignDefaultFontFace: { fontFamily: 'Missing', fontStyleName: 'Semibold' }, inDesignFontFaceByFormatId: {} }); assert.equal(result.ok, false); assert.equal(result.diagnostic.reason, 'FONT_FACE_UNAVAILABLE'); assert.equal(p.contents, 'old'); });
+});

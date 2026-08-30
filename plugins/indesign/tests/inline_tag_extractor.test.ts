@@ -16,8 +16,8 @@ function loadExtractor() {
     return sandbox.SmartLinterInlineTagExtractor;
 }
 
-function paragraph(contents: string, ranges: Array<{ contents: string; fontStyle?: string; underline?: boolean }>) {
-    return { contents, textStyleRanges: ranges };
+function paragraph(contents: string, ranges: Array<{ contents: string; fontStyle?: string; underline?: boolean; appliedFont?: any }>) {
+    return { contents, textStyleRanges: ranges.map((range) => ({ ...range, appliedFont: range.appliedFont || { fontFamily: 'Minion Pro', fontStyleName: range.fontStyle || 'Regular', isValid: true } })) };
 }
 
 function textFrom(tokens: any[]) {
@@ -56,28 +56,24 @@ describe('InDesign inline tag extractor', () => {
         ]);
     });
 
-    it('nests paired tags correctly for a combined formatting run', () => {
+    it('fails closed when a paragraph has no unformatted default face', () => {
         const result = loadExtractor().extractParagraphTokens(paragraph('Both', [{ contents: 'Both', fontStyle: 'Bold Italic' }]));
-        assert.equal(result.ok, true);
-        assert.deepEqual(JSON.parse(JSON.stringify(result.tokens)), [
-            { type: 'open', id: '1', kind: 'bold' }, { type: 'open', id: '1', kind: 'italic' },
-            { type: 'text', value: 'Both' },
-            { type: 'close', id: '1', kind: 'italic' }, { type: 'close', id: '1', kind: 'bold' },
-        ]);
+        assert.equal(result.ok, false);
+        assert.equal(result.reason, 'DEFAULT_FONT_FACE_UNAVAILABLE');
     });
 
     it('merges adjacent ranges with the same formatting', () => {
-        const result = loadExtractor().extractParagraphTokens(paragraph('joined', [
-            { contents: 'join', fontStyle: 'Bold' }, { contents: 'ed', fontStyle: 'Bold' },
+        const result = loadExtractor().extractParagraphTokens(paragraph('joined ', [
+            { contents: 'join', fontStyle: 'Bold' }, { contents: 'ed', fontStyle: 'Bold' }, { contents: ' ', fontStyle: 'Regular' },
         ]));
         assert.equal(result.ok, true);
         assert.deepEqual(JSON.parse(JSON.stringify(result.tokens)), [
-            { type: 'open', id: '1', kind: 'bold' }, { type: 'text', value: 'joined' }, { type: 'close', id: '1', kind: 'bold' },
+            { type: 'open', id: '1', kind: 'bold' }, { type: 'text', value: 'joined' }, { type: 'close', id: '1', kind: 'bold' }, { type: 'text', value: ' ' },
         ]);
     });
 
     it('safely falls back when style-range text does not equal paragraph contents', () => {
         const result = loadExtractor().extractParagraphTokens(paragraph('Expected', [{ contents: 'Different' }]));
-        assert.deepEqual(JSON.parse(JSON.stringify(result)), { ok: false, tokens: [], plainText: 'Expected' });
+        assert.deepEqual(JSON.parse(JSON.stringify(result)), { ok: false, tokens: [], plainText: 'Expected', reason: 'PLAIN_TEXT_MISMATCH' });
     });
 });

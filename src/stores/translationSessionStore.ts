@@ -131,9 +131,19 @@ function tagAwareSentenceMatches(paragraph: SegmentParagraph): SentenceMatch[] {
         sourceTokens.push(token);
       }
     }
+    const ids = new Set(sourceTokens.filter((token): token is Extract<InlineToken, { type: 'open' | 'close' }> => token.type === 'open' || token.type === 'close').map((token) => token.id));
+    const sourceFaces = tagged.inDesignFontFaces;
+    const byFormatId: Record<string, { fontFamily: string; fontStyleName: string }> = {};
+    if (sourceFaces) for (const id of ids) {
+      if (!sourceFaces.byFormatId[id]) return { segmentIndex, sourceText: sentence.text, startOffset: sentence.start, endOffset: sentence.end, candidates: [] };
+      byFormatId[id] = sourceFaces.byFormatId[id];
+    }
     return {
       segmentIndex, sourceText: sentence.text, startOffset: sentence.start, endOffset: sentence.end, candidates: [],
-      taggedSource: { sourceTokens, tagStatus: 'valid' },
+      taggedSource: {
+        sourceTokens, tagStatus: 'valid',
+        ...(sourceFaces ? { inDesignFontFaces: { defaultFontFace: sourceFaces.defaultFontFace, byFormatId } } : {}),
+      },
     };
   });
 }
@@ -499,7 +509,21 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
           } else if (segmentText) runs.push({ text: segmentText, bold: false, italic: false, underline: false });
         }
         if (runs.map((run) => run.text).join('') !== targetText) return { ok: false, reason: 'Rendered text differs from paragraph target.', diagnostic: { paragraphId, documentOrderIndex: first.documentOrderIndex, reason: 'RENDERED_TEXT_MISMATCH' }, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
-        plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText, runs });
+        const metadata = ordered.map((segment) => segment.taggedSource?.inDesignFontFaces).filter(Boolean);
+        if (metadata.length) {
+          const defaultFace = metadata[0]!.defaultFontFace;
+          const byFormatId: Record<string, { fontFamily: string; fontStyleName: string }> = {};
+          for (const item of metadata) {
+            if (item!.defaultFontFace.fontFamily !== defaultFace.fontFamily || item!.defaultFontFace.fontStyleName !== defaultFace.fontStyleName) return { ok: false, reason: 'InDesign default font faces conflict.', diagnostic: { paragraphId, documentOrderIndex: first.documentOrderIndex, reason: 'FONT_FACE_UNAVAILABLE' }, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
+            for (const [id, face] of Object.entries(item!.byFormatId)) {
+              const prior = byFormatId[id];
+              if (prior && (prior.fontFamily !== face.fontFamily || prior.fontStyleName !== face.fontStyleName)) return { ok: false, reason: 'InDesign format font faces conflict.', diagnostic: { paragraphId, documentOrderIndex: first.documentOrderIndex, reason: 'FONT_FACE_UNAVAILABLE' }, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
+              byFormatId[id] = face;
+            }
+          }
+          for (const run of runs) for (const id of run.sourceFormatIds || []) if (!byFormatId[id]) return { ok: false, reason: 'InDesign format font face is missing.', diagnostic: { paragraphId, documentOrderIndex: first.documentOrderIndex, reason: 'FONT_FACE_UNAVAILABLE' }, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
+          plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText, runs, inDesignDefaultFontFace: defaultFace, inDesignFontFaceByFormatId: byFormatId });
+        } else plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText, runs });
       }
     }
     return { ok: true, plans, translatedParagraphCount: plans.length, untranslatedParagraphCount: totalParagraphCount - plans.length, totalParagraphCount };

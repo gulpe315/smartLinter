@@ -13,12 +13,6 @@
         var safe = String(requestId || 'request').replace(/[^A-Za-z0-9_-]/g, '_');
         return File(Folder.temp.fsName + '/smartlinter-' + safe + '-' + (new Date()).getTime() + '.indd');
     }
-    function extractDiffHunks(sourceText, targetText) {
-        var start = 0, sourceEnd = sourceText.length, targetEnd = targetText.length;
-        while (start < sourceEnd && start < targetEnd && sourceText.charAt(start) === targetText.charAt(start)) start++;
-        while (sourceEnd > start && targetEnd > start && sourceText.charAt(sourceEnd - 1) === targetText.charAt(targetEnd - 1)) { sourceEnd--; targetEnd--; }
-        return sourceText === targetText ? [] : [{ start: start, end: sourceEnd, oldText: sourceText.substring(start, sourceEnd), newText: targetText.substring(start, targetEnd) }];
-    }
     function generate(request, options) {
         options = options || {};
         var inApp = options.appInstance || (typeof app !== 'undefined' ? app : null);
@@ -30,7 +24,7 @@
             sourceDoc.saveACopy(temporary);
             copiedDoc = inApp.open(temporary);
             if (inApp.scriptPreferences && typeof UserInteractionLevels !== 'undefined') inApp.scriptPreferences.userInteractionLevel = UserInteractionLevels.NEVER_INTERACT;
-            var plans = (request.paragraphPlans || []).slice(0), replacer = new SmartLinterAtomicReplacer({ appInstance: inApp });
+            var plans = (request.paragraphPlans || []).slice(0), replacer = new SmartLinterAtomicReplacer({ appInstance: inApp }), materializer = new SmartLinterInDesignTranslationMaterializer({ appInstance: inApp });
             plans.sort(function(a, b) { return a.documentOrderIndex - b.documentOrderIndex; });
             /* Verify every fingerprint before applying any hunk. */
             for (var i = 0; i < plans.length; i++) {
@@ -40,10 +34,8 @@
             for (var j = 0; j < plans.length; j++) {
                 var plan = plans[j], paragraph = replacer.findParagraphById(copiedDoc, plan.paragraphId, plan.expectedSourceHash);
                 if (!paragraph) return fail(request, 'FINGERPRINT_MISMATCH', 'Copied document paragraph fingerprint mismatch');
-                var text = paragraph.contents || '';
-                if (text === plan.targetText) continue;
-                var result = replacer.execute({ commandId: request.requestId + '-' + j, paragraphId: plan.paragraphId, baseHash: plan.expectedSourceHash, expectedHash: hash(plan.targetText), hunks: extractDiffHunks(text, plan.targetText) }, { appInstance: inApp, doc: copiedDoc, targetParagraph: paragraph });
-                if (result.status !== 'SUCCESS') return fail(request, 'FAILED', result.message || 'Replacement failed');
+                var result = materializer.apply(paragraph, plan);
+                if (!result.ok) return { requestId: request.requestId || 'unknown', status: 'FAILED', message: result.diagnostic.detail || result.diagnostic.reason, diagnostic: result.diagnostic };
             }
             copiedDoc.saveAs(File(request.destinationPath));
             succeeded = true;

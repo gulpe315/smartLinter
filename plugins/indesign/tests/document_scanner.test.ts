@@ -65,15 +65,15 @@ describe('InDesign document scanner', () => {
         const env = new MockInDesignEnvironment(); env.stories.length = 0;
         const story = env.createStory(['Hello bold'], { id: '40' });
         (story.paragraphs[0] as any).textStyleRanges = [
-            { contents: 'Hello ', fontStyle: 'Regular', underline: false },
-            { contents: 'bold', fontStyle: 'Bold', underline: false },
+            { contents: 'Hello ', fontStyle: 'Regular', underline: false, appliedFont: { fontFamily: 'Minion Pro', fontStyleName: 'Regular', isValid: true } },
+            { contents: 'bold', fontStyle: 'Bold', underline: false, appliedFont: { fontFamily: 'Minion Pro', fontStyleName: 'Bold', isValid: true } },
         ];
         const result = loadScanner().enumerateAllDocumentParagraphs(env.activeDocument, { requestId: 'formatted' });
         assert.deepEqual(JSON.parse(JSON.stringify(result.paragraphs[0].taggedSource)), {
             tagStatus: 'valid', sourceTokens: [
                 { type: 'text', value: 'Hello ' },
                 { type: 'open', id: '1', kind: 'bold' }, { type: 'text', value: 'bold' }, { type: 'close', id: '1', kind: 'bold' },
-            ],
+            ], inDesignFontFaces: { defaultFontFace: { fontFamily: 'Minion Pro', fontStyleName: 'Regular' }, byFormatId: { '1': { fontFamily: 'Minion Pro', fontStyleName: 'Bold' } } },
         });
     });
 

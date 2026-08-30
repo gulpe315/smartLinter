@@ -18,6 +18,7 @@
 #include "transaction_runner.jsx"
 #include "atomic_replacer.jsx"
 #include "document_scanner.jsx"
+#include "translation_materializer.jsx"
 #include "document_generator.jsx"
 
 (function(global) {

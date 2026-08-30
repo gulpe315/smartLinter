@@ -27,6 +27,7 @@ function setup() {
     SmartLinterHashUtil: { computeParagraphHash }, SmartLinterTextObserver: function() {},
   };
   sandbox.global = sandbox; sandbox.globalThis = sandbox; sandbox.$ = { global: sandbox };
+  sandbox.SmartLinterInDesignTranslationMaterializer = function() { this.apply = (paragraph: any, plan: any) => { paragraph.contents = plan.targetText; return { ok: true }; }; };
   vm.runInNewContext(source(generator), sandbox, { filename: generator });
   sandbox.SmartLinterAtomicReplacer = function() {
     this.findParagraphById = (doc: any, paragraphId: string, baseHash: string) => {
@@ -42,7 +43,7 @@ function setup() {
   };
   return { sandbox, app, sourceDoc, get copied() { return copied; } };
 }
-function request(target = 'Translated paragraph') { return { requestId: 't6b-test', destinationPath: '/output/translated.indd', paragraphPlans: [{ paragraphId: 'indesign-para-1-0', documentOrderIndex: 0, expectedSourceHash: computeParagraphHash('Source paragraph'), targetText: target }] }; }
+function request(target = 'Translated paragraph') { return { requestId: 't6b-test', destinationPath: '/output/translated.indd', paragraphPlans: [{ paragraphId: 'indesign-para-1-0', documentOrderIndex: 0, expectedSourceHash: computeParagraphHash('Source paragraph'), targetText: target, runs: [{ text: target, bold: false, italic: false, underline: false }], inDesignDefaultFontFace: { fontFamily: 'Minion Pro', fontStyleName: 'Regular' }, inDesignFontFaceByFormatId: {} }] }; }
 
 describe('InDesign translated-document generator (T6b)', () => {
   it('copies, translates, saves, removes temp, and never changes source', () => {

@@ -23,6 +23,7 @@ export interface TaggedSegmentData {
     targetTokens?: InlineToken[];
     tagStatus: 'valid' | 'fallback-plain' | 'broken';
     fallbackReason?: string;
+    inDesignFontFaces?: InDesignFontFaceMetadata;
 }
 
 /** Text replacement execution outcomes */
@@ -179,6 +180,11 @@ export interface InDesignSourceFontFace {
     fontStyleName: string;
 }
 
+export interface InDesignFontFaceMetadata {
+    defaultFontFace: InDesignSourceFontFace;
+    byFormatId: Record<string, InDesignSourceFontFace>;
+}
+
 export type GenerationDiagnosticReason =
     | 'FINGERPRINT_MISMATCH'
     | 'INVALID_TARGET_TAGS'
@@ -314,7 +320,8 @@ export function isTaggedSegmentData(val: unknown): val is TaggedSegmentData {
         && obj.sourceTokens.every(isInlineToken)
         && (obj.targetTokens === undefined || (Array.isArray(obj.targetTokens) && obj.targetTokens.every(isInlineToken)))
         && (obj.tagStatus === 'valid' || obj.tagStatus === 'fallback-plain' || obj.tagStatus === 'broken')
-        && (obj.fallbackReason === undefined || typeof obj.fallbackReason === 'string');
+        && (obj.fallbackReason === undefined || typeof obj.fallbackReason === 'string')
+        && (obj.inDesignFontFaces === undefined || isInDesignFontFaceMetadata(obj.inDesignFontFaces));
 }
 
 export function isReplacementStatus(val: unknown): val is ReplacementStatus {
@@ -481,6 +488,14 @@ export function isRenderedRun(val: unknown): val is RenderedRun {
 export function isInDesignSourceFontFace(val: unknown): val is InDesignSourceFontFace {
     return typeof val === 'object' && val !== null && typeof (val as Record<string, unknown>).fontFamily === 'string'
         && typeof (val as Record<string, unknown>).fontStyleName === 'string';
+}
+
+export function isInDesignFontFaceMetadata(val: unknown): val is InDesignFontFaceMetadata {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return isInDesignSourceFontFace(obj.defaultFontFace)
+        && typeof obj.byFormatId === 'object' && obj.byFormatId !== null
+        && Object.values(obj.byFormatId).every(isInDesignSourceFontFace);
 }
 
 export function isGenerationDiagnostic(val: unknown): val is GenerationDiagnostic {

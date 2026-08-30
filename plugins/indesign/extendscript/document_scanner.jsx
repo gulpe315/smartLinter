@@ -75,7 +75,7 @@
                     var text = String(para.contents || '');
                     var extraction = SmartLinterInlineTagExtractor.extractParagraphTokens(para);
                     var taggedSource = extraction.ok
-                        ? { sourceTokens: extraction.tokens, tagStatus: 'valid' }
+                        ? { sourceTokens: extraction.tokens, tagStatus: 'valid', inDesignFontFaces: extraction.inDesignFontFaces }
                         : { sourceTokens: [{ type: 'text', value: text }], tagStatus: 'fallback-plain', fallbackReason: extraction.reason };
                     response.paragraphs.push({
                         paragraphId: 'indesign-para-' + storyId + '-' + p,
