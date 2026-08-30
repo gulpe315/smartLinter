@@ -410,8 +410,16 @@ pub async fn enumerate_document_paragraphs(
 }
 
 #[tauri::command]
-pub async fn generate_translated_document(paragraph_plans: Vec<DocumentGenerationParagraphPlan>, server_handle: State<'_, ServerHandle>) -> Result<GenerateTranslatedDocumentResponse, String> {
-    server_handle.session_manager().request_generate_translated_document(paragraph_plans).await.map_err(|error| error.to_string())
+pub async fn generate_translated_document(paragraph_plans: Vec<DocumentGenerationParagraphPlan>, destination_path: Option<String>, server_handle: State<'_, ServerHandle>) -> Result<GenerateTranslatedDocumentResponse, String> {
+    let session = server_handle.session_manager().get_snapshot().await.ok_or_else(|| "No active editor session".to_string())?;
+    if session.editor_type == EditorType::Word {
+        return server_handle.session_manager().request_generate_translated_document(paragraph_plans).await.map_err(|error| error.to_string());
+    }
+    let request_id = format!("indesign-generate-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis());
+    let destination_path = destination_path.ok_or_else(|| "An InDesign translated document requires a destination path".to_string())?;
+    tokio::task::spawn_blocking(move || crate::indesign_com::generate_translated_document(request_id, paragraph_plans, destination_path))
+        .await
+        .map_err(|error| format!("InDesign document generation task failed: {error}"))?
 }
 
 /// Gets current QA paragraph contents in InDesign without changing selection or focus.

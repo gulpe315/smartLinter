@@ -18,6 +18,7 @@
 #include "transaction_runner.jsx"
 #include "atomic_replacer.jsx"
 #include "document_scanner.jsx"
+#include "document_generator.jsx"
 
 (function(global) {
     'use strict';
@@ -465,6 +466,16 @@
             requestId: command ? command.requestId : undefined,
             includeUnplacedStories: command ? command.includeUnplacedStories : false
         });
+    };
+
+    /** COM DoScript entry point. This deliberately is not a WebSocket handler. */
+    SmartLinterDaemon.prototype.generateTranslatedDocument = function(request, options) {
+        options = options || {};
+        var generator = (typeof SmartLinterDocumentGenerator !== 'undefined') ? SmartLinterDocumentGenerator : global.SmartLinterDocumentGenerator;
+        if (!generator || typeof generator.generateTranslatedDocument !== 'function') {
+            return { requestId: request ? (request.requestId || 'unknown') : 'unknown', status: 'FAILED', message: 'DocumentGenerator not initialized in daemon' };
+        }
+        return generator.generateTranslatedDocument(request, { appInstance: options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null) });
     };
 
     /** Returns the current QA paragraph contents without changing selection or focus. */

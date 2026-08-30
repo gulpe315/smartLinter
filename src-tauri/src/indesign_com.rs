@@ -54,7 +54,7 @@ mod platform {
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use windows::core::{BSTR, GUID, PCWSTR, VARIANT};
-    use crate::protocol::{EnumerateDocumentResponse, ReplacementCommand, ReplacementResult};
+    use crate::protocol::{DocumentGenerationParagraphPlan, EnumerateDocumentResponse, GenerateTranslatedDocumentResponse, ReplacementCommand, ReplacementResult};
     use windows::Win32::Foundation::{
         CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE, RPC_E_CALL_REJECTED,
         RPC_E_CHANGED_MODE, RPC_E_SERVERCALL_RETRYLATER,
@@ -575,6 +575,23 @@ mod platform {
         unreachable!("the retry loop always returns")
     }
 
+    pub fn generate_translated_document(request_id: String, paragraph_plans: Vec<DocumentGenerationParagraphPlan>, destination_path: String) -> Result<GenerateTranslatedDocumentResponse, String> {
+        if !is_indesign_process_running()? { return Err("InDesign is not running".to_string()); }
+        let request = serde_json::json!({ "requestId": request_id, "paragraphPlans": paragraph_plans, "destinationPath": destination_path });
+        let script = format!("#targetengine \"smartlinter_persistent_engine\"\n(function() {{ if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{ return JSON.stringify($.global.SmartLinterDaemonInstance.generateTranslatedDocument({request})); }} return JSON.stringify({{ requestId: {}, status: 'FAILED', message: 'InDesign SmartLinterDaemonInstance is not initialized' }}); }})();", serde_json::to_string(&request_id).map_err(|e| format!("Cannot serialize generation request ID: {e}"))?);
+        let _com = ComApartment::initialize()?; let dispatch = active_indesign()?; let start = Instant::now();
+        for (attempt, delay) in [100_u64, 300, 900].into_iter().enumerate() {
+            thread::sleep(Duration::from_millis(delay));
+            match do_script_with_result(&dispatch, &script) {
+                Ok(output) => { tracing::debug!(elapsed_ms = start.elapsed().as_millis() as u64, attempt = attempt + 1, "InDesign translated document generation completed"); return serde_json::from_str(&output).map_err(|e| format!("Cannot decode InDesign document generation result: {e}")); }
+                Err(error) if is_transient_busy(&error) && attempt < 2 => continue,
+                Err(error) if is_transient_busy(&error) => return Err(format!("InDesign remained busy after 3 DoScript attempts: {error}")),
+                Err(error) => return Err(format!("InDesign DoScript failed: {error}")),
+            }
+        }
+        unreachable!("the retry loop always returns")
+    }
+
     pub fn enumerate_document_paragraphs(
         include_unplaced_stories: bool,
     ) -> Result<EnumerateDocumentResponse, String> {
@@ -615,7 +632,7 @@ mod platform {
 }
 
 #[cfg(windows)]
-pub use platform::{detect_running_indesign, enumerate_document_paragraphs, execute_replacement, get_live_paragraph_snapshot, get_live_paragraph_snapshots, inject_daemon_script, locate_paragraph};
+pub use platform::{detect_running_indesign, enumerate_document_paragraphs, execute_replacement, generate_translated_document, get_live_paragraph_snapshot, get_live_paragraph_snapshots, inject_daemon_script, locate_paragraph};
 
 #[cfg(not(windows))]
 pub fn detect_running_indesign() -> Result<bool, String> {
@@ -651,6 +668,9 @@ pub fn get_live_paragraph_snapshot(_paragraph_id: String, _base_hash: Option<Str
 pub fn get_live_paragraph_snapshots(_paragraph_ids: Vec<String>) -> Result<Vec<LiveParagraphSnapshotEntry>, String> {
     Err("InDesign COM automation is only supported on Windows".to_string())
 }
+
+#[cfg(not(windows))]
+pub fn generate_translated_document(_request_id: String, _paragraph_plans: Vec<crate::protocol::DocumentGenerationParagraphPlan>, _destination_path: String) -> Result<crate::protocol::GenerateTranslatedDocumentResponse, String> { Err("InDesign COM automation is only supported on Windows".to_string()) }
 
 #[cfg(not(windows))]
 pub fn enumerate_document_paragraphs(_include_unplaced_stories: bool) -> Result<crate::protocol::EnumerateDocumentResponse, String> {

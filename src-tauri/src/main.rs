@@ -49,6 +49,7 @@ fn main() {
         .try_init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
             let event_sink = Arc::new(TauriBridgeEventSink::new(app_handle));

@@ -872,7 +872,16 @@ export class TauriBridgeService implements IBridgeService {
 
   async generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[]): Promise<GenerateTranslatedDocumentResponse> {
     if (!this.isTauriAvailable()) return this.fallbackService.generateTranslatedDocument(paragraphPlans);
-    return await invoke('generate_translated_document', { paragraphPlans });
+    const health = await this.fetchBridgeHealth();
+    let destinationPath: string | undefined;
+    if (health.editorType === 'InDesign') {
+      // Kept runtime-loaded so the browser fallback remains dependency-free; Tauri supplies it.
+      const { save } = await import(/* @vite-ignore */ '@tauri-apps/plugin-dialog');
+      const selected = await save({ filters: [{ name: 'InDesign document', extensions: ['indd'] }] });
+      if (selected === null) return { requestId: 'indesign-generate-cancelled', status: 'FAILED', message: 'Document generation cancelled by user' };
+      destinationPath = selected;
+    }
+    return await invoke('generate_translated_document', { paragraphPlans, destinationPath });
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {

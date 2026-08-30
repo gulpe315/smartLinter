@@ -163,6 +163,8 @@ export interface DocumentGenerationParagraphPlan {
 export interface GenerateTranslatedDocumentRequest {
     requestId: string;
     paragraphPlans: DocumentGenerationParagraphPlan[];
+    /** Destination selected before InDesign creates its temporary copy. Ignored by Word. */
+    destinationPath?: string;
 }
 
 export type GenerateTranslatedDocumentStatus =
@@ -435,7 +437,8 @@ export function isGenerateTranslatedDocumentRequest(val: unknown): val is Genera
     const obj = val as Record<string, unknown>;
     return typeof obj.requestId === 'string'
         && Array.isArray(obj.paragraphPlans)
-        && obj.paragraphPlans.every(isDocumentGenerationParagraphPlan);
+        && obj.paragraphPlans.every(isDocumentGenerationParagraphPlan)
+        && (obj.destinationPath === undefined || typeof obj.destinationPath === 'string');
 }
 
 export function isGenerateTranslatedDocumentStatus(val: unknown): val is GenerateTranslatedDocumentStatus {

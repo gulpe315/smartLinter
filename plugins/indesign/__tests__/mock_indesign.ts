@@ -84,7 +84,14 @@ export interface MockDocument {
     id: string;
     name: string;
     stories?: MockStory[] & { itemByID?: (id: string) => MockStory | null };
+    saveACopy?: (file: any) => void;
+    saveAs?: (file: any) => void;
+    close?: (option: any) => void;
 }
+
+/** T6b document-copy workflow constants, mirroring the ExtendScript globals. */
+export const MockSaveOptions = { NO: 'NO' };
+export const MockUserInteractionLevels = { NEVER_INTERACT: 'NEVER_INTERACT' };
 
 export interface MockIdleTask {
     name: string;
@@ -183,12 +190,20 @@ export class MockInDesignEnvironment {
     public appListeners: Map<string, Array<(event: any) => void>> = new Map();
     public doScriptHistory: DoScriptCallRecord[] = [];
     public stories: MockStory[] = [];
+    public savedCopies: string[] = [];
+    public savedDocuments: string[] = [];
+    public removedFiles: string[] = [];
+    public closedDocuments: any[] = [];
+    public scriptPreferences = { userInteractionLevel: 'INTERACT_WITH_ALL' };
 
     public socketInstances: MockSocket[] = [];
     public socketHandler?: (req: string) => string;
 
     constructor(initialText = 'Default InDesign editorial paragraph.', docName = 'Magazine_Spread.indd') {
         const doc: MockDocument = { id: 'doc-id-001', name: docName };
+        doc.saveACopy = (file: any) => { this.savedCopies.push(file && file.fsName ? file.fsName : String(file)); };
+        doc.saveAs = (file: any) => { this.savedDocuments.push(file && file.fsName ? file.fsName : String(file)); };
+        doc.close = (option: any) => { this.closedDocuments.push(option); };
         this.documents = [doc];
         this.activeDocument = doc;
         this.syncStories();
@@ -481,6 +496,8 @@ export class MockInDesignEnvironment {
             get documents() { return self.documents; },
             get activeDocument() { return self.activeDocument; },
             get selection() { return self.selection; },
+            get scriptPreferences() { return self.scriptPreferences; },
+            open(file: any) { return self.openCopiedDocument(file); },
 
             doScript(
                 callback: () => any,
@@ -590,6 +607,20 @@ export class MockInDesignEnvironment {
                 }
             }
         };
+    }
+
+    /** Deep copied document factory used by T6b tests; source and copy paragraphs never alias. */
+    public openCopiedDocument(file: any): MockDocument {
+        const source = this.activeDocument!;
+        const copiedStories: any = this.stories.map((story) => ({ ...story, paragraphs: story.paragraphs.map((p) => ({ ...p, contents: p.contents })) }));
+        copiedStories.itemByID = (id: any) => copiedStories.find((story: any) => String(story.id) === String(id)) || null;
+        const doc: MockDocument = {
+            id: source.id + '-copy', name: file && file.fsName ? file.fsName : 'copy.indd', stories: copiedStories,
+            saveAs: (destination) => { this.savedDocuments.push(destination.fsName || String(destination)); },
+            close: (option) => { this.closedDocuments.push(option); }
+        };
+        this.savedCopies.push(file && file.fsName ? file.fsName : String(file));
+        return doc;
     }
 
     public triggerIdleTick(taskName = 'smartlinter_persistent_monitor', eventObj?: any): any {

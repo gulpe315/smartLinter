@@ -578,7 +578,7 @@
         // A command's paragraphId is authoritative.  Do not let a changed
         // cursor/selection redirect a real command to another paragraph.
         if (hasResolvableParagraphId) {
-            var doc = inApp ? inApp.activeDocument : null;
+            var doc = options.doc || (inApp ? inApp.activeDocument : null);
             targetParagraph = findParagraphById(doc, command.paragraphId, command.baseHash);
             if (targetParagraph) {
                 currentText = targetParagraph.contents || '';

@@ -221,7 +221,7 @@ pub struct EnumerateDocumentResponse {
 pub struct DocumentGenerationParagraphPlan { pub paragraph_id: String, pub document_order_index: u32, pub expected_source_hash: String, pub target_text: String }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct GenerateTranslatedDocumentRequest { pub request_id: String, pub paragraph_plans: Vec<DocumentGenerationParagraphPlan> }
+pub struct GenerateTranslatedDocumentRequest { pub request_id: String, pub paragraph_plans: Vec<DocumentGenerationParagraphPlan>, #[serde(skip_serializing_if = "Option::is_none")] pub destination_path: Option<String> }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GenerateTranslatedDocumentStatus { Success, UnsupportedHost, OriginalUnsaved, FingerprintMismatch, Failed }

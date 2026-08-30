@@ -542,7 +542,7 @@ impl SessionManager {
         let request_id = super::auth_manager::generate_session_token();
         let (response_tx, response_rx) = oneshot::channel();
         self.pending_document_generations.lock().await.insert(request_id.clone(), PendingDocumentGeneration { session_id: session.session_id.clone(), sender: response_tx });
-        if sender.send(BridgeMessage::GenerateTranslatedDocumentRequest(GenerateTranslatedDocumentRequest { request_id: request_id.clone(), paragraph_plans })).is_err() { self.pending_document_generations.lock().await.remove(&request_id); return Err(SessionError::ChannelClosed); }
+        if sender.send(BridgeMessage::GenerateTranslatedDocumentRequest(GenerateTranslatedDocumentRequest { request_id: request_id.clone(), paragraph_plans, destination_path: None })).is_err() { self.pending_document_generations.lock().await.remove(&request_id); return Err(SessionError::ChannelClosed); }
         drop(session_guard);
         match tokio::time::timeout(DOCUMENT_GENERATION_TIMEOUT, response_rx).await { Ok(Ok(response)) => Ok(response), Ok(Err(_)) => Err(SessionError::GenerationCancelled), Err(_) => { self.pending_document_generations.lock().await.remove(&request_id); Err(SessionError::GenerationTimeout) } }
     }
