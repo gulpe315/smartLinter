@@ -133,16 +133,25 @@ T6a Word generator와 T6b InDesign generator는 다음 순서를 따른다.
 ## §3. Word Materializer — content range와 `UnderlineType`
 
 `WordTranslationMaterializer`는 문장 경계나 hunk 경계를 사용하지
-않는다. 먼저 문단의 content range 전체를
-`insertText(fullTargetText, 'Replace')`로 한 번 교체한 뒤, 검증된 run의
-누적 `[start, length]`를 사용해 그 content range의
-`getSubstring(start, length)`를 얻는다. 각 non-empty range에 다음 세
-속성을 모두 명시적으로 쓴다.
+않는다. 먼저 `paragraph.getRange(Word.RangeLocation.content)`로 문단 끝
+표시를 제외한 content range를 얻는다. 검증된 `RenderedRun`을 순서대로
+처리하며, 빈 문자열 run은 건너뛴다. 첫 non-empty run은 content range에
+`insertText(run.text, 'Replace')`로 삽입하고, 이후의 non-empty run은 직전에
+삽입해 반환된 range에 `insertText(run.text, 'End')`로 이어 삽입한다. 각
+`insertText`가 반환한 `Word.Range`는 바로 그 run의 범위이므로, 반환 직후
+다음 세 속성을 모두 명시적으로 쓴다.
 
 ```ts
-range.font.bold = run.bold;
-range.font.italic = run.italic;
-range.font.underline = run.underline ? 'Single' : 'None';
+const insertedRange = insertionPoint.insertText(
+  run.text,
+  isFirstRun ? 'Replace' : 'End',
+);
+insertedRange.font.bold = run.bold;
+insertedRange.font.italic = run.italic;
+insertedRange.font.underline = run.underline
+  ? Word.UnderlineType.single
+  : Word.UnderlineType.none;
+insertionPoint = insertedRange;
 ```
 
 `font.underline`은 boolean이 아니라 `Word.UnderlineType` 열거형 문자열
@@ -151,11 +160,13 @@ range.font.underline = run.underline ? 'Single' : 'None';
 `Word.UnderlineType.single`/`Word.UnderlineType.none` 상수를 사용할 수
 있으며, 의미는 동일하다.
 
-run을 하나씩 `'End'`로 삽입하는 방식은 앞 run의 서식이 뒤 run으로
-상속될 수 있어 채택하지 않는다. 한 번의 전체 교체 후 정확한 substring
-range에 true/false와 underline enum을 모두 쓰면 문단 기본 서식의 누수도
-막고 mock으로 호출 순서와 적용 범위를 검증할 수 있다. 빈 run에는
-substring을 만들지 않는다.
+이 순차 체이닝은 공식 `insertText` 반환 range만 사용하므로 별도의 offset
+range API에 의존하지 않는다. `'End'` 삽입 시 앞 run의 서식이 새 텍스트에
+fallback으로 상속될 수 있지만, 이는 해당 속성의 값을 지정하지 않았을 때만
+발생한다. 매 run 반환 range에 `bold`, `italic`, `underline` 세 속성을 모두
+즉시 명시하면 상속된 값은 전부 덮어써져 누수될 여지가 없다. 따라서 문단
+기본 서식이나 앞 run의 서식과 무관하게 각 run의 검증된 서식이 확정되며,
+mock에서도 삽입과 세 속성 쓰기의 순서·범위를 검증할 수 있다.
 
 ## §4. InDesign Materializer — `Font` 캐시, exact match, fail-closed
 
@@ -319,9 +330,9 @@ token은 all-false로 자동 강등하지 않고 §5에 따른 fail-closed 실�
   placeholder/unsupported token, empty text, text mismatch, 인접 동일
   서식 병합, 위치가 이동한 유효 target tag를 다룬다.
 - `mock_office_word.ts`는 range별 text와 `bold`/`italic`/`underline`
-  값을 보관하고, `getSubstring()`이 반환하는 range 및 content replace와
-  format write의 순서를 관찰 가능하게 한다. underline은 boolean이 아닌
-  `'Single'`/`'None'` enum 값으로 검증한다.
+  값을 보관하고, 순차 `insertText('Replace'|'End')` 체이닝이 반환하는
+  range 및 content replace와 format write의 순서를 관찰 가능하게 한다.
+  underline은 boolean이 아닌 `'Single'`/`'None'` enum 값으로 검증한다.
 - `mock_indesign.ts`는 `Font` collection, 초기화 시 캐시될
   `fontFamily`/`fontStyleName` face, character range의 `appliedFont`와
   `underline`, cache miss와 write 실패를 모델링한다. `TextFont` mock은
