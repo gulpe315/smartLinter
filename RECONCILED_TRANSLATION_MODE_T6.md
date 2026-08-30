@@ -42,20 +42,67 @@ Q2~Q7은 1차 자문에서 이미 수렴했고, Q1 재조율 이후에도 추가
    버린다 — 원본은 애초에 읽기(`getFileAsync`)만 됐으므로 항상
    무결하다.
 
-## §2. InDesign — `Document.duplicate()` 기반 완전 자동 흐름 (최종 확정)
+## §2. InDesign — `saveACopy()` + `app.open()` 기반 완전 자동 흐름 (2026-08-30 정정, 최종 확정)
 
-Word와 굳이 같은 전략을 쓸 필요 없음(agy/Codex 공통 결론) — InDesign은
-ExtendScript가 다중 문서를 직접 제어할 수 있으므로 더 매끄러운 완전
-자동 흐름을 쓴다.
+**정정 이력**: 원래 §2는 `sourceDoc.duplicate()`를 전제로 했으나, T6b
+지시서 작성 준비 중 Claude가 Adobe 공식 InDesign DOM 문서
+(indesignjs.de 미러, `Document` 클래스 전체 85개 메서드 전수 확인)로
+`Document.duplicate()`가 **존재하지 않음**을 확인했다
+(`RECONCILE_TRANSLATION_MODE_T6B_DUPLICATE_API.md` 참고). agy와 Codex
+양쪽에 독립적으로 재조율을 요청한 결과, **agy는 Object Model 전수
+검토로, Codex는 Adobe 공식 DOM 문서(developer.adobe.com,
+AdobeDocs/indesign-18-dom) 웹 검색으로 각자 독립적으로 동일한 결론에
+도달**했다 — `duplicate()`는 `Page`/`Spread`/`PageItem` 등 하위 객체
+전용이고, 문서 전체 복제는 `saveACopy(file)` + `app.open(file)`이
+유일한 정석이다. 아래는 그 정정된 흐름이다.
 
 1. 활성 원본 재스캔 및 세션 검증(§5).
-2. `sourceDoc.duplicate()`로 복제 문서 생성.
-3. 기존 `atomic_replacer.jsx`(이미 `doc`을 파라미터로 받는 구조 —
-   리팩터링 불필요)를 복제 문서 대상으로 호출해 문단별 치환.
-4. Tauri `tauri-plugin-dialog`로 사용자가 선택한 저장 경로에
-   `doc.saveAs(targetFile)`(또는 `saveACopy`)로 저장.
-5. 성공 시 복제 문서를 열어 둔 채 완료 표시, 실패 시 저장되지 않은
-   복제본을 `close(SaveOptions.NO)`로 폐기 — 원본은 항상 무변경.
+2. ExtendScript 내장 `Folder.temp`(OS 임시 디렉토리, 추가 Tauri
+   의존성 불필요)에 충돌 없는 파일명으로 `sourceDoc.saveACopy(tempFile)`
+   — 원본은 이 호출로 변경되지 않는다(API 계약).
+3. `var copiedDoc = app.open(tempFile);`로 복제본을 연다. **`app.activeDocument`를
+   암묵적으로 재조회하지 않고, 이 반환값 `copiedDoc`을 그대로 대상
+   문서로 사용한다**(Codex가 Adobe 공식 문서 기준으로 권고 — 창
+   활성화 타이밍/`showingWindow` 옵션에 따라 activeDocument가 불안정할
+   수 있음). 이를 위해 `atomic_replacer.jsx`의
+   `SmartLinterAtomicReplacer.prototype.execute`(현재 항상
+   `inApp.activeDocument`로 암묵 도출, 565~581번째 줄 4곳)를 **Word의
+   `WordDocumentPort` 리팩터링과 동일한 패턴으로** `options.doc`
+   파라미터를 우선 사용하고 없으면 기존처럼 `activeDocument`로
+   폴백하도록 최소 확장한다 — 기존 인플레이스 교체(Task 8/T3b) 호출
+   경로는 `options.doc` 미전달로 100% 기존 동작 보존, T6b는
+   `options.doc = copiedDoc`으로 새 경로를 쓴다(agy도 동일 방향을
+   "장기 권고"로 제시, Codex는 이를 필수로 권고 — 더 보수적인 쪽으로
+   수렴).
+4. 위 엔진으로 복제본에 문단별 치환 적용(§5 이중 fingerprint 대조
+   포함).
+5. **성공 시**: Tauri `tauri-plugin-dialog`로 사용자가 선택한 저장
+   경로에 `copiedDoc.saveAs(finalFile)`로 저장(열어 둔 채 유지) →
+   직후 `tempFile.remove()`로 2번의 임시 파일을 정리한다(`saveAs`는
+   파일을 이동시키지 않고 새 위치에 저장하므로 원래 임시 파일이
+   orphan으로 남는다 — agy가 지적).
+6. **실패 시**: `copiedDoc.close(SaveOptions.NO)`로 복제본을 닫고,
+   `tempFile.remove()`로 2번에서 만든 임시 파일을 디스크에서 실제로
+   삭제한다(Word와 달리 이 복제 단계 자체가 이미 디스크 쓰기이므로,
+   실패 시 "그냥 버려짐"이 아니라 명시적 삭제가 반드시 필요 — 빠뜨리면
+   임시 디렉토리에 고아 파일이 쌓인다). 원본은 2번의 `saveACopy` 계약에
+   의해 항상 무변경.
+7. 임시 파일 생성/삭제는 **ExtendScript(`File.remove()`) 계층이
+   전담**한다 — agy 근거: Word T6a가 "원본 파일 접근은 항상 플러그인
+   로컬에서 끝난다"는 원칙을 지킨 것과 동일한 책임 분리, 그리고
+   InDesign이 파일 핸들을 쥔 상태에서 Rust(Tauri) 쪽이 별도 삭제를
+   시도하면 프로세스 간 타이밍 이슈로 `ERROR_SHARING_VIOLATION`
+   위험이 있다(ExtendScript 쪽은 `close`/`saveAs` 직후 동기적으로
+   핸들이 해제돼 안전).
+8. `app.open(tempFile)` 호출 전 `app.scriptPreferences.userInteractionLevel
+   = UserInteractionLevels.NEVER_INTERACT;`를 설정하고 `try/finally`로
+   복원해, 폰트/링크 누락 등 알림 팝업이 자동화를 블로킹하지 않게 한다
+   (agy 추가 권고, T6b 지시서에 반드시 포함).
+9. §3(서식 Materializer)/§4(본문 외 콘텐츠 보존) 전제에는 영향 없음
+   — agy/Codex 공통 확인: `saveACopy`가 만드는 것은 원본의 완전한
+   바이너리 스냅샷이므로 표/머리말/각주 등은 그대로 보존되고,
+   Materializer는 최종적으로 열려 있는 `Document` DOM에 서식을
+   적용하는 것이라 복제 메커니즘 변경과 무관하다.
 
 ## §3. 서식(굵게/기울임/밑줄) 재적용 — 독립된 Materializer 신설
 
