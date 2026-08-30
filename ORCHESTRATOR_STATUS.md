@@ -1,6 +1,62 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+2차 후속) — **T6c(서식 Materializer, Word+InDesign 공통) 전체 완료**
+(Change Set 1 Word + Change Set 2 InDesign 둘 다 구현·검증·커밋
+완료). 사용자가 명시적으로 "먼저 T6c(당시엔 Change Set 2) 마무리
+후 안티그래비티/멀티에디터로 넘어가겠다"고 확인했다 — 다음 세션은
+사용자와 이 시점에 T6d(백로그)로 계속 갈지, 아니면 이제
+`BACKLOG_MULTI_EDITOR_SUPPORT.md`(VSCode/Antigravity 확장)로
+전환할지부터 확인할 것.** 아래 이 절을 먼저 읽을 것.
+
+## 이번 세션 완료(2차 후속) — T6c Change Set 2(InDesign) + T6c 전체 완료
+
+**커밋 3개(`8ecf0ce` Change Set 2 지시서, `cf25864` Change Set 2
+구현 — 아직 원격 push 안 함).**
+
+- Change Set 1과 동일한 위임 흐름(Codex 초안 → agy 검토 → 필요시
+  보완 → 구현 → 병렬 검증) 유지. agy가 지시서 리뷰에서 작은 누락
+  1건 발견(`shared/protocol/types.ts`에 `InDesignFontFaceMetadata`/
+  `TaggedSegmentData.inDesignFontFaces`가 Change Set 1에서 빠져
+  있었음) — 이건 단순 누락이라 Claude가 직접 지시서에 추가.
+- **구현**: T4-1 InDesign extractor(`inline_tag_extractor.jsx`)가
+  `range.appliedFont`에서 exact `{fontFamily, fontStyleName}` 캡처,
+  boolean+exact face 둘 다 같아야 병합, face 없음/invalid/
+  defaultFace 모호성 시 fail-closed. `document_scanner.jsx`→
+  `translationSessionStore.ts`(host-neutral 유지, Word 세그먼트는
+  영향 없음)→신규 `SmartLinterInDesignTranslationMaterializer`
+  (`app.fonts.everyItem().getElements()` 1회 캐시, exact match만,
+  `Semibold→Bold` 등 캐노니컬 매핑 없음, 실패 시
+  `FONT_FACE_UNAVAILABLE`)로 provenance 전달. `document_generator.jsx`
+  가 hunk 실행기 대신 이 Materializer를 호출하되 T6b의 fingerprint
+  전수검증/실패시 close+temp삭제/원본불변성 계약은 100% 보존.
+- **검증**: Codex 자체 `npx vitest run`이 또 60초 샌드박스 제약으로
+  못 끝났다(이 세션에서만 세 번째 반복 — Codex의 vitest 전체 실행은
+  구조적으로 이 제약에 걸리는 것으로 보임, 다음 세션도 항상
+  병행 대비할 것) — Claude가 네이티브로 병렬 재검증. `npm test`
+  253/253(+2)·`test:indesign` 100/100·`npx vitest run` 473/473·
+  `npm run build` 전부 통과, agy 결함 0건 최종 승인.
+- **T6c 완료로 Word/InDesign 양쪽 새 번역 문서 생성이 굵게/기울임/
+  밑줄 서식까지 재현한다.** 색상/크기/문자스타일/OpenType, 표/
+  머리말/각주 서식은 T6d/후속 범위(의도된 v1 제한).
+- **cwd 관련 운영 메모**: 이 세션에서 배경 Bash 호출 후 세션의
+  영속 cwd가 종종 `D:\ViewPick`로 되돌아가는 현상이 여러 번
+  재현됐다(`git commit: not a git repository`, `npm ENOENT`
+  등으로 발현). **앞으로 이 프로젝트의 모든 Bash 호출은 `cd
+  /d/smartLinter &&`를 매번 명시할 것** — 이전 호출이 성공했다고
+  cwd가 유지된다고 가정하지 말 것.
+- **다음 세션이 참고할 것**: 사용자가 이미 "T6d(백로그)→문장단위
+  CAT 정합성 Phase 0→Kiwi" 순서를 확정해뒀지만, 오늘 세션 중
+  "안티그래비티/VSCode로 넘어가도 되는지" 질문이 나왔고 사용자가
+  "먼저 마무리"(T6c)를 택했다 — 즉 T6c까지만 우선순위였을 뿐,
+  T6d~Kiwi까지 전부 끝내야 멀티에디터로 넘어간다고 확정된 건
+  아니다. 다음 세션 시작 시 "T6d로 계속 vs
+  `BACKLOG_MULTI_EDITOR_SUPPORT.md`로 전환"을 사용자에게 다시
+  확인할 것.
+
+---
+
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 이전 업데이트: 2026-08-30(같은 세션
 후속) — T6c 설계 전체 확정 + **Change Set 1(공통 계약+Word 서식
 Materializer) 구현·검증·커밋 완료.** Change Set 2(InDesign extractor
 확장+Materializer)는 아직 시작 안 함 — 다음 세션은 거기서 시작할 것.**
