@@ -1,5 +1,10 @@
 /** Creates a translated copy of the active Word document without writing to the original. */
-import type { DocumentGenerationProgress, GenerateTranslatedDocumentRequest, GenerateTranslatedDocumentResponse } from '../../../shared/protocol/types.ts';
+import type {
+    DocumentGenerationProgress,
+    GenerateTranslatedDocumentRequest,
+    GenerateTranslatedDocumentResponse,
+    TableLocator,
+} from '../../../shared/protocol/types.ts';
 import { computeParagraphHash } from '../../../shared/engine/hash_util.ts';
 import { materializeTranslationPlans } from './translation_materializer.ts';
 
@@ -41,6 +46,26 @@ export async function generateTranslatedWordDocument(
     office: any = (globalThis as any).Office,
     lifecycle: { isCancelled?: () => boolean; onProgress?: (progress: DocumentGenerationProgress) => void } = {},
 ): Promise<GenerateTranslatedDocumentResponse> {
+    // 1. Preflight validation on paragraph plans
+    for (const plan of request.paragraphPlans || []) {
+        if (plan.containerKind === 'TABLE') {
+            const loc = plan.tableLocator;
+            if (
+                !loc ||
+                typeof loc.tableIndex !== 'number' || loc.tableIndex < 0 || !Number.isInteger(loc.tableIndex) ||
+                typeof loc.cellIndex !== 'number' || loc.cellIndex < 0 || !Number.isInteger(loc.cellIndex) ||
+                typeof loc.paragraphIndexInCell !== 'number' || loc.paragraphIndexInCell < 0 || !Number.isInteger(loc.paragraphIndexInCell) ||
+                (loc.rowIndex !== undefined && (typeof loc.rowIndex !== 'number' || loc.rowIndex < 0 || !Number.isInteger(loc.rowIndex)))
+            ) {
+                return {
+                    requestId: request.requestId,
+                    status: 'FAILED',
+                    message: 'Invalid table locator in paragraph plan',
+                };
+            }
+        }
+    }
+
     if (!office?.context?.requirements?.isSetSupported?.('WordApiHiddenDocument', '1.3')) {
         return { requestId: request.requestId, status: 'UNSUPPORTED_HOST' };
     }
@@ -65,13 +90,116 @@ export async function generateTranslatedWordDocument(
             const created = context.application.createDocument(base64);
             await context.sync();
             if (cancelled()) { try { created.close?.(); await context.sync(); } catch {} throw cancellation(); }
-            const paragraphs = created.body.paragraphs;
-            paragraphs.load('text');
-            await context.sync();
-            progress('verifying-copy');
-            if (plans.some((plan) => computeParagraphHash(paragraphs.items?.[plan.documentOrderIndex]?.text || '') !== plan.expectedSourceHash)) {
-                throw Object.assign(new Error('FINGERPRINT_MISMATCH'), { code: 'FINGERPRINT_MISMATCH' });
+
+            // Load both body paragraphs and tables from the copy document
+            const bodyParagraphs = created.body?.paragraphs;
+            const tables = created.body?.tables;
+            bodyParagraphs?.load?.('text');
+            tables?.load?.('items');
+            if (tables?.items) {
+                for (const table of tables.items) {
+                    table.load?.('items');
+                    table.rows?.load?.('items');
+                    if (table.rows?.items) {
+                        for (const row of table.rows.items) {
+                            row.load?.('items');
+                            row.cells?.load?.('items');
+                            if (row.cells?.items) {
+                                for (const cell of row.cells.items) {
+                                    cell.load?.('items');
+                                    const cellParas = cell.body?.paragraphs || cell.paragraphs;
+                                    cellParas?.load?.('text');
+                                }
+                            }
+                        }
+                    }
+                }
             }
+            await context.sync();
+
+            // Build sparse paragraph resolution map
+            interface CreatedTablePara {
+                rawParagraph: any;
+                tableIndex: number;
+                rowIndex: number;
+                cellIndex: number;
+                paragraphIndexInCell: number;
+                consumed: boolean;
+            }
+            const createdTableParas: CreatedTablePara[] = [];
+            const tableItems = tables?.items || [];
+            for (let tIdx = 0; tIdx < tableItems.length; tIdx++) {
+                const table = tableItems[tIdx];
+                const rows = table.rows?.items || [];
+                for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+                    const row = rows[rIdx];
+                    const cells = row.cells?.items || [];
+                    for (let cIdx = 0; cIdx < cells.length; cIdx++) {
+                        const cell = cells[cIdx];
+                        const cellParas = cell.body?.paragraphs?.items || cell.paragraphs?.items || [];
+                        for (let pIdx = 0; pIdx < cellParas.length; pIdx++) {
+                            createdTableParas.push({
+                                rawParagraph: cellParas[pIdx],
+                                tableIndex: tIdx,
+                                rowIndex: rIdx,
+                                cellIndex: cIdx,
+                                paragraphIndexInCell: pIdx,
+                                consumed: false,
+                            });
+                        }
+                    }
+                }
+            }
+
+            const resolvedByOrder: Record<number, any> = {};
+            let order = 0;
+            const bodyItems = bodyParagraphs?.items || [];
+            for (const bodyPara of bodyItems) {
+                const matchedTableEntry = createdTableParas.find(
+                    (tp) => !tp.consumed && tp.rawParagraph === bodyPara
+                );
+                if (matchedTableEntry) {
+                    matchedTableEntry.consumed = true;
+                    resolvedByOrder[order++] = matchedTableEntry.rawParagraph;
+                } else {
+                    resolvedByOrder[order++] = bodyPara;
+                }
+            }
+            for (const unconsumed of createdTableParas) {
+                if (!unconsumed.consumed) {
+                    unconsumed.consumed = true;
+                    resolvedByOrder[order++] = unconsumed.rawParagraph;
+                }
+            }
+
+            function resolveTargetParagraph(plan: GenerateTranslatedDocumentRequest['paragraphPlans'][number]): any | null {
+                if (plan.containerKind === 'TABLE') {
+                    const loc = plan.tableLocator;
+                    if (!loc) return null;
+                    const table = tableItems[loc.tableIndex];
+                    const rowIndex = loc.rowIndex ?? 0;
+                    const row = table?.rows?.items?.[rowIndex];
+                    const cell = row?.cells?.items?.[loc.cellIndex];
+                    const cellParas = cell?.body?.paragraphs?.items || cell?.paragraphs?.items;
+                    return cellParas?.[loc.paragraphIndexInCell] ?? null;
+                }
+                return resolvedByOrder[plan.documentOrderIndex] ?? null;
+            }
+
+            progress('verifying-copy');
+            const sparseParagraphs: Record<number, any> = {};
+            for (const plan of plans) {
+                const targetPara = resolveTargetParagraph(plan);
+                if (!targetPara) {
+                    throw Object.assign(new Error('LOCATOR_RESOLUTION_FAILED'), { code: 'LOCATOR_RESOLUTION_FAILED' });
+                }
+                const currentText = targetPara.text || '';
+                if (computeParagraphHash(currentText) !== plan.expectedSourceHash) {
+                    throw Object.assign(new Error('FINGERPRINT_MISMATCH'), { code: 'FINGERPRINT_MISMATCH' });
+                }
+                sparseParagraphs[plan.documentOrderIndex] = targetPara;
+            }
+
             progress('materializing', 0);
             for (let index = 0; index < plans.length;) {
                 if (cancelled()) { try { created.close?.(); await context.sync(); } catch {} throw cancellation(); }
@@ -85,7 +213,7 @@ export async function generateTranslatedWordDocument(
                     chunk.push(candidate);
                     payloadBytes += candidateBytes;
                 }
-                const materialized = await materializeTranslationPlans(paragraphs.items, chunk);
+                const materialized = await materializeTranslationPlans(sparseParagraphs as any, chunk);
                 if (!materialized.ok) throw Object.assign(new Error(materialized.diagnostic.detail || materialized.diagnostic.reason), { diagnostic: materialized.diagnostic });
                 const syncStarted = Date.now();
                 await context.sync();
