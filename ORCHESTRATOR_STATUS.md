@@ -1,12 +1,59 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
-5차 후속) — **T6d-2 Change Set 1(공통 protocol/XLIFF 계약 + InDesign 표
-번역) 설계·구현·검증·커밋 완료(로컬 커밋만, push 안 함).** 이 라운드부터
-**Codex를 배제하고 agy에게만 자문·구현을 맡기는 방식으로 전환**했다
-(사용자 지시, 이유는 Codex 사용량 한도 반복 실패 — 아래 "워크플로 전환"
-절 참고). Change Set 2(Word 표 번역)는 아직 시작 안 함 — 다음 세션은
-거기서 시작할 것.** 아래 이 절을 먼저 읽을 것.
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+6차 후속) — **T6d-2 전체(Change Set 1 InDesign + Change Set 2 Word 표
+번역) 완료.** Word/InDesign 양쪽 표 번역이 T6d-1 progress/cancel 기반
+위에서 동작한다. 이 라운드부터 **Codex를 배제하고 agy에게만 자문·구현을
+맡기는 방식으로 전환**했다(사용자 지시, 이유는 Codex 사용량 한도 반복
+실패 — 아래 "워크플로 전환" 절 참고). T6d-3 이후(머리말/바닥글/각주 등)는
+아직 범위 밖 — 다음 세션 시작 시 T6d를 여기서 마무리할지, 아니면 이미
+확정된 다음 트랙(문장단위 CAT 정합성 Phase 0 → Kiwi)으로 넘어갈지
+**사용자에게 먼저 확인할 것**.** 아래 이 절을 먼저 읽을 것.
+
+## 이번 세션 완료(6차 후속) — T6d-2 Change Set 2(Word 표 번역) 완료로 T6d-2 전체 종료
+
+**커밋 2개(`085d151` Change Set 2 지시서, `f5c32fe` Change Set 2 구현 —
+아직 원격 push 안 함).**
+
+- 지시서(`TASK_REQUEST_TRANSLATION_MODE_T6D2_2.md`)도 agy가 초안 작성.
+  Claude가 저장 전 실제 버그 하나를 미리 잡음: `translation_materializer.ts`
+  가 `paragraphs[plan.documentOrderIndex]`로 직접 인덱싱하는데, 표가
+  본문과 전역 순서를 공유하면 이 인덱싱이 **표 plan뿐 아니라 표 뒤에
+  오는 본문 plan까지** 깨뜨린다는 걸 코드로 확인해 지시서에 "documentOrderIndex
+  키 sparse 구조" 요구사항을 추가. agy 검토에서 이 정정 중 Claude가 또
+  실수한 부분(Map은 대괄호 인덱싱이 안 됨 — plain object/sparse array만
+  가능)도 잡아 반영.
+- **구현(agy, `--dangerously-skip-permissions`)**: `document_scanner.ts`가
+  `body.tables`를 명시적으로 순회해 표 문단을 만들고, `body.paragraphs`와
+  **참조 동일성**(텍스트 비교 아님 — 빈 셀/중복 텍스트 오매칭 방지)으로
+  병합해 두 가지 미확정 케이스(`body.paragraphs`가 표 포함/미포함) 모두
+  안전하게 처리. `document_generator.ts`는 지시서 요구대로
+  `documentOrderIndex` 키 sparse map(`resolvedByOrder`)을 만들어
+  materializer(무수정)에 넘김.
+- **Claude diff 리뷰가 결함 1건 발견**: `resolveTargetParagraph`의
+  TABLE 분기가 표 locator 조회 실패 시 `resolvedByOrder`(전역 순서 맵)로
+  폴백해 **엉뚱한 다른 문단을 반환할 수 있는** fail-closed 위반 — fingerprint
+  대조가 대부분 잡아내긴 하겠지만 설계 의도(`LOCATOR_RESOLUTION_FAILED`
+  즉시 반환)가 아니었음. 관례대로 Claude가 직접 안 고치고 agy에게
+  후속 지시서로 되돌려 수정(폴백 제거, `null` 반환) + 회귀 테스트
+  (Scenario 8: out-of-bounds locator가 다른 문단으로 대체되지 않고
+  fail-closed되는지) 추가.
+- **검증**: Claude 네이티브 재확인(diff 직접 읽음 + 커맨드 재실행) —
+  `npm test` 271→272, `test:word` 86→87(Scenario 1~8 전부), `test:indesign`
+  107/107(불변), `test:ui` 480/480, `build`, `cargo check --release`
+  전부 통과.
+- **T6d-2 전체 완료**: Word/InDesign 양쪽에서 표 셀 문단이 스캔·XLIFF
+  round-trip·번역 문서 생성까지 body 문단과 동일한 fail-closed/progress/
+  cancel 계약 아래 동작한다. 병합 셀·빈 셀·다중 문단 셀·본문 혼합 순서
+  전부 fixture로 검증됨. 머리말/바닥글/각주(T6d-3 이후)는 여전히 범위 밖.
+- **다음 세션이 참고할 것**: 사용자가 이미 "T6d(백로그)→문장단위 CAT
+  정합성 Phase 0→Kiwi" 순서를 확정해뒀지만, T6d 안에서도 T6d-3(머리말/
+  바닥글/각주)까지 마저 할지 vs 여기서 다음 트랙으로 넘어갈지는 아직
+  확인 안 됨 — 세션 시작 시 먼저 물어볼 것. 워크플로(Codex 배제, agy
+  전담 + `--dangerously-skip-permissions`)가 여전히 유효한지도 함께
+  재확인.
+
+---
 
 ## 이번 세션 완료(5차 후속) — 워크플로 전환(Codex 배제) + T6d-2 설계·Change Set 1 구현
 
