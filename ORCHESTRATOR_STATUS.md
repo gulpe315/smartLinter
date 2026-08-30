@@ -1,14 +1,71 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
-3차 후속) — **T6d 설계 확정 완료(구현은 아직 시작 안 함).** T6d-1
-(진행률/협력적 취소/timeout 재설계, 컨테이너 무관 기반) →
-T6d-2(표 번역, 그 기반의 첫 소비자) 순서로 확정. 이번 라운드에서
-**설계 자문 질문(DESIGN_REQUEST) 자체는 Claude가 직접 작성하고
-Codex/agy는 답변만 하는 방식으로 워크플로가 정정됐다**(사용자가
-"설계를 왜 codex가 하고 있지?"로 직접 지적 — 아래 절 참고). 다음
-세션은 T6d-1 구현 지시서 작성부터 시작할 것.** 아래 이 절을 먼저
-읽을 것.
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+4차 후속) — **T6d-1(진행률/협력적 취소/timeout lifecycle) 구현·검증·
+커밋 완료(로컬 커밋만, push 안 함).** 1차 구현에 치명적 결함 다수가
+있었으나 agy 리뷰+Claude 네이티브 검증으로 잡아 후속 라운드로 전부
+수정했다. 다음 세션은 T6d-2(표 번역, RECONCILED §3)부터 시작할 것.**
+아래 이 절을 먼저 읽을 것.
+
+## 이번 세션 완료(4차 후속) — T6d-1 구현(2라운드) 완료
+
+**커밋 3개(`a3a9199` T6d-1 지시서, `2573a4e` 후속 지시서, `b1d5df6`
+구현 — 아직 원격 push 안 함).**
+
+- **지시서**: Codex가 `RECONCILED_TRANSLATION_MODE_T6D.md` §1/§2/§6를
+  근거로 초안 작성 → agy 독립 검토(결함 0건, 사실관계 10개 항목 전부
+  코드와 정확히 일치 확인) → 커밋.
+- **1차 구현(Codex)**: 마무리 직전 자체 보고에서 이미 "요구된 신규
+  테스트를 대부분 작성 못 했다"고 인정. Claude 네이티브 재검증
+  (`npm test`/`test:word`/`test:indesign`/`test:ui`/`build`/
+  `cargo check --release`/`cargo test`)과 agy 독립 diff 리뷰를
+  병렬로 진행한 결과, agy가 7개 결함을 발견(그중 3개는 Claude가
+  직접 코드를 읽어 재확인) — ①`types.ts`의 `CANCELLED` type guard
+  누락으로 `npm test` 실제 1건 실패, ②Rust idle watchdog이 실제로는
+  activity와 무관하게 30초 뒤 무조건 끊기는 단발성 timeout(진짜
+  watchdog 아님), ③InDesign cancel이 `pending_document_generations`에
+  아예 등록 안 돼 Cancel 버튼이 죽은 코드, ④progress 이벤트가
+  Rust→Tauri emit→프론트엔드로 이어지는 경로가 없어 UI가 계속
+  "preflight"에 고정, ⑤프론트엔드 옛 고정 70초 timeout 잔존,
+  ⑥Word chunking이 설계된 3중 상한이 아니라 문단 1개 고정,
+  ⑦UI 문구가 영어 원문 그대로.
+- **관례대로 Claude가 직접 고치지 않고** 7개 결함을 전부 정리한
+  후속 지시서(`TASK_REQUEST_TRANSLATION_MODE_T6D1_FOLLOWUP.md`)를
+  작성해 Codex에게 되돌렸다. **Codex가 수정 작업 막바지(최종 보고
+  직전)에 ChatGPT 사용량 한도에 걸려 자연어 요약 없이 끊겼다** —
+  로그에 최종 diff는 남아 있었으나 "다 됐다"는 보고가 없어, Claude가
+  git status·전체 diff·네이티브 재실행으로 직접 상태를 확인했다.
+- **2차 구현 검증**: `npm test` 255/255, `test:word` 46/46,
+  `test:indesign` 101/101(1차 실패했던 InDesign cancel 테스트도
+  isolation 재실행에서 통과 확인), `test:ui` 474/474(1회 벤치마크
+  타이밍 테스트가 동시 빌드 부하로 우연히 실패했으나 단독 재실행
+  시 통과 — 회귀 아님), `build`/`cargo check --release` 통과,
+  `cargo test` 114/115(1개는 로컬에 Ollama 미실행으로 나는 기존
+  환경 의존 실패, 무관). Claude가 idle watchdog 루프(`tokio::select!`
+  기반 재계산)·InDesign cancellation_file 마커 메커니즘·progress
+  emit 배선·Word 3중 상한 chunking을 직접 코드로 재확인, agy 최종
+  독립 검토도 7개 결함 전부 "확정 수정 완료"로 승인(경미한 영어
+  문구 1건만 지적) → 그 문구는 단순 텍스트라 Claude가 직접 고쳐
+  (host별 한국어 취소 지연 안내) build/관련 테스트 재확인 후 커밋.
+- **T6d-1 완료로 Word/InDesign 본문 생성 경로가 requestId 기반
+  진행률·협력적 취소·idle watchdog+hard limit·late response 무시
+  계약을 공유하는 기반이 갖춰졌다.** 표(T6d-2)는 이 기반의 첫
+  소비자로 다음 라운드다.
+- **워크플로 교훈**: Codex가 자체 사용량 한도로 최종 보고 없이
+  끊기는 새 실패 모드가 나왔다 — 앞으로 백그라운드 Codex 호출이
+  끝나면 로그 끝부분에 `ERROR: You've hit your usage limit`가
+  있는지 항상 확인하고, 있으면 Codex의 자체 "PASS" 주장을 신뢰하지
+  말고 git status/diff로 직접 상태를 재구성할 것.
+- **다음 세션이 참고할 것**: T6d-2(표 번역) 설계 자문부터.
+  `RECONCILED_TRANSLATION_MODE_T6D.md` §3에 이미 방향이 있다 —
+  Word/InDesign 각각 1~2개 실제 fixture로 locator/병합 셀/빈 셀/
+  서식 보존/복제본 재탐색을 먼저 검증한 뒤에만 착수, XLIFF에
+  `containerKind: TABLE` 등 메타데이터 필수. 워크플로는 계속: 질문
+  프레이밍(Claude 직접) → Codex/agy 독립 답변 → 재조율 → 지시서
+  (Codex 초안 → agy 검토) → 구현(Codex) → 검증(Claude 네이티브 +
+  agy 병렬).
+
+---
 
 ## 이번 세션 완료(3차 후속) — T6d 설계 확정 + 워크플로 정정
 
