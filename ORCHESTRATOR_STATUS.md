@@ -1,6 +1,79 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+3차 후속) — **T6d 설계 확정 완료(구현은 아직 시작 안 함).** T6d-1
+(진행률/협력적 취소/timeout 재설계, 컨테이너 무관 기반) →
+T6d-2(표 번역, 그 기반의 첫 소비자) 순서로 확정. 이번 라운드에서
+**설계 자문 질문(DESIGN_REQUEST) 자체는 Claude가 직접 작성하고
+Codex/agy는 답변만 하는 방식으로 워크플로가 정정됐다**(사용자가
+"설계를 왜 codex가 하고 있지?"로 직접 지적 — 아래 절 참고). 다음
+세션은 T6d-1 구현 지시서 작성부터 시작할 것.** 아래 이 절을 먼저
+읽을 것.
+
+## 이번 세션 완료(3차 후속) — T6d 설계 확정 + 워크플로 정정
+
+**커밋 4개(`5baff69` 설계 자문 요청, `6c3f217` agy/Codex 답변+확정
+스펙 — 아직 원격 push 안 함).**
+
+- **워크플로 정정(중요, 향후 모든 라운드에 적용)**: T6c 라운드까지는
+  Codex에게 "조사+질문구성+잠정의견"을 한 번에 맡기고 agy가 그
+  초안을 검토하는 방식이었는데, T6d 착수 시 사용자가 "설계를 왜
+  codex가 하고 있지?"라고 직접 제동을 걸었다 — 질문을 던지는
+  사람과 먼저 답하는 사람이 같으면 자기 질문틀 안에서 원하는 답으로
+  유도하는 편향이 생기고, 뒤이은 agy 검토도 그 틀 안에서만
+  반응하게 된다는 문제 제기였다. **확정된 새 원칙**: 코드 사실관계
+  조사는 여전히 Codex/Explore에게 위임해 토큰을 아끼되,
+  `DESIGN_REQUEST_*.md`의 질문(Q1~Qn) 프레이밍 자체는 **Claude가
+  직접 작성**한다. Codex와 agy는 그 질문에 각자 독립적으로 답변하고
+  갈리면 재조율한다 — 이게 이 프로젝트의 원래 관례(T3/T4/T5)이기도
+  하다. `RECONCILED_*.md`/`TASK_REQUEST_*.md`/실제 구현은 계속
+  Codex에게 초안을 위임하는 현재 방식 유지(이 단계는 답을 정리/실행
+  하는 것이라 편향 위험이 다름). 상세는
+  `smartlinter-orchestrator-minimize-own-tokens` 메모리 참고.
+- **T6d 설계 확정**: `DESIGN_REQUEST_TRANSLATION_MODE_T6D.md`(Claude
+  작성, Codex의 사전 조사 결과는 재료로만 흡수)를 agy·Codex 양쪽에
+  각자 독립적으로 답변시킨 뒤, 3가지 실질적 불일치를 재조율했다.
+  - **분할 단위**: Codex는 처음에 (컨테이너 커버리지/생성
+    lifecycle/협력적 취소) 3개 독립 트랙을 제안했으나, agy의
+    2단계안(T6d-1 lifecycle 통합 기반 + T6d-2 표)에 승복 — lifecycle과
+    취소가 같은 `Word.run` 경계·청크·정리 정책을 공유해 3트랙 분리가
+    결합도를 과소평가했다고 스스로 인정.
+  - **콘텐츠 우선순위**: agy는 "표부터 바로 구현"(Word
+    `document.body.tables` 결정론적 접근, InDesign scanner가 이미
+    TABLE kind 감지)을 제안, Codex는 "표 포함 모든 컨테이너를 먼저
+    discovery spike로 검증"을 제안 — agy의 "표 우선"에 동의하되
+    Codex의 "먼저 검증" 원칙은 T6d-2의 첫 작업(표 fixture 1~2개
+    선행 검증)으로 축소 반영해 수렴.
+  - **Word.run 취소 메커니즘(가장 중요한 사실관계 쟁점)**: agy는
+    `Word.run`을 문단 청크 단위로 나눠 매 청크 `context.sync()`마다
+    취소 체크포인트+진행률 emit을 제안, Codex는 최초 답변에서
+    "Word.run/COM 호출은 비선점적 단일 블록이라 중간 취소가
+    불가능하다"고 반박했다. **Claude가 Microsoft 공식 Office.js
+    문서 검증을 Codex에게 요청한 결과, Codex 스스로 자기 판단이
+    틀렸음을 확인**(`DocumentCreated` 공식 예제 자체가 하나의
+    `Word.run` 안에서 여러 `sync()`를 반복하는 패턴을 씀) — agy
+    원안에 전적으로 동의로 전환.
+  - agy 최종 검토(결함 0건, 전면 승인) 후 확정.
+- **T6d 확정 스펙**(`RECONCILED_TRANSLATION_MODE_T6D.md`): §1
+  분할(T6d-1/T6d-2/T7 경계 메모), §2 T6d-1의 progress/cancel
+  protocol(5단계 취소 계약, 청크 크기는 문단수/페이로드/시간 3중
+  상한, InDesign은 동기 호출 특성상 호출 전후에서만 취소 검사 가능,
+  timeout을 idle watchdog+hard limit 조합으로 재설계), §3 T6d-2
+  표 번역(fixture 선행 검증 필수, XLIFF `containerKind` 등 메타데이터
+  필수), §4 T6d-3 이후(머리말/바닥글/각주, 후속 범위로 명시만), §5
+  T7 경계 메모(세부 정책은 정직하게 미정으로 남김), §6 테스트/fixture
+  요구사항.
+- **다음 세션이 참고할 것**: T6d-1(진행률/협력적 취소/timeout 재설계)
+  구현 지시서 작성부터 시작. 이번에도 지시서/구현 초안은 Codex에게
+  위임하되, agy 병렬 리뷰 + Claude 독립 검증(npm test/vitest/build/
+  cargo check)을 유지할 것. T6d-1은 Word/InDesign 양쪽 생성
+  파이프라인과 Rust 세션 관리(`pending_document_generations`,
+  timeout 로직)를 동시에 건드리는 인프라 라운드라 T6a/T6b/T6c보다
+  범위가 넓다 — 필요하면 사용자와 다시 하위 분할 여부를 상의할 것.
+
+---
+
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 이전 업데이트: 2026-08-30(같은 세션
 2차 후속) — **T6c(서식 Materializer, Word+InDesign 공통) 전체 완료**
 (Change Set 1 Word + Change Set 2 InDesign 둘 다 구현·검증·커밋
 완료). 사용자가 명시적으로 "먼저 T6c(당시엔 Change Set 2) 마무리
