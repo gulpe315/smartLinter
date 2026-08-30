@@ -1,6 +1,76 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30 — T6b(InDesign
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+후속) — T6c 설계 전체 확정 + **Change Set 1(공통 계약+Word 서식
+Materializer) 구현·검증·커밋 완료.** Change Set 2(InDesign extractor
+확장+Materializer)는 아직 시작 안 함 — 다음 세션은 거기서 시작할 것.**
+아래 이 절을 먼저 읽을 것.
+
+## 이번 세션 완료(같은 세션 후속) — T6c 설계 확정 + Change Set 1(Word) 구현
+
+**커밋 6개(`9ca5939` 설계 자문, `3e332b1` agy 답변+재조율,
+`673380a` 확정 스펙, `980d77d` Word API 블로커 해소, `824aeed`는
+이전 T6b 커밋 — T6c용 `TASK_REQUEST_TRANSLATION_MODE_T6C1.md`는
+`980d77d`에 포함, `b4990d1` Change Set 1 구현 — 아직 원격 push 안 함).**
+
+- **설계 자문·확정 전체를 Codex 초안 작성 → agy 검토 → 필요시 재조율
+  순서로 위임 진행**(이 세션에 새로 확립된 "오케스트레이터는 위임
+  우선" 원칙 적용, `smartlinter-orchestrator-minimize-own-tokens`
+  메모리 참고). `DESIGN_REQUEST_TRANSLATION_MODE_T6C.md`(Codex 초안,
+  Q1~Q8 잠정 의견 포함) → `AGY_ANSWER_TRANSLATION_MODE_T6C.md`(agy
+  독립 답변) → `RECONCILED_TRANSLATION_MODE_T6C.md`(Codex가 최종
+  합성) 순서로 문서가 쌓였다.
+- **API 사실관계 오류 2건을 이 라운드에서도 발견·정정**(T6/T6b의
+  `Document.duplicate()` 사례와 같은 패턴이 이번에도 재현):
+  1. agy가 최초 Q7 답변에서 InDesign 폰트 객체를 `TextFont`로,
+     `app.fonts.itemByName(family+탭+style)`을 1차 조회 수단으로,
+     `Semibold/Heavy→Bold`·`Oblique→Italic` 캐노니컬 매핑을 제안했으나,
+     Codex가 Adobe 공식 문서(developer.adobe.com,
+     indesignjs.de)로 직접 검증한 결과 셋 다 틀렸다 — 실제 객체명은
+     `Font`, `itemByName` 탭 키는 "typically"일 뿐 절대 계약이 아님,
+     캐노니컬 매핑은 API가 보장하지 않는 위험한 가정. agy가 3가지
+     전부 전적으로 수용해 정정.
+  2. 이 정정 과정에서 새로 드러난 미해결 지점("`RenderedRun`의
+     boolean만으론 정확한 `fontStyleName`을 알 수 없다")을 Codex가
+     T4-1 InDesign 추출기(`inline_tag_extractor.jsx`)를 직접 조사해
+     해결 — 현재 추출기가 boolean만 뭉개고 실제 `appliedFont`를
+     읽지 않는다는 사실을 확인하고, source token id 기반 face
+     provenance를 scanner→protocol→plan→`RenderedRun.sourceFormatIds`
+     →writer로 전달하는 경로를 새로 설계(offset이 아니라 id 기반이라
+     번역 어순이 바뀌어도 안전). agy 최종 승인.
+  3. Word Change Set 1 지시서 작성 중 Codex가 또 하나 발견:
+     `Word.Range.getSubstring()`이 실제 Office.js API에 없음(agy도
+     원래 이 방식을 권고했다가 Microsoft 공식 문서 확인 후 철회).
+     대신 `paragraph.getRange(RangeLocation.content)` +
+     순차 `insertText('Replace'|'End')` 체이닝 + 매 반환 range에
+     3속성(bold/italic/`Word.UnderlineType`) 즉시 명시 방식으로
+     확정 — 이 방식은 Codex가 이전에 "서식 상속 위험"으로 기각했던
+     방식이지만, "매번 3속성을 전부 명시하면 상속 여지가 없다"는
+     근거로 agy가 재검토 후 수용.
+- **Change Set 1(공통 계약+Word Materializer) 구현**: `RenderedRun`/
+  `GenerationDiagnostic` protocol 타입, `src/utils/translationFormatting.ts`
+  (신규 — `xliffImport.ts`의 기존 태그 구조 검증 헬퍼 3개를 이곳으로
+  옮겨 import와 generation이 하나의 token 계약 공유), host-neutral
+  `prepareDocumentGeneration()` 확장(taggedTarget→`runs` 렌더링),
+  `plugins/word/src/translation_materializer.ts`(신규, 순차 insertText
+  체이닝), 기존 `WordReplacementExecutor` 호출을 이걸로 교체.
+  **InDesign 관련 파일은 전혀 건드리지 않음**(Change Set 2 범위).
+- **최종 검증**: Codex 자체 검증에서 `npx vitest run`이 자기 샌드박스
+  60초 제약으로 못 끝났다 — Claude가 네이티브로 재실행(병렬로 agy
+  diff 리뷰도 동시 진행, 순차 아님). `npm test`(251/251, +11)·
+  `npm run test:word`(46/46, +11)·`npx vitest run`(473/473, +2)·
+  `npm run build` 전부 통과, agy 리뷰 결함 0건으로 최종 승인.
+- **다음 세션이 참고할 것**: `RECONCILED_TRANSLATION_MODE_T6C.md`
+  §9의 **Change Set 2**(T4-1 InDesign extractor 확장 → scanner →
+  InDesign Materializer → InDesign mock/test) 지시서 작성부터 시작.
+  이번에도 Codex 초안 → agy 검토 → 필요시 재조율 → 구현 → 병렬
+  검증(Claude 네이티브 + agy) 순서를 그대로 유지할 것. 특히 InDesign
+  `Font` 캐시 초기화 시점(모듈/세션 최초 1회)과 exact-match 실패 시
+  `FONT_FACE_UNAVAILABLE` fail-closed가 정확히 구현되는지 중점 검토.
+
+---
+
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 이전 업데이트: 2026-08-30 — T6b(InDesign
 새 번역 문서 생성 파이프라인) 구현·검증·커밋까지 완료(로컬 커밋만,
 원격 push 안 함 — 정책대로 전체 작업 마무리 시 한 번에 push). 이
 세션에서 T6 확정 스펙 §2(InDesign 흐름)의 핵심 전제 오류
