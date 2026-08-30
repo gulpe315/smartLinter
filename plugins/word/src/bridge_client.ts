@@ -15,6 +15,8 @@ import {
     type EnumerateDocumentResponse,
     type GenerateTranslatedDocumentRequest,
     type GenerateTranslatedDocumentResponse,
+    type DocumentGenerationProgress,
+    type CancelTranslatedDocumentRequest,
     type LocateRequest,
     type LocateResponse,
     type AuthHandshake,
@@ -59,6 +61,7 @@ export type CommandHandler = (command: ReplacementCommand) => void | Promise<voi
 export type SnapshotRequestHandler = (request: LiveSnapshotRequest) => void | Promise<void>;
 export type EnumerateDocumentRequestHandler = (request: EnumerateDocumentRequest) => void | Promise<void>;
 export type GenerateTranslatedDocumentRequestHandler = (request: GenerateTranslatedDocumentRequest) => void | Promise<void>;
+export type CancelTranslatedDocumentRequestHandler = (request: CancelTranslatedDocumentRequest) => void | Promise<void>;
 export type LocateRequestHandler = (request: LocateRequest) => void | Promise<void>;
 export type StatusChangeHandler = (status: BridgeConnectionStatus, message?: string) => void;
 
@@ -85,6 +88,7 @@ export class WordBridgeClient {
     private readonly snapshotRequestHandlers: Set<SnapshotRequestHandler> = new Set();
     private readonly enumerateDocumentRequestHandlers: Set<EnumerateDocumentRequestHandler> = new Set();
     private readonly generateTranslatedDocumentRequestHandlers: Set<GenerateTranslatedDocumentRequestHandler> = new Set();
+    private readonly cancelTranslatedDocumentRequestHandlers: Set<CancelTranslatedDocumentRequestHandler> = new Set();
     private readonly locateRequestHandlers: Set<LocateRequestHandler> = new Set();
     private readonly statusHandlers: Set<StatusChangeHandler> = new Set();
 
@@ -148,6 +152,10 @@ export class WordBridgeClient {
     public onGenerateTranslatedDocumentRequest(handler: GenerateTranslatedDocumentRequestHandler): () => void {
         this.generateTranslatedDocumentRequestHandlers.add(handler);
         return () => this.generateTranslatedDocumentRequestHandlers.delete(handler);
+    }
+    public onCancelTranslatedDocumentRequest(handler: CancelTranslatedDocumentRequestHandler): () => void {
+        this.cancelTranslatedDocumentRequestHandlers.add(handler);
+        return () => this.cancelTranslatedDocumentRequestHandlers.delete(handler);
     }
 
     /** Subscribes to locate requests received over the connected WebSocket. */
@@ -335,6 +343,10 @@ export class WordBridgeClient {
             this.ws.send(JSON.stringify({ type: 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE', payload: response } satisfies BridgeMessage));
             return true;
         } catch { return false; }
+    }
+    public sendDocumentGenerationProgress(progress: DocumentGenerationProgress): boolean {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN || this.status !== 'CONNECTED') return false;
+        try { this.ws.send(JSON.stringify({ type: 'DOCUMENT_GENERATION_PROGRESS', payload: progress } satisfies BridgeMessage)); return true; } catch { return false; }
     }
 
     /** Sends a locate response. Locate RPC is WebSocket-only. */
@@ -526,6 +538,11 @@ export class WordBridgeClient {
                     try { void Promise.resolve(handler(message.payload)).catch(() => {}); } catch { /* isolated */ }
                 }
                 break;
+            case 'CANCEL_TRANSLATED_DOCUMENT_REQUEST':
+                for (const handler of this.cancelTranslatedDocumentRequestHandlers) {
+                    try { void Promise.resolve(handler(message.payload)).catch(() => {}); } catch { /* isolated */ }
+                }
+                break;
             case 'LOCATE_REQUEST':
                 for (const handler of this.locateRequestHandlers) {
                     try { void Promise.resolve(handler(message.payload)).catch(() => {}); } catch { /* isolated */ }
@@ -536,6 +553,8 @@ export class WordBridgeClient {
             case 'REPLACEMENT_RESULT':
             case 'LIVE_SNAPSHOT_RESPONSE':
             case 'ENUMERATE_DOCUMENT_RESPONSE':
+            case 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE':
+            case 'DOCUMENT_GENERATION_PROGRESS':
             case 'LOCATE_RESPONSE':
             case 'HEARTBEAT':
             case 'AUTH_HANDSHAKE':

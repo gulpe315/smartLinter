@@ -213,7 +213,19 @@ export type GenerateTranslatedDocumentStatus =
     | 'UNSUPPORTED_HOST'
     | 'ORIGINAL_UNSAVED'
     | 'FINGERPRINT_MISMATCH'
-    | 'FAILED';
+    | 'FAILED'
+    | 'CANCELLED';
+
+/** Real host boundaries; this intentionally has no container-specific phase. */
+export type DocumentGenerationPhase = 'preflight' | 'copying' | 'verifying-copy' | 'materializing' | 'finalizing';
+export interface DocumentGenerationProgress {
+    requestId: string;
+    phase: DocumentGenerationPhase;
+    completedUnits?: number;
+    totalUnits?: number;
+}
+/** Idempotent request.  Acknowledgement is not a terminal result. */
+export interface CancelTranslatedDocumentRequest { requestId: string; }
 
 export interface GenerateTranslatedDocumentResponse {
     requestId: string;
@@ -289,6 +301,8 @@ export type BridgeMessage =
     | { type: 'ENUMERATE_DOCUMENT_RESPONSE'; payload: EnumerateDocumentResponse }
     | { type: 'GENERATE_TRANSLATED_DOCUMENT_REQUEST'; payload: GenerateTranslatedDocumentRequest }
     | { type: 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE'; payload: GenerateTranslatedDocumentResponse }
+    | { type: 'DOCUMENT_GENERATION_PROGRESS'; payload: DocumentGenerationProgress }
+    | { type: 'CANCEL_TRANSLATED_DOCUMENT_REQUEST'; payload: CancelTranslatedDocumentRequest }
     | { type: 'LOCATE_REQUEST'; payload: LocateRequest }
     | { type: 'LOCATE_RESPONSE'; payload: LocateResponse }
     | { type: 'HEARTBEAT'; payload: HeartbeatPayload };
@@ -520,7 +534,7 @@ export function isGenerateTranslatedDocumentRequest(val: unknown): val is Genera
 
 export function isGenerateTranslatedDocumentStatus(val: unknown): val is GenerateTranslatedDocumentStatus {
     return val === 'SUCCESS' || val === 'UNSUPPORTED_HOST' || val === 'ORIGINAL_UNSAVED'
-        || val === 'FINGERPRINT_MISMATCH' || val === 'FAILED';
+        || val === 'FINGERPRINT_MISMATCH' || val === 'FAILED' || val === 'CANCELLED';
 }
 
 export function isGenerateTranslatedDocumentResponse(val: unknown): val is GenerateTranslatedDocumentResponse {
@@ -531,6 +545,24 @@ export function isGenerateTranslatedDocumentResponse(val: unknown): val is Gener
         && (obj.appliedParagraphCount === undefined || (typeof obj.appliedParagraphCount === 'number' && Number.isInteger(obj.appliedParagraphCount) && obj.appliedParagraphCount >= 0))
         && (obj.message === undefined || typeof obj.message === 'string')
         && (obj.diagnostic === undefined || isGenerationDiagnostic(obj.diagnostic));
+}
+
+export function isDocumentGenerationPhase(val: unknown): val is DocumentGenerationPhase {
+    return val === 'preflight' || val === 'copying' || val === 'verifying-copy' || val === 'materializing' || val === 'finalizing';
+}
+
+export function isDocumentGenerationProgress(val: unknown): val is DocumentGenerationProgress {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    const validUnit = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value >= 0;
+    return typeof obj.requestId === 'string' && isDocumentGenerationPhase(obj.phase)
+        && (obj.completedUnits === undefined || validUnit(obj.completedUnits))
+        && (obj.totalUnits === undefined || validUnit(obj.totalUnits))
+        && !(typeof obj.completedUnits === 'number' && typeof obj.totalUnits === 'number' && obj.completedUnits > obj.totalUnits);
+}
+
+export function isCancelTranslatedDocumentRequest(val: unknown): val is CancelTranslatedDocumentRequest {
+    return typeof val === 'object' && val !== null && typeof (val as Record<string, unknown>).requestId === 'string';
 }
 
 export function isLocateStatus(val: unknown): val is LocateStatus {
@@ -617,6 +649,10 @@ export function isBridgeMessage(val: unknown): val is BridgeMessage {
             return isGenerateTranslatedDocumentRequest(obj.payload);
         case 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE':
             return isGenerateTranslatedDocumentResponse(obj.payload);
+        case 'DOCUMENT_GENERATION_PROGRESS':
+            return isDocumentGenerationProgress(obj.payload);
+        case 'CANCEL_TRANSLATED_DOCUMENT_REQUEST':
+            return isCancelTranslatedDocumentRequest(obj.payload);
         case 'LOCATE_REQUEST':
             return isLocateRequest(obj.payload);
         case 'LOCATE_RESPONSE':

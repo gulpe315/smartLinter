@@ -206,6 +206,10 @@ async fn handle_websocket_connection(
                     Ok(BridgeMessage::GenerateTranslatedDocumentResponse(response)) => {
                         session_mgr.complete_generate_translated_document(&current_session_id, response).await;
                     }
+                    Ok(BridgeMessage::DocumentGenerationProgress(progress)) => {
+                        session_mgr.record_document_generation_progress(&current_session_id, progress.clone()).await;
+                        event_sink.emit_document_generation_progress(&progress).await;
+                    }
                     Ok(BridgeMessage::LocateResponse(response)) => {
                         session_mgr.complete_locate(&current_session_id, response).await;
                     }
@@ -217,6 +221,7 @@ async fn handle_websocket_connection(
                     | Ok(BridgeMessage::LiveSnapshotRequest(_))
                     | Ok(BridgeMessage::EnumerateDocumentRequest(_))
                     | Ok(BridgeMessage::GenerateTranslatedDocumentRequest(_))
+                    | Ok(BridgeMessage::CancelTranslatedDocumentRequest(_))
                     | Ok(BridgeMessage::LocateRequest(_)) => {
                         // Unexpected incoming server-to-client message types
                     }

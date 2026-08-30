@@ -13,6 +13,7 @@ import {
   type EnumerateDocumentResponse,
   type GenerateTranslatedDocumentResponse,
   type DocumentGenerationParagraphPlan,
+  type DocumentGenerationProgress,
   type QaReport,
   type QaIssue,
 } from '../../shared/protocol/types.ts';
@@ -119,6 +120,7 @@ export interface BridgeEventMap {
   'tm-status-changed': TmStatusPayload;
   'batch-scan-progress': BatchScanProgressPayload;
   'qa-report-received': QaReportPayload;
+  'document-generation-progress': DocumentGenerationProgress;
 }
 
 export type BridgeEventName = keyof BridgeEventMap;
@@ -169,7 +171,8 @@ export interface IBridgeService {
   getLiveParagraphSnapshots(paragraphIds: string[]): Promise<LiveParagraphSnapshotEntry[]>;
 
   enumerateDocumentParagraphs(options?: { includeUnplacedStories?: boolean }): Promise<EnumerateDocumentResponse>;
-  generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[]): Promise<GenerateTranslatedDocumentResponse>;
+  generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[], requestId?: string): Promise<GenerateTranslatedDocumentResponse>;
+  cancelTranslatedDocument(requestId: string): Promise<boolean>;
 
   /** Fetches current bridge health and status */
   fetchBridgeHealth(): Promise<BridgeStatusPayload>;
@@ -537,9 +540,10 @@ export class MockBridgeService implements IBridgeService {
     };
   }
 
-  async generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[]): Promise<GenerateTranslatedDocumentResponse> {
-    return { requestId: 'mock-generate-document', status: 'SUCCESS', appliedParagraphCount: paragraphPlans.length };
+  async generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[], requestId = 'mock-generate-document'): Promise<GenerateTranslatedDocumentResponse> {
+    return { requestId, status: 'SUCCESS', appliedParagraphCount: paragraphPlans.length };
   }
+  async cancelTranslatedDocument(_requestId: string): Promise<boolean> { return true; }
 
   async fetchBridgeHealth(): Promise<BridgeStatusPayload> {
     return {
@@ -870,8 +874,8 @@ export class TauriBridgeService implements IBridgeService {
     });
   }
 
-  async generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[]): Promise<GenerateTranslatedDocumentResponse> {
-    if (!this.isTauriAvailable()) return this.fallbackService.generateTranslatedDocument(paragraphPlans);
+  async generateTranslatedDocument(paragraphPlans: DocumentGenerationParagraphPlan[], requestId?: string): Promise<GenerateTranslatedDocumentResponse> {
+    if (!this.isTauriAvailable()) return this.fallbackService.generateTranslatedDocument(paragraphPlans, requestId);
     const health = await this.fetchBridgeHealth();
     let destinationPath: string | undefined;
     if (health.editorType === 'InDesign') {
@@ -881,7 +885,11 @@ export class TauriBridgeService implements IBridgeService {
       if (selected === null) return { requestId: 'indesign-generate-cancelled', status: 'FAILED', message: 'Document generation cancelled by user' };
       destinationPath = selected;
     }
-    return await invoke('generate_translated_document', { paragraphPlans, destinationPath });
+    return await invoke('generate_translated_document', { paragraphPlans, destinationPath, requestId });
+  }
+  async cancelTranslatedDocument(requestId: string): Promise<boolean> {
+    if (!this.isTauriAvailable()) return this.fallbackService.cancelTranslatedDocument(requestId);
+    return await invoke('cancel_translated_document', { requestId });
   }
 
   async executeAiCommand(instruction: string, paragraph: ParagraphPayload): Promise<AiCommandResult> {

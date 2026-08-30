@@ -575,10 +575,11 @@ mod platform {
         unreachable!("the retry loop always returns")
     }
 
-    pub fn generate_translated_document(request_id: String, paragraph_plans: Vec<DocumentGenerationParagraphPlan>, destination_path: String) -> Result<GenerateTranslatedDocumentResponse, String> {
+    pub fn generate_translated_document(request_id: String, paragraph_plans: Vec<DocumentGenerationParagraphPlan>, destination_path: String, cancellation_file: Option<String>) -> Result<GenerateTranslatedDocumentResponse, String> {
         if !is_indesign_process_running()? { return Err("InDesign is not running".to_string()); }
         let request = serde_json::json!({ "requestId": request_id, "paragraphPlans": paragraph_plans, "destinationPath": destination_path });
-        let script = format!("#targetengine \"smartlinter_persistent_engine\"\n(function() {{ if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{ return JSON.stringify($.global.SmartLinterDaemonInstance.generateTranslatedDocument({request})); }} return JSON.stringify({{ requestId: {}, status: 'FAILED', message: 'InDesign SmartLinterDaemonInstance is not initialized' }}); }})();", serde_json::to_string(&request_id).map_err(|e| format!("Cannot serialize generation request ID: {e}"))?);
+        let options = serde_json::json!({ "cancellationFile": cancellation_file });
+        let script = format!("#targetengine \"smartlinter_persistent_engine\"\n(function() {{ if (typeof $.global.SmartLinterDaemonInstance !== 'undefined' && $.global.SmartLinterDaemonInstance) {{ return JSON.stringify($.global.SmartLinterDaemonInstance.generateTranslatedDocument({request}, {options})); }} return JSON.stringify({{ requestId: {}, status: 'FAILED', message: 'InDesign SmartLinterDaemonInstance is not initialized' }}); }})();", serde_json::to_string(&request_id).map_err(|e| format!("Cannot serialize generation request ID: {e}"))?);
         let _com = ComApartment::initialize()?; let dispatch = active_indesign()?; let start = Instant::now();
         for (attempt, delay) in [100_u64, 300, 900].into_iter().enumerate() {
             thread::sleep(Duration::from_millis(delay));
@@ -670,7 +671,7 @@ pub fn get_live_paragraph_snapshots(_paragraph_ids: Vec<String>) -> Result<Vec<L
 }
 
 #[cfg(not(windows))]
-pub fn generate_translated_document(_request_id: String, _paragraph_plans: Vec<crate::protocol::DocumentGenerationParagraphPlan>, _destination_path: String) -> Result<crate::protocol::GenerateTranslatedDocumentResponse, String> { Err("InDesign COM automation is only supported on Windows".to_string()) }
+pub fn generate_translated_document(_request_id: String, _paragraph_plans: Vec<crate::protocol::DocumentGenerationParagraphPlan>, _destination_path: String, _cancellation_file: Option<String>) -> Result<crate::protocol::GenerateTranslatedDocumentResponse, String> { Err("InDesign COM automation is only supported on Windows".to_string()) }
 
 #[cfg(not(windows))]
 pub fn enumerate_document_paragraphs(_include_unplaced_stories: bool) -> Result<crate::protocol::EnumerateDocumentResponse, String> {

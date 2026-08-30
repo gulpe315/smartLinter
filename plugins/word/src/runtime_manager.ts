@@ -45,6 +45,8 @@ export class WordRuntimeManager {
     private snapshotRequestUnsubscribe: (() => void) | null = null;
     private enumerateDocumentRequestUnsubscribe: (() => void) | null = null;
     private generateTranslatedDocumentUnsubscribe: (() => void) | null = null;
+    private cancelTranslatedDocumentUnsubscribe: (() => void) | null = null;
+    private readonly generationCancels = new Map<string, { cancelled: boolean; terminal: boolean }>();
     private locateRequestUnsubscribe: (() => void) | null = null;
     private commandUnsubscribe: (() => void) | null = null;
 
@@ -214,6 +216,8 @@ export class WordRuntimeManager {
             this.enumerateDocumentRequestUnsubscribe = null;
             this.generateTranslatedDocumentUnsubscribe?.();
             this.generateTranslatedDocumentUnsubscribe = null;
+            this.cancelTranslatedDocumentUnsubscribe?.();
+            this.cancelTranslatedDocumentUnsubscribe = null;
             this.locateRequestUnsubscribe?.();
             this.locateRequestUnsubscribe = null;
             this.commandUnsubscribe?.();
@@ -274,8 +278,22 @@ export class WordRuntimeManager {
 
         if (this.bridgeClient && !this.generateTranslatedDocumentUnsubscribe) {
             this.generateTranslatedDocumentUnsubscribe = this.bridgeClient.onGenerateTranslatedDocumentRequest(async (request) => {
-                const response = await generateTranslatedWordDocument(request, (globalThis as any).Word?.run, this.officeHost || (globalThis as any).Office);
+                const token = { cancelled: false, terminal: false };
+                this.generationCancels.set(request.requestId, token);
+                const response = await generateTranslatedWordDocument(request, (globalThis as any).Word?.run, this.officeHost || (globalThis as any).Office, {
+                    isCancelled: () => token.cancelled,
+                    onProgress: (progress) => { if (!token.terminal) this.bridgeClient?.sendDocumentGenerationProgress(progress); },
+                });
+                if (token.terminal) return;
+                token.terminal = true;
                 this.bridgeClient?.sendGenerateTranslatedDocumentResponse(response);
+                this.generationCancels.delete(request.requestId);
+            });
+        }
+        if (this.bridgeClient && !this.cancelTranslatedDocumentUnsubscribe) {
+            this.cancelTranslatedDocumentUnsubscribe = this.bridgeClient.onCancelTranslatedDocumentRequest((request) => {
+                const token = this.generationCancels.get(request.requestId);
+                if (token && !token.terminal) token.cancelled = true;
             });
         }
 

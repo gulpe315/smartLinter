@@ -6,15 +6,18 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, broadcast, oneshot, Mutex, RwLock};
 
-use crate::protocol::{BridgeMessage, EditorType, EnumerateDocumentRequest, EnumerateDocumentResponse, GenerateTranslatedDocumentRequest, GenerateTranslatedDocumentResponse, DocumentGenerationParagraphPlan, LiveSnapshotRequest, LiveSnapshotResponse, LocateRequest, LocateResponse, ParagraphPayload, ReplacementCommand, ReplacementResult};
+use crate::protocol::{BridgeMessage, EditorType, EnumerateDocumentRequest, EnumerateDocumentResponse, GenerateTranslatedDocumentRequest, GenerateTranslatedDocumentResponse, DocumentGenerationParagraphPlan, LiveSnapshotRequest, LiveSnapshotResponse, LocateRequest, LocateResponse, ParagraphPayload, ReplacementCommand, ReplacementResult, DocumentGenerationProgress, CancelTranslatedDocumentRequest};
 
 const LIVE_SNAPSHOT_TIMEOUT: Duration = Duration::from_secs(3);
 const DOCUMENT_SCAN_TIMEOUT: Duration = Duration::from_secs(10);
-const DOCUMENT_GENERATION_TIMEOUT: Duration = Duration::from_secs(60);
+/// Idle is reset by meaningful host progress; hard limit remains absolute.
+const DOCUMENT_GENERATION_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
+const DOCUMENT_GENERATION_HARD_LIMIT: Duration = Duration::from_secs(10 * 60);
 
 #[derive(Debug)]
 struct PendingSnapshot {
@@ -26,7 +29,7 @@ struct PendingDocumentScan {
     session_id: String,
     sender: oneshot::Sender<EnumerateDocumentResponse>,
 }
-#[derive(Debug)] struct PendingDocumentGeneration { session_id: String, sender: oneshot::Sender<GenerateTranslatedDocumentResponse> }
+#[derive(Debug)] struct PendingDocumentGeneration { session_id: String, sender: oneshot::Sender<GenerateTranslatedDocumentResponse>, accepted_at: Instant, last_activity: Instant, cancellation_requested: bool, cancellation_file: Option<PathBuf> }
 #[derive(Debug)]
 struct PendingLocate { session_id: String, sender: oneshot::Sender<LocateResponse> }
 
@@ -108,6 +111,7 @@ pub trait BridgeEventSink: Send + Sync + 'static {
     async fn emit_status_changed(&self, event: &BridgeStatusEvent);
     async fn emit_telemetry(&self, payload: &ParagraphPayload);
     async fn emit_replacement_result(&self, result: &ReplacementResult);
+    async fn emit_document_generation_progress(&self, progress: &DocumentGenerationProgress);
 }
 
 /// No-op implementation of `BridgeEventSink`.
@@ -119,6 +123,7 @@ impl BridgeEventSink for NoopEventSink {
     async fn emit_status_changed(&self, _event: &BridgeStatusEvent) {}
     async fn emit_telemetry(&self, _payload: &ParagraphPayload) {}
     async fn emit_replacement_result(&self, _result: &ReplacementResult) {}
+    async fn emit_document_generation_progress(&self, _progress: &DocumentGenerationProgress) {}
 }
 
 /// Broadcast-channel-based implementation of `BridgeEventSink` for unit tests and event subscriptions.
@@ -173,6 +178,7 @@ impl BridgeEventSink for BroadcastEventSink {
     async fn emit_replacement_result(&self, result: &ReplacementResult) {
         let _ = self.result_sender.send(result.clone());
     }
+    async fn emit_document_generation_progress(&self, _progress: &DocumentGenerationProgress) {}
 }
 
 /// Active connected editor session metadata.
@@ -534,17 +540,37 @@ impl SessionManager {
         }
     }
 
-    pub async fn request_generate_translated_document(&self, paragraph_plans: Vec<DocumentGenerationParagraphPlan>) -> Result<GenerateTranslatedDocumentResponse, SessionError> {
+    pub async fn request_generate_translated_document(&self, paragraph_plans: Vec<DocumentGenerationParagraphPlan>, requested_id: Option<String>) -> Result<GenerateTranslatedDocumentResponse, SessionError> {
         let session_guard = self.active_session.read().await;
         let session = session_guard.as_ref().ok_or(SessionError::NotFound)?;
         if session.editor_type != EditorType::Word { return Err(SessionError::NotFound); }
         let sender = session.command_sender.as_ref().ok_or(SessionError::ChannelClosed)?;
-        let request_id = super::auth_manager::generate_session_token();
+        let request_id = requested_id.unwrap_or_else(super::auth_manager::generate_session_token);
         let (response_tx, response_rx) = oneshot::channel();
-        self.pending_document_generations.lock().await.insert(request_id.clone(), PendingDocumentGeneration { session_id: session.session_id.clone(), sender: response_tx });
+        let now = Instant::now();
+        self.pending_document_generations.lock().await.insert(request_id.clone(), PendingDocumentGeneration { session_id: session.session_id.clone(), sender: response_tx, accepted_at: now, last_activity: now, cancellation_requested: false, cancellation_file: None });
         if sender.send(BridgeMessage::GenerateTranslatedDocumentRequest(GenerateTranslatedDocumentRequest { request_id: request_id.clone(), paragraph_plans, destination_path: None })).is_err() { self.pending_document_generations.lock().await.remove(&request_id); return Err(SessionError::ChannelClosed); }
         drop(session_guard);
-        match tokio::time::timeout(DOCUMENT_GENERATION_TIMEOUT, response_rx).await { Ok(Ok(response)) => Ok(response), Ok(Err(_)) => Err(SessionError::GenerationCancelled), Err(_) => { self.pending_document_generations.lock().await.remove(&request_id); Err(SessionError::GenerationTimeout) } }
+        // Progress resets only the idle deadline. The hard deadline remains absolute.
+        tokio::pin!(response_rx);
+        loop {
+            let (accepted_at, last_activity) = match self.pending_document_generations.lock().await.get(&request_id) {
+                Some(entry) => (entry.accepted_at, entry.last_activity),
+                None => return Err(SessionError::GenerationCancelled),
+            };
+            let now = Instant::now();
+            let hard_remaining = DOCUMENT_GENERATION_HARD_LIMIT.saturating_sub(now.saturating_duration_since(accepted_at));
+            let idle_remaining = DOCUMENT_GENERATION_IDLE_TIMEOUT.saturating_sub(now.saturating_duration_since(last_activity));
+            if hard_remaining.is_zero() || idle_remaining.is_zero() {
+                self.cancel_generate_translated_document(&request_id).await;
+                self.pending_document_generations.lock().await.remove(&request_id);
+                return Err(SessionError::GenerationTimeout);
+            }
+            tokio::select! {
+                response = &mut response_rx => return response.map_err(|_| SessionError::GenerationCancelled),
+                _ = tokio::time::sleep(hard_remaining.min(idle_remaining)) => continue,
+            }
+        }
     }
 
     /// Sends a correlated locate request and waits at most three seconds for the editor response.
@@ -615,6 +641,36 @@ impl SessionManager {
     pub async fn complete_generate_translated_document(&self, session_id: &str, response: GenerateTranslatedDocumentResponse) {
         let request_id = response.request_id.clone(); let pending = self.pending_document_generations.lock().await.remove(&request_id);
         match pending { Some(pending) if pending.session_id == session_id => { let _ = pending.sender.send(response); }, Some(pending) => { self.pending_document_generations.lock().await.insert(request_id, pending); }, None => tracing::debug!("Ignoring unknown translated-document response") }
+    }
+    /// InDesign has no bridge socket, so cancellation is delivered through a marker file
+    /// that its ExtendScript checks at each COM-safe boundary.
+    pub async fn begin_indesign_document_generation(&self, request_id: String, cancellation_file: PathBuf) -> Result<(), SessionError> {
+        let session_guard = self.active_session.read().await;
+        let session = session_guard.as_ref().ok_or(SessionError::NotFound)?;
+        if session.editor_type != EditorType::InDesign { return Err(SessionError::NotFound); }
+        let (sender, _receiver) = oneshot::channel();
+        let now = Instant::now();
+        self.pending_document_generations.lock().await.insert(request_id, PendingDocumentGeneration { session_id: session.session_id.clone(), sender, accepted_at: now, last_activity: now, cancellation_requested: false, cancellation_file: Some(cancellation_file) });
+        Ok(())
+    }
+    pub async fn emit_document_generation_progress(&self, progress: &DocumentGenerationProgress) {
+        self.event_sink.emit_document_generation_progress(progress).await;
+    }
+    pub async fn record_document_generation_progress(&self, session_id: &str, progress: DocumentGenerationProgress) {
+        if let (Some(done), Some(total)) = (progress.completed_units, progress.total_units) { if done > total { tracing::debug!(request_id = %progress.request_id, "Ignoring invalid generation progress"); return; } }
+        let mut pending = self.pending_document_generations.lock().await;
+        match pending.get_mut(&progress.request_id) {
+            Some(entry) if entry.session_id == session_id && !entry.cancellation_requested && entry.accepted_at.elapsed() < DOCUMENT_GENERATION_HARD_LIMIT => entry.last_activity = Instant::now(),
+            Some(_) => tracing::debug!(request_id = %progress.request_id, "Ignoring stale generation progress"),
+            None => tracing::debug!(request_id = %progress.request_id, "Ignoring late generation progress"),
+        }
+    }
+    pub async fn cancel_generate_translated_document(&self, request_id: &str) -> bool {
+        let (session_id, cancellation_file) = { let mut pending = self.pending_document_generations.lock().await; match pending.get_mut(request_id) { Some(entry) if !entry.cancellation_requested => { entry.cancellation_requested = true; (entry.session_id.clone(), entry.cancellation_file.clone()) }, _ => return false } };
+        if let Some(path) = cancellation_file { let _ = std::fs::write(path, b"cancelled"); }
+        let active = self.active_session.read().await;
+        if let Some(session) = active.as_ref().filter(|s| s.session_id == session_id) { if let Some(sender) = &session.command_sender { let _ = sender.send(BridgeMessage::CancelTranslatedDocumentRequest(CancelTranslatedDocumentRequest { request_id: request_id.to_string() })); } }
+        true
     }
 
     async fn clear_pending_snapshots_for_session(&self, session_id: &str) {
@@ -864,5 +920,31 @@ mod tests {
         let _ = receiver.recv().await.unwrap();
         tokio::time::sleep(DOCUMENT_SCAN_TIMEOUT + Duration::from_millis(50)).await;
         assert_eq!(request_task.await.unwrap(), Err(SessionError::ScanTimeout));
+    }
+
+    #[tokio::test]
+    async fn indesign_cancel_marks_the_request_file_for_the_next_extend_script_boundary() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        manager.acquire_session(EditorType::InDesign, None, None).await.unwrap();
+        let marker = std::env::temp_dir().join(format!("smartlinter-session-test-{}", current_timestamp_ms()));
+        let _ = std::fs::remove_file(&marker);
+        manager.begin_indesign_document_generation("indesign-test".to_string(), marker.clone()).await.unwrap();
+        assert!(manager.cancel_generate_translated_document("indesign-test").await);
+        assert!(marker.exists(), "cancellation must reach the script-visible marker");
+        let _ = std::fs::remove_file(marker);
+    }
+
+    #[tokio::test]
+    async fn generation_late_response_is_ignored_after_terminal_response() {
+        let manager = SessionManager::new(Arc::new(NoopEventSink));
+        let (sender, mut receiver) = mpsc::unbounded_channel();
+        let session_id = manager.acquire_session(EditorType::Word, None, Some(sender)).await.unwrap();
+        let waiter = tokio::spawn({ let manager = manager.clone(); async move { manager.request_generate_translated_document(vec![], Some("terminal".to_string())).await } });
+        let _ = receiver.recv().await.unwrap();
+        let response = GenerateTranslatedDocumentResponse { request_id: "terminal".to_string(), status: crate::protocol::GenerateTranslatedDocumentStatus::Success, applied_paragraph_count: Some(0), message: None };
+        manager.complete_generate_translated_document(&session_id, response.clone()).await;
+        assert_eq!(waiter.await.unwrap().unwrap(), response);
+        manager.complete_generate_translated_document(&session_id, response).await;
+        assert!(!manager.pending_document_generations.lock().await.contains_key("terminal"));
     }
 }

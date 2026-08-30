@@ -9,7 +9,7 @@
 use std::sync::Arc;
 use smart_linter::ai::{DEFAULT_MODEL_NAME, LocalLlmProvider, MicroScopingQueue, OllamaProvider};
 use smart_linter::commands;
-use smart_linter::protocol::{ParagraphPayload, ReplacementResult};
+use smart_linter::protocol::{ParagraphPayload, ReplacementResult, DocumentGenerationProgress};
 use smart_linter::server::{BridgeEventSink, BridgeServer, BridgeStatusEvent};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -36,6 +36,9 @@ impl BridgeEventSink for TauriBridgeEventSink {
 
     async fn emit_replacement_result(&self, result: &ReplacementResult) {
         let _ = self.app_handle.emit("replacement-result", result);
+    }
+    async fn emit_document_generation_progress(&self, progress: &DocumentGenerationProgress) {
+        let _ = self.app_handle.emit("document-generation-progress", progress);
     }
 }
 
@@ -86,6 +89,7 @@ fn main() {
             commands::get_live_paragraph_snapshots,
             commands::enumerate_document_paragraphs,
             commands::generate_translated_document,
+            commands::cancel_translated_document,
             commands::list_ollama_models,
             commands::check_ollama_health,
             commands::set_ollama_model,

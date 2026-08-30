@@ -19,24 +19,35 @@
         if (!inApp || !inApp.activeDocument) return fail(request, 'FAILED', 'No active InDesign document');
         if (!request || !request.destinationPath) return fail(request || {}, 'FAILED', 'No destination path supplied');
         var sourceDoc = inApp.activeDocument, copiedDoc = null, temporary = tempFile(request.requestId), succeeded = false;
+        var cancelled = function() { return options.isCancelled && options.isCancelled() === true; };
+        var progress = function(phase, completed) { if (options.onProgress) options.onProgress({ requestId: request.requestId, phase: phase, completedUnits: completed, totalUnits: phase === 'materializing' ? (request.paragraphPlans || []).length : undefined }); };
+        if (cancelled()) return fail(request, 'CANCELLED', 'Cancellation requested before generation');
         var previousLevel = inApp.scriptPreferences ? inApp.scriptPreferences.userInteractionLevel : undefined;
         try {
-            sourceDoc.saveACopy(temporary);
+            progress('copying'); sourceDoc.saveACopy(temporary);
+            if (cancelled()) return fail(request, 'CANCELLED', 'Cancellation requested after copy');
             copiedDoc = inApp.open(temporary);
+            if (cancelled()) return fail(request, 'CANCELLED', 'Cancellation requested after opening copy');
             if (inApp.scriptPreferences && typeof UserInteractionLevels !== 'undefined') inApp.scriptPreferences.userInteractionLevel = UserInteractionLevels.NEVER_INTERACT;
             var plans = (request.paragraphPlans || []).slice(0), replacer = new SmartLinterAtomicReplacer({ appInstance: inApp }), materializer = new SmartLinterInDesignTranslationMaterializer({ appInstance: inApp });
             plans.sort(function(a, b) { return a.documentOrderIndex - b.documentOrderIndex; });
+            progress('preflight');
             /* Verify every fingerprint before applying any hunk. */
+            progress('verifying-copy');
             for (var i = 0; i < plans.length; i++) {
                 var planned = replacer.findParagraphById(copiedDoc, plans[i].paragraphId, plans[i].expectedSourceHash);
                 if (!planned || hash(planned.contents || '') !== plans[i].expectedSourceHash) return fail(request, 'FINGERPRINT_MISMATCH', 'Copied document paragraph fingerprint mismatch');
             }
             for (var j = 0; j < plans.length; j++) {
+                if (cancelled()) return fail(request, 'CANCELLED', 'Cancellation requested at materialization boundary');
+                progress('materializing', j);
                 var plan = plans[j], paragraph = replacer.findParagraphById(copiedDoc, plan.paragraphId, plan.expectedSourceHash);
                 if (!paragraph) return fail(request, 'FINGERPRINT_MISMATCH', 'Copied document paragraph fingerprint mismatch');
                 var result = materializer.apply(paragraph, plan);
                 if (!result.ok) return { requestId: request.requestId || 'unknown', status: 'FAILED', message: result.diagnostic.detail || result.diagnostic.reason, diagnostic: result.diagnostic };
             }
+            if (cancelled()) return fail(request, 'CANCELLED', 'Cancellation requested before finalizing');
+            progress('finalizing');
             copiedDoc.saveAs(File(request.destinationPath));
             succeeded = true;
             if (temporary.exists) temporary.remove();

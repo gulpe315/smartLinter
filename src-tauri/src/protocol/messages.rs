@@ -224,7 +224,16 @@ pub struct DocumentGenerationParagraphPlan { pub paragraph_id: String, pub docum
 pub struct GenerateTranslatedDocumentRequest { pub request_id: String, pub paragraph_plans: Vec<DocumentGenerationParagraphPlan>, #[serde(skip_serializing_if = "Option::is_none")] pub destination_path: Option<String> }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum GenerateTranslatedDocumentStatus { Success, UnsupportedHost, OriginalUnsaved, FingerprintMismatch, Failed }
+pub enum GenerateTranslatedDocumentStatus { Success, UnsupportedHost, OriginalUnsaved, FingerprintMismatch, Failed, Cancelled }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DocumentGenerationPhase { Preflight, Copying, VerifyingCopy, Materializing, Finalizing }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentGenerationProgress { pub request_id: String, pub phase: DocumentGenerationPhase, #[serde(skip_serializing_if = "Option::is_none")] pub completed_units: Option<u32>, #[serde(skip_serializing_if = "Option::is_none")] pub total_units: Option<u32> }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelTranslatedDocumentRequest { pub request_id: String }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GenerateTranslatedDocumentResponse { pub request_id: String, pub status: GenerateTranslatedDocumentStatus, #[serde(skip_serializing_if = "Option::is_none")] pub applied_paragraph_count: Option<u32>, #[serde(skip_serializing_if = "Option::is_none")] pub message: Option<String> }
@@ -319,6 +328,8 @@ pub enum BridgeMessage {
     EnumerateDocumentResponse(EnumerateDocumentResponse),
     GenerateTranslatedDocumentRequest(GenerateTranslatedDocumentRequest),
     GenerateTranslatedDocumentResponse(GenerateTranslatedDocumentResponse),
+    DocumentGenerationProgress(DocumentGenerationProgress),
+    CancelTranslatedDocumentRequest(CancelTranslatedDocumentRequest),
     LocateRequest(LocateRequest),
     LocateResponse(LocateResponse),
     Heartbeat(HeartbeatPayload),

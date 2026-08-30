@@ -96,4 +96,9 @@ describe('InDesign translated-document generator (T6b)', () => {
     const result = env.sandbox.SmartLinterDocumentGenerator.generateTranslatedDocument(translated);
     assert.equal(result.status, 'SUCCESS');
   });
+  it('observes cancellation at the next safe boundary and cleans up the copied document', () => {
+    const env = setup(); let checks = 0;
+    const result = env.sandbox.SmartLinterDocumentGenerator.generateTranslatedDocument(request(), { appInstance: env.app, isCancelled: () => ++checks >= 3 });
+    assert.equal(result.status, 'CANCELLED'); assert.equal(env.app.closedWith, 'NO'); assert.equal(env.app.tempRemoved, true); assert.equal(env.app.savedAs, undefined);
+  });
 });

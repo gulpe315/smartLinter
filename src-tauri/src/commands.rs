@@ -410,16 +410,31 @@ pub async fn enumerate_document_paragraphs(
 }
 
 #[tauri::command]
-pub async fn generate_translated_document(paragraph_plans: Vec<DocumentGenerationParagraphPlan>, destination_path: Option<String>, server_handle: State<'_, ServerHandle>) -> Result<GenerateTranslatedDocumentResponse, String> {
+pub async fn generate_translated_document(paragraph_plans: Vec<DocumentGenerationParagraphPlan>, destination_path: Option<String>, request_id: Option<String>, server_handle: State<'_, ServerHandle>) -> Result<GenerateTranslatedDocumentResponse, String> {
     let session = server_handle.session_manager().get_snapshot().await.ok_or_else(|| "No active editor session".to_string())?;
     if session.editor_type == EditorType::Word {
-        return server_handle.session_manager().request_generate_translated_document(paragraph_plans).await.map_err(|error| error.to_string());
+        return server_handle.session_manager().request_generate_translated_document(paragraph_plans, request_id).await.map_err(|error| error.to_string());
     }
-    let request_id = format!("indesign-generate-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis());
+    let request_id = request_id.unwrap_or_else(|| format!("indesign-generate-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string()).unwrap_or_default().as_millis()));
     let destination_path = destination_path.ok_or_else(|| "An InDesign translated document requires a destination path".to_string())?;
-    tokio::task::spawn_blocking(move || crate::indesign_com::generate_translated_document(request_id, paragraph_plans, destination_path))
+    let cancellation_file = std::env::temp_dir().join(format!("smartlinter-cancel-{request_id}"));
+    let _ = std::fs::remove_file(&cancellation_file);
+    server_handle.session_manager().begin_indesign_document_generation(request_id.clone(), cancellation_file.clone()).await.map_err(|error| error.to_string())?;
+    server_handle.session_manager().emit_document_generation_progress(&crate::protocol::DocumentGenerationProgress { request_id: request_id.clone(), phase: crate::protocol::DocumentGenerationPhase::Preflight, completed_units: None, total_units: None }).await;
+    let manager = server_handle.session_manager();
+    let request_id_for_task = request_id.clone();
+    let result = tokio::task::spawn_blocking(move || crate::indesign_com::generate_translated_document(request_id_for_task, paragraph_plans, destination_path, Some(cancellation_file.to_string_lossy().to_string())))
         .await
-        .map_err(|error| format!("InDesign document generation task failed: {error}"))?
+        .map_err(|error| format!("InDesign document generation task failed: {error}"))?;
+    let response = match result { Ok(response) => response, Err(message) => GenerateTranslatedDocumentResponse { request_id: request_id.clone(), status: crate::protocol::GenerateTranslatedDocumentStatus::Failed, applied_paragraph_count: None, message: Some(message) } };
+    manager.complete_generate_translated_document(&session.session_id, response.clone()).await;
+    Ok(response)
+}
+
+/// Cancellation is idempotent: accepting it only asks the host to stop at its next safe boundary.
+#[tauri::command]
+pub async fn cancel_translated_document(request_id: String, server_handle: State<'_, ServerHandle>) -> Result<bool, String> {
+    Ok(server_handle.session_manager().cancel_generate_translated_document(&request_id).await)
 }
 
 /// Gets current QA paragraph contents in InDesign without changing selection or focus.

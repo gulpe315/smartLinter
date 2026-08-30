@@ -4,6 +4,16 @@ import { useBridgeStore } from '../bridgeStore.ts';
 import { useTranslationSessionStore } from '../translationSessionStore.ts';
 
 describe('document generation preparation', () => {
+  it('updates progress monotonically and ignores late progress for another request', () => {
+    const listeners = new Map<string, (payload: any) => void>();
+    const service = { listen: (event: string, handler: any) => { listeners.set(event, handler); return () => {}; } } as any;
+    const stop = useTranslationSessionStore.getState().initEventListener(service);
+    useTranslationSessionStore.setState({ activeDocumentGeneration: { requestId: 'active', phase: 'preflight', cancelRequested: false, hostConstraint: 'test' } });
+    listeners.get('document-generation-progress')!({ requestId: 'active', phase: 'materializing', completedUnits: 3, totalUnits: 5 });
+    listeners.get('document-generation-progress')!({ requestId: 'other', phase: 'finalizing', completedUnits: 5, totalUnits: 5 });
+    expect(useTranslationSessionStore.getState().activeDocumentGeneration).toMatchObject({ requestId: 'active', phase: 'materializing', completedUnits: 3, totalUnits: 5 });
+    stop();
+  });
   it('blocks generation when a segment needs validation after the mandatory rescan', async () => {
     const text = 'Source'; const hash = computeParagraphHash(text); const paragraphId = `word-para-body-0-${hash.slice(0, 12)}`;
     useBridgeStore.getState().setEditorStatus({ connected: true, editorType: 'Word' });

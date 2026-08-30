@@ -53,7 +53,7 @@ export const Header: React.FC = () => {
 
   const { openSettingsModal, openGuidelineViewer, sourceLang, targetLang } = useConfigStore();
   const resetQaCards = useQaStore((state) => state.resetQaCards);
-  const { isTranslationModeActive, segments, isScanning, scanError, lastScanSummary, lastImportSummary, importError, documentGenerationMessage } = useTranslationSessionStore();
+  const { isTranslationModeActive, segments, isScanning, scanError, lastScanSummary, lastImportSummary, importError, documentGenerationMessage, activeDocumentGeneration } = useTranslationSessionStore();
   const exportableSegmentCount = segments.filter((segment) => segment.status !== 'needs-validation').length;
   const needsValidationCount = segments.length - exportableSegmentCount;
   const isTranslationExportDisabled = segments.length === 0 || needsValidationCount > 0 || isScanning;
@@ -365,7 +365,12 @@ export const Header: React.FC = () => {
           </button>
         </div>
       )}
-      {documentGenerationMessage ? (
+      {activeDocumentGeneration ? (
+        <div role="status" className="flex items-center gap-2 px-4 pb-2 text-xs text-cyan-300">
+          <span>{({ preflight: '사전 점검', copying: '복사본 생성', 'verifying-copy': '복사본 검증', materializing: '번역 적용', finalizing: '저장 및 마무리' } as const)[activeDocumentGeneration.phase]}{activeDocumentGeneration.totalUnits !== undefined ? ` (${activeDocumentGeneration.completedUnits ?? 0}/${activeDocumentGeneration.totalUnits})` : ''}{activeDocumentGeneration.cancelRequested ? ` — 취소 요청됨: ${activeDocumentGeneration.hostConstraint}` : ''}</span>
+          <button disabled={activeDocumentGeneration.cancelRequested} onClick={() => { void useTranslationSessionStore.getState().cancelDocumentGeneration(); }} className="rounded border border-cyan-500 px-2 py-0.5 disabled:opacity-50">Cancel</button>
+        </div>
+      ) : documentGenerationMessage ? (
         <p role="status" className="px-4 pb-2 text-xs text-cyan-300">{documentGenerationMessage}</p>
       ) : importError ? (
         <p role="status" className="px-4 pb-2 text-xs text-amber-300">{importError}</p>

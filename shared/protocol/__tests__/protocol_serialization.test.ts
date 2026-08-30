@@ -34,6 +34,8 @@ import {
     isLocateRequest,
     isLocateResponse,
     isEnumerateDocumentResponse,
+    isDocumentGenerationProgress,
+    isCancelTranslatedDocumentRequest,
 } from '../types.ts';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -282,6 +284,17 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
             assert.ok(schema.definitions.AuthResponse);
             assert.ok(schema.definitions.HeartbeatPayload);
             assert.ok(schema.definitions.BridgeMessage);
+        });
+    });
+
+    describe('translated-document lifecycle wire compatibility', () => {
+        it('accepts camelCase progress and cancellation while rejecting invalid units', () => {
+            assert.equal(isDocumentGenerationProgress({ requestId: 'same-request', phase: 'materializing', completedUnits: 1, totalUnits: 2 }), true);
+            assert.equal(isDocumentGenerationProgress({ requestId: 'same-request', phase: 'materializing', completedUnits: -1 }), false);
+            assert.equal(isDocumentGenerationProgress({ requestId: 'same-request', phase: 'materializing', completedUnits: 3, totalUnits: 2 }), false);
+            assert.equal(isCancelTranslatedDocumentRequest({ requestId: 'same-request' }), true);
+            assert.equal(isBridgeMessage({ type: 'DOCUMENT_GENERATION_PROGRESS', payload: { requestId: 'same-request', phase: 'copying' } }), true);
+            assert.equal(isBridgeMessage({ type: 'GENERATE_TRANSLATED_DOCUMENT_RESPONSE', payload: { requestId: 'same-request', status: 'CANCELLED' } }), true);
         });
     });
 });

@@ -476,7 +476,11 @@
         if (!generator || typeof generator.generateTranslatedDocument !== 'function') {
             return { requestId: request ? (request.requestId || 'unknown') : 'unknown', status: 'FAILED', message: 'DocumentGenerator not initialized in daemon' };
         }
-        return generator.generateTranslatedDocument(request, { appInstance: options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null) });
+        var cancellationFile = options.cancellationFile ? File(options.cancellationFile) : null;
+        return generator.generateTranslatedDocument(request, {
+            appInstance: options.appInstance || this.appInstance || (typeof app !== 'undefined' ? app : null),
+            isCancelled: function() { return cancellationFile && cancellationFile.exists; }
+        });
     };
 
     /** Returns the current QA paragraph contents without changing selection or focus. */

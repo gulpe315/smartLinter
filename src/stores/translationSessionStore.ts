@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type DocumentGenerationParagraphPlan, type EnumerateDocumentSummary, type GenerationDiagnostic, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { type DocumentGenerationParagraphPlan, type DocumentGenerationPhase, type EnumerateDocumentSummary, type GenerationDiagnostic, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
 import { renderTargetTokensToRuns } from '../utils/translationFormatting.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
@@ -20,7 +20,6 @@ import { analyzeXliffImport, applyXliffImport, parseXliffImport, type XliffConfl
 import { useBridgeStore } from './bridgeStore.ts';
 
 const TRANSLATION_SESSION_STORAGE_KEY = 'smartlinter_translation_session';
-const GENERATION_TIMEOUT = 70_000;
 let scanRequestToken = 0;
 
 export type TranslationSegmentStatus =
@@ -318,6 +317,8 @@ export interface TranslationSessionState {
   prepareDocumentGeneration: (service?: IBridgeService) => Promise<DocumentGenerationPreparation>;
   generateTranslatedDocument: (plans: DocumentGenerationParagraphPlan[], service?: IBridgeService) => Promise<void>;
   documentGenerationMessage: string | null;
+  activeDocumentGeneration: { requestId: string; phase: DocumentGenerationPhase; completedUnits?: number; totalUnits?: number; cancelRequested: boolean; hostConstraint: string } | null;
+  cancelDocumentGeneration: (service?: IBridgeService) => Promise<void>;
   updateSegmentTarget: (segmentId: string, text: string) => void;
   removeSegment: (segmentId: string) => void;
   clearSession: () => void;
@@ -334,6 +335,7 @@ const initialState = {
   lastImportSummary: null as TranslationSessionState['lastImportSummary'],
   importError: null as string | null,
   documentGenerationMessage: null as string | null,
+  activeDocumentGeneration: null as TranslationSessionState['activeDocumentGeneration'],
 };
 
 export const useTranslationSessionStore = create<TranslationSessionState>()(persist((set, get) => ({
@@ -531,15 +533,25 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
 
   generateTranslatedDocument: async (plans, service) => {
     set({ documentGenerationMessage: null });
+    const requestId = `generate-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const hostConstraint = useBridgeStore.getState().editorType === 'InDesign'
+      ? '현재 동기 호출 완료 후 정리됩니다.'
+      : '현재 sync 청크 완료 후 정리됩니다.';
+    set({ activeDocumentGeneration: { requestId, phase: 'preflight', cancelRequested: false, hostConstraint } });
     try {
-      const response = await Promise.race([
-        (service || getBridgeService()).generateTranslatedDocument(plans),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('GENERATION_TIMEOUT')), GENERATION_TIMEOUT)),
-      ]);
-      set({ documentGenerationMessage: response.status === 'SUCCESS'
+      const response = await (service || getBridgeService()).generateTranslatedDocument(plans, requestId);
+      if (response.requestId !== requestId) return;
+      set({ activeDocumentGeneration: null, documentGenerationMessage: response.status === 'SUCCESS'
         ? `번역 문서를 생성했습니다: ${response.appliedParagraphCount ?? 0}개 문단 적용`
         : `번역 문서 생성 실패 (${response.status})${response.message ? `: ${response.message}` : ''}` });
     } catch (error: any) { set({ documentGenerationMessage: `번역 문서 생성 실패: ${error?.message || String(error)}` }); }
+  },
+
+  cancelDocumentGeneration: async (service) => {
+    const active = get().activeDocumentGeneration;
+    if (!active || active.cancelRequested) return;
+    set({ activeDocumentGeneration: { ...active, cancelRequested: true } });
+    await (service || getBridgeService()).cancelTranslatedDocument(active.requestId);
   },
 
   updateSegmentTarget: (segmentId, text) => set((state) => {
@@ -564,9 +576,17 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
 
   initEventListener: (service) => {
     const bridgeService = service || getBridgeService();
-    return bridgeService.listen('new-paragraph-detected', (payload) => {
+    const stopParagraphs = bridgeService.listen('new-paragraph-detected', (payload) => {
       get().upsertParagraphSegments(payload);
     });
+    const stopProgress = bridgeService.listen('document-generation-progress', (progress) => {
+      const active = get().activeDocumentGeneration;
+      if (!active || active.requestId !== progress.requestId || active.cancelRequested) return;
+      const completedUnits = progress.completedUnits === undefined ? active.completedUnits : Math.max(active.completedUnits ?? 0, progress.completedUnits);
+      const totalUnits = progress.totalUnits === undefined ? active.totalUnits : Math.max(active.totalUnits ?? 0, progress.totalUnits);
+      set({ activeDocumentGeneration: { ...active, phase: progress.phase, completedUnits, totalUnits } });
+    });
+    return () => { stopParagraphs(); stopProgress(); };
   },
 
   reset: () => set({ ...initialState }),
