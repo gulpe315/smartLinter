@@ -158,6 +158,41 @@ export interface DocumentGenerationParagraphPlan {
     documentOrderIndex: number;
     expectedSourceHash: string;
     targetText: string;
+    /** Fully rendered formatting runs for translated-document generation. */
+    runs?: RenderedRun[];
+    /** Reserved for the InDesign renderer; not populated by the Word path. */
+    inDesignDefaultFontFace?: InDesignSourceFontFace;
+    /** Reserved for the InDesign renderer; not populated by the Word path. */
+    inDesignFontFaceByFormatId?: Record<string, InDesignSourceFontFace>;
+}
+
+export interface RenderedRun {
+    text: string;
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    sourceFormatIds?: string[];
+}
+
+export interface InDesignSourceFontFace {
+    fontFamily: string;
+    fontStyleName: string;
+}
+
+export type GenerationDiagnosticReason =
+    | 'FINGERPRINT_MISMATCH'
+    | 'INVALID_TARGET_TAGS'
+    | 'RENDERED_TEXT_MISMATCH'
+    | 'FONT_FACE_UNAVAILABLE'
+    | 'FORMAT_APPLY_FAILED';
+
+export interface GenerationDiagnostic {
+    paragraphId?: string;
+    documentOrderIndex?: number;
+    reason: GenerationDiagnosticReason;
+    detail?: string;
+    fontFamily?: string;
+    requestedStyle?: string;
 }
 
 export interface GenerateTranslatedDocumentRequest {
@@ -179,6 +214,7 @@ export interface GenerateTranslatedDocumentResponse {
     status: GenerateTranslatedDocumentStatus;
     appliedParagraphCount?: number;
     message?: string;
+    diagnostic?: GenerationDiagnostic;
 }
 
 /** Request to reveal a paragraph in the active editor. Offsets are reserved for future span selection. */
@@ -429,7 +465,33 @@ export function isDocumentGenerationParagraphPlan(val: unknown): val is Document
     return typeof obj.paragraphId === 'string'
         && typeof obj.documentOrderIndex === 'number' && Number.isInteger(obj.documentOrderIndex) && obj.documentOrderIndex >= 0
         && typeof obj.expectedSourceHash === 'string'
-        && typeof obj.targetText === 'string';
+        && typeof obj.targetText === 'string'
+        && (obj.runs === undefined || (Array.isArray(obj.runs) && obj.runs.every(isRenderedRun)))
+        && (obj.inDesignDefaultFontFace === undefined || isInDesignSourceFontFace(obj.inDesignDefaultFontFace))
+        && (obj.inDesignFontFaceByFormatId === undefined || (typeof obj.inDesignFontFaceByFormatId === 'object' && obj.inDesignFontFaceByFormatId !== null && Object.values(obj.inDesignFontFaceByFormatId).every(isInDesignSourceFontFace)));
+}
+
+export function isRenderedRun(val: unknown): val is RenderedRun {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return typeof obj.text === 'string' && typeof obj.bold === 'boolean' && typeof obj.italic === 'boolean' && typeof obj.underline === 'boolean'
+        && (obj.sourceFormatIds === undefined || (Array.isArray(obj.sourceFormatIds) && obj.sourceFormatIds.every((id) => typeof id === 'string')));
+}
+
+export function isInDesignSourceFontFace(val: unknown): val is InDesignSourceFontFace {
+    return typeof val === 'object' && val !== null && typeof (val as Record<string, unknown>).fontFamily === 'string'
+        && typeof (val as Record<string, unknown>).fontStyleName === 'string';
+}
+
+export function isGenerationDiagnostic(val: unknown): val is GenerationDiagnostic {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    return (obj.paragraphId === undefined || typeof obj.paragraphId === 'string')
+        && (obj.documentOrderIndex === undefined || (typeof obj.documentOrderIndex === 'number' && Number.isInteger(obj.documentOrderIndex)))
+        && (obj.reason === 'FINGERPRINT_MISMATCH' || obj.reason === 'INVALID_TARGET_TAGS' || obj.reason === 'RENDERED_TEXT_MISMATCH' || obj.reason === 'FONT_FACE_UNAVAILABLE' || obj.reason === 'FORMAT_APPLY_FAILED')
+        && (obj.detail === undefined || typeof obj.detail === 'string')
+        && (obj.fontFamily === undefined || typeof obj.fontFamily === 'string')
+        && (obj.requestedStyle === undefined || typeof obj.requestedStyle === 'string');
 }
 
 export function isGenerateTranslatedDocumentRequest(val: unknown): val is GenerateTranslatedDocumentRequest {
@@ -452,7 +514,8 @@ export function isGenerateTranslatedDocumentResponse(val: unknown): val is Gener
     return typeof obj.requestId === 'string'
         && isGenerateTranslatedDocumentStatus(obj.status)
         && (obj.appliedParagraphCount === undefined || (typeof obj.appliedParagraphCount === 'number' && Number.isInteger(obj.appliedParagraphCount) && obj.appliedParagraphCount >= 0))
-        && (obj.message === undefined || typeof obj.message === 'string');
+        && (obj.message === undefined || typeof obj.message === 'string')
+        && (obj.diagnostic === undefined || isGenerationDiagnostic(obj.diagnostic));
 }
 
 export function isLocateStatus(val: unknown): val is LocateStatus {

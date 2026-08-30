@@ -1,8 +1,7 @@
 /** Creates a translated copy of the active Word document without writing to the original. */
 import type { GenerateTranslatedDocumentRequest, GenerateTranslatedDocumentResponse } from '../../../shared/protocol/types.ts';
 import { computeParagraphHash } from '../../../shared/engine/hash_util.ts';
-import { extractDiffHunks } from '../../../shared/engine/diff_engine.ts';
-import { WordReplacementExecutor } from './replacement_executor.ts';
+import { materializeTranslationPlans } from './translation_materializer.ts';
 
 const asyncResult = <T>(invoke: (callback: (result: any) => void) => void): Promise<T> => new Promise((resolve, reject) => {
     invoke((result) => result?.status === (globalThis as any).Office?.AsyncResultStatus?.Succeeded || result?.status === 'succeeded'
@@ -58,25 +57,15 @@ export async function generateTranslatedWordDocument(
             if (plans.some((plan) => computeParagraphHash(paragraphs.items?.[plan.documentOrderIndex]?.text || '') !== plan.expectedSourceHash)) {
                 throw Object.assign(new Error('FINGERPRINT_MISMATCH'), { code: 'FINGERPRINT_MISMATCH' });
             }
-            const createdRunner = async (callback: (createdContext: any) => Promise<any>) => callback(context);
-            for (const plan of plans) {
-                const sourceText = paragraphs.items[plan.documentOrderIndex]?.text || '';
-                const result = await new WordReplacementExecutor({ wordRunner: createdRunner }).execute({
-                    commandId: `generate-${request.requestId}-${plan.documentOrderIndex}`,
-                    paragraphId: plan.paragraphId,
-                    baseHash: plan.expectedSourceHash,
-                    expectedHash: computeParagraphHash(plan.targetText),
-                    hunks: extractDiffHunks(sourceText, plan.targetText),
-                }, { wordRunner: createdRunner, documentRoot: created });
-                if (result.status !== 'SUCCESS') throw new Error(result.message || `Replacement failed: ${result.status}`);
-                appliedParagraphCount++;
-            }
+            const materialized = await materializeTranslationPlans(paragraphs.items, plans);
+            if (!materialized.ok) throw Object.assign(new Error(materialized.diagnostic.detail || materialized.diagnostic.reason), { diagnostic: materialized.diagnostic });
+            appliedParagraphCount = materialized.appliedParagraphCount;
             created.open();
             await context.sync();
         });
         return { requestId: request.requestId, status: 'SUCCESS', appliedParagraphCount };
     } catch (error: any) {
         if (error?.code === 'FINGERPRINT_MISMATCH') return { requestId: request.requestId, status: 'FINGERPRINT_MISMATCH' };
-        return { requestId: request.requestId, status: 'FAILED', message: error?.message || String(error) };
+        return { requestId: request.requestId, status: 'FAILED', message: error?.message || String(error), diagnostic: error?.diagnostic };
     }
 }

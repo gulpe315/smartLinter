@@ -9,7 +9,8 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type DocumentGenerationParagraphPlan, type EnumerateDocumentSummary, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { type DocumentGenerationParagraphPlan, type EnumerateDocumentSummary, type GenerationDiagnostic, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { renderTargetTokensToRuns } from '../utils/translationFormatting.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
 import { splitIntoSentences } from '../utils/sentenceBoundary.ts';
@@ -193,7 +194,7 @@ export function buildParagraphTargetText(paragraphSegments: TranslationSessionSe
 
 export type DocumentGenerationPreparation =
   | { ok: true; plans: DocumentGenerationParagraphPlan[]; translatedParagraphCount: number; untranslatedParagraphCount: number; totalParagraphCount: number }
-  | { ok: false; reason: string; translatedParagraphCount: number; untranslatedParagraphCount: number; totalParagraphCount: number };
+  | { ok: false; reason: string; diagnostic?: GenerationDiagnostic; translatedParagraphCount: number; untranslatedParagraphCount: number; totalParagraphCount: number };
 
 const isLegacyWordParagraphId = (paragraphId: string) => (
   /^word-para-[^-]+$/.test(paragraphId) && !paragraphId.startsWith('word-para-body-')
@@ -487,7 +488,19 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
       const sourceText = ordered.map((segment) => segment.sourceText).join('');
       const targetText = buildParagraphTargetText(ordered);
       const first = ordered[0];
-      if (targetText !== sourceText && first?.documentOrderIndex !== undefined) plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText });
+      if (targetText !== sourceText && first?.documentOrderIndex !== undefined) {
+        const runs = [] as import('../../shared/protocol/types.ts').RenderedRun[];
+        for (const segment of ordered) {
+          const segmentText = segment.status === 'untranslated' ? segment.sourceText : segment.targetDraft;
+          if (segment.status !== 'untranslated' && segment.taggedTarget?.tagStatus === 'valid' && segment.taggedTarget.targetTokens) {
+            const rendered = renderTargetTokensToRuns(segment.taggedTarget.targetTokens, segment.targetDraft);
+            if (!rendered.ok) return { ok: false, reason: rendered.message, diagnostic: { paragraphId, documentOrderIndex: first.documentOrderIndex, reason: rendered.reason === 'TEXT_MISMATCH' ? 'RENDERED_TEXT_MISMATCH' : 'INVALID_TARGET_TAGS', detail: rendered.message }, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
+            runs.push(...rendered.runs);
+          } else if (segmentText) runs.push({ text: segmentText, bold: false, italic: false, underline: false });
+        }
+        if (runs.map((run) => run.text).join('') !== targetText) return { ok: false, reason: 'Rendered text differs from paragraph target.', diagnostic: { paragraphId, documentOrderIndex: first.documentOrderIndex, reason: 'RENDERED_TEXT_MISMATCH' }, translatedParagraphCount: 0, untranslatedParagraphCount: totalParagraphCount, totalParagraphCount };
+        plans.push({ paragraphId, documentOrderIndex: first.documentOrderIndex, expectedSourceHash: first.sourceHash, targetText, runs });
+      }
     }
     return { ok: true, plans, translatedParagraphCount: plans.length, untranslatedParagraphCount: totalParagraphCount - plans.length, totalParagraphCount };
   },

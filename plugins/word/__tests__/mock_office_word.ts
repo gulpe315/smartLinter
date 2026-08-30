@@ -31,6 +31,7 @@ export class MockWordContext {
 
     private syncCount = 0;
     private docState: MockDocumentState;
+    public operations: any[] = [];
 
     constructor(docState: MockDocumentState) {
         this.docState = docState;
@@ -59,7 +60,17 @@ export class MockWordContext {
     }
 
     private createParagraph(state: MockDocumentState): any {
-        const paragraph: any = { text: state.text, load: (_prop: string) => {}, getRange: () => ({ getSubstring: (start: number, length: number) => ({ insertText: (value: string) => { state.text = state.text.slice(0, start) + value + state.text.slice(start + length); paragraph.text = state.text; } }) }) };
+        const makeRange = (start: number, length: number): any => ({
+            font: new Proxy({}, { set: (_target, property, value) => { if (property === 'underline' && typeof value === 'boolean') throw new Error('underline must be an enum value'); this.operations.push({ type: 'format', start, length, property, value }); return true; } }),
+            insertText: (value: string, location: string) => {
+                if (location === 'Replace') { state.text = state.text.slice(0, start) + value + state.text.slice(start + length); }
+                else if (location === 'End') { state.text = state.text.slice(0, start + length) + value + state.text.slice(start + length); }
+                else throw new Error(`Unsupported insert location: ${location}`);
+                paragraph.text = state.text; const result = makeRange(start, value.length); this.operations.push({ type: 'insert', start, length, value, location }); return result;
+            },
+            getSubstring: (offset: number, substringLength: number) => makeRange(start + offset, substringLength),
+        });
+        const paragraph: any = { text: state.text, load: (_prop: string) => {}, getRange: () => makeRange(0, state.text.length) };
         return paragraph;
     }
 
@@ -153,6 +164,8 @@ export class MockWordEnvironment {
     public office: MockOfficeHost;
     public docState: MockDocumentState;
     public activeContext: MockWordContext;
+    public createdContext?: MockWordContext;
+    public openCallCount = 0;
 
     constructor(initialText = 'This is a sample paragraph in Word.', initialTitle = 'TestDocument.docx') {
         this.office = new MockOfficeHost();
@@ -164,10 +177,10 @@ export class MockWordEnvironment {
             callback({ status: this.office.AsyncResultStatus.Succeeded, value: { sliceCount: 1, getSliceAsync: (_index: number, done: (result: any) => void) => done({ status: this.office.AsyncResultStatus.Succeeded, value: { index: 0, data: bytes } }), closeAsync: (done?: () => void) => done?.() } });
         };
         (this.activeContext as any).application = { createDocument: (_base64: string) => {
-            const copy = new MockWordContext({ ...this.docState });
+            const copy = new MockWordContext({ ...this.docState }); this.createdContext = copy;
             const created: any = copy.document;
             created.openCallCount = 0;
-            created.open = () => { created.openCallCount++; };
+            created.open = () => { created.openCallCount++; this.openCallCount++; };
             return created;
         } };
     }

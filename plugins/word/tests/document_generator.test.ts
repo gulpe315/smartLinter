@@ -6,7 +6,7 @@ import { computeParagraphHash } from '../../../shared/engine/hash_util.ts';
 function harness(text: string, supported = true) {
   let originalWrites = 0;
   let opened = 0;
-  const makeParagraph = (state: { text: string }) => ({ get text() { return state.text; }, load() {}, getRange: () => ({ getSubstring: (start: number, length: number) => ({ insertText: (value: string) => { state.text = state.text.slice(0, start) + value + state.text.slice(start + length); } }) }) });
+  const makeParagraph = (state: { text: string }) => ({ get text() { return state.text; }, load() {}, getRange: () => ({ insertText: (value: string, location: string) => { if (location === 'Replace') state.text = value; else throw new Error('unexpected insert location'); return { font: {} }; } }) });
   const original = { text };
   const document: any = { saved: true, load() {}, body: { paragraphs: { items: [makeParagraph(original)], load() {}, insertText: () => { originalWrites++; } } } };
   const context: any = { document, sync: async () => {}, application: { createDocument: () => { const copy = { text }; return { body: { paragraphs: { items: [makeParagraph(copy)], load() {} } }, open: () => { opened++; } }; } } };
@@ -16,7 +16,7 @@ function harness(text: string, supported = true) {
 
 test('does not call any original-document write API while generating a copy', async () => {
   const h = harness('Source');
-  const result = await generateTranslatedWordDocument({ requestId: 'a', paragraphPlans: [{ paragraphId: `word-para-body-0-${computeParagraphHash('Source').slice(0, 12)}`, documentOrderIndex: 0, expectedSourceHash: computeParagraphHash('Source'), targetText: 'Target' }] }, h.runner, h.office);
+  const result = await generateTranslatedWordDocument({ requestId: 'a', paragraphPlans: [{ paragraphId: `word-para-body-0-${computeParagraphHash('Source').slice(0, 12)}`, documentOrderIndex: 0, expectedSourceHash: computeParagraphHash('Source'), targetText: 'Target', runs: [{ text: 'Target', bold: false, italic: false, underline: false }] }] }, h.runner, h.office);
   assert.equal(result.status, 'SUCCESS'); assert.equal(h.originalWrites, 0); assert.equal(h.opened, 1);
 });
 test('fails closed before applying any paragraph when the fingerprint differs', async () => {
@@ -28,4 +28,9 @@ test('returns UNSUPPORTED_HOST before document reads when hidden documents are u
   const h = harness('Source', false);
   const result = await generateTranslatedWordDocument({ requestId: 'c', paragraphPlans: [] }, h.runner, h.office);
   assert.equal(result.status, 'UNSUPPORTED_HOST');
+});
+test('does not open the copy when materialization fails', async () => {
+  const h = harness('Source');
+  const result = await generateTranslatedWordDocument({ requestId: 'd', paragraphPlans: [{ paragraphId: 'p', documentOrderIndex: 0, expectedSourceHash: computeParagraphHash('Source'), targetText: 'Target', runs: [{ text: 'Wrong', bold: false, italic: false, underline: false }] }] }, h.runner, h.office);
+  assert.equal(result.status, 'FAILED'); assert.equal(result.diagnostic?.reason, 'RENDERED_TEXT_MISMATCH'); assert.equal(h.opened, 0);
 });

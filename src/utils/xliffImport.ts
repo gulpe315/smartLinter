@@ -1,5 +1,6 @@
 import { type TranslationSessionSegment } from '../stores/translationSessionStore.ts';
 import { type InlineToken, type InlineTokenKind, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { sameInlineCodeStructure, textFromTokens } from './translationFormatting.ts';
 
 export interface ParsedTransUnit {
   id: string;
@@ -77,64 +78,6 @@ function parseInlineTokens(element: Element | null): InlineToken[] | undefined {
   return tokens;
 }
 
-type InlineCodeStructure = {
-  orderedSignature: string[];
-  codesById: Map<string, { kind: string; parentId: string | null }>;
-};
-
-/** Returns inline-code signatures, or null when the token sequence is malformed. */
-function inlineCodeSignature(tokens: InlineToken[]): InlineCodeStructure | null {
-  const stack: Array<{ id: string; kind: string }> = [];
-  const orderedSignature: string[] = [];
-  const codesById = new Map<string, { kind: string; parentId: string | null }>();
-  const ids = new Set<string>();
-  for (const token of tokens) {
-    if (token.type === 'text') continue;
-    if (token.type === 'placeholder') {
-      if (!token.id || ids.has(`ph:${token.id}`)) return null;
-      ids.add(`ph:${token.id}`);
-      orderedSignature.push(`ph:${token.id}:${token.kind}`);
-      codesById.set(`ph:${token.id}`, { kind: token.kind, parentId: null });
-      continue;
-    }
-    if (!token.id || !inlineKinds.includes(token.kind)) return null;
-    if (token.type === 'open') {
-      if (ids.has(token.id)) return null;
-      ids.add(token.id);
-      codesById.set(token.id, { kind: token.kind, parentId: stack.at(-1)?.id ?? null });
-      stack.push({ id: token.id, kind: token.kind });
-      orderedSignature.push(`open:${token.id}:${token.kind}`);
-    } else {
-      const open = stack.pop();
-      if (!open || open.id !== token.id || open.kind !== token.kind) return null;
-      orderedSignature.push(`close:${token.id}:${token.kind}`);
-    }
-  }
-  return stack.length === 0 ? { orderedSignature, codesById } : null;
-}
-
-const sameInlineCodeStructure = (
-  left: InlineToken[],
-  right: InlineToken[],
-  positionIndependent = false,
-): boolean => {
-  const leftSignature = inlineCodeSignature(left);
-  const rightSignature = inlineCodeSignature(right);
-  if (!leftSignature || !rightSignature) return false;
-  if (!positionIndependent) {
-    return leftSignature.orderedSignature.length === rightSignature.orderedSignature.length
-      && leftSignature.orderedSignature.every((part, index) => part === rightSignature.orderedSignature[index]);
-  }
-  return leftSignature.codesById.size === rightSignature.codesById.size
-    && [...leftSignature.codesById].every(([id, code]) => {
-      const other = rightSignature.codesById.get(id);
-      return other?.kind === code.kind && other.parentId === code.parentId;
-    });
-};
-
-const textFromTokens = (tokens: InlineToken[] | undefined, fallback: string): string => (
-  tokens ? tokens.filter((token) => token.type === 'text').map((token) => token.value).join('') : fallback
-);
 
 export function parseXliffImport(xmlContent: string): XliffParseResult {
   const document = new DOMParser().parseFromString(xmlContent, 'application/xml');
