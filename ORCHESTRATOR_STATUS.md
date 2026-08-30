@@ -1,11 +1,103 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
-4차 후속) — **T6d-1(진행률/협력적 취소/timeout lifecycle) 구현·검증·
-커밋 완료(로컬 커밋만, push 안 함).** 1차 구현에 치명적 결함 다수가
-있었으나 agy 리뷰+Claude 네이티브 검증으로 잡아 후속 라운드로 전부
-수정했다. 다음 세션은 T6d-2(표 번역, RECONCILED §3)부터 시작할 것.**
-아래 이 절을 먼저 읽을 것.
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
+5차 후속) — **T6d-2 Change Set 1(공통 protocol/XLIFF 계약 + InDesign 표
+번역) 설계·구현·검증·커밋 완료(로컬 커밋만, push 안 함).** 이 라운드부터
+**Codex를 배제하고 agy에게만 자문·구현을 맡기는 방식으로 전환**했다
+(사용자 지시, 이유는 Codex 사용량 한도 반복 실패 — 아래 "워크플로 전환"
+절 참고). Change Set 2(Word 표 번역)는 아직 시작 안 함 — 다음 세션은
+거기서 시작할 것.** 아래 이 절을 먼저 읽을 것.
+
+## 이번 세션 완료(5차 후속) — 워크플로 전환(Codex 배제) + T6d-2 설계·Change Set 1 구현
+
+**커밋 4개(`c4203bd` 설계 자문 요청, `43fc112` 확정 스펙, `19eb8a2`
+Change Set 1 지시서, `9ce63b6` Change Set 1 구현 — 아직 원격 push 안 함).**
+
+### 워크플로 전환 — Codex 배제, agy가 설계+구현 전부 담당
+Codex(`codex.cmd` npm 안정판)가 T6d-2 설계 답변을 두 번 시도했으나 둘 다
+ChatGPT 사용량 한도(usage limit)에 걸려 실패(두 번째는 시작도 못 함,
+16:24 재시도 안내). 사용자가 대기 대신 "코덱스 작업은 모두 agy에게
+위임해"로 명시 지시. 상세는 `smartlinter-orchestrator-minimize-own-tokens`
+메모리 참고 — **"일단"이라는 표현이라 다음 세션 시작 시 이 상태가 여전히
+유효한지 사용자에게 재확인할 것** (한도가 풀리면 원래 역할 분담으로
+돌아갈 가능성 있음).
+
+agy는 이 환경에서 명령 실행/파일쓰기(`write_file`)가 기본적으로 막혀
+있으나, **`--dangerously-skip-permissions` 플래그가 이번엔 실제로
+통과했다**(과거 기록엔 "Claude Code 분류기가 막는다"고 돼 있었으나
+재테스트 결과 파일 쓰기 성공 확인 — `agy-codex-cli-quirks` 메모리
+갱신함). 이 덕분에 agy에게 실제 코드 구현(파일 작성)까지 맡길 수
+있었다. 단, agy는 **웹 검색(`read_url`)도 이 환경에서 막혀 있어** API
+공식 문서 검증은 여전히 못 한다 — 학습 지식 기반 답변(확신도 명시)에
+의존해야 한다.
+
+### T6d-2 설계 자문
+`DESIGN_REQUEST_TRANSLATION_MODE_T6D2.md`(Claude가 직접 작성한 Q1~Q7,
+Explore 에이전트의 코드 사실관계 조사 결과를 재료로 흡수)를 agy에게
+2라운드로 답변시켰다: 1차는 일반 답변, 2차는 원래 Codex가 하려던 "Q1
+API 사실관계 공식 문서 검증" 역할까지 agy에게 재위임(웹 접근 차단, 학습
+지식만으로 확신도 명시 요청).
+
+**agy가 가장 중요한 사실(Word `body.paragraphs`가 표 셀 문단을 포함하는지
+여부)에 대해 확신도를 뒤집는 패턴을 보였다** — 1차에서는 "불확실, Codex
+검증 필요"였다가, 2차(웹 접근 차단 후 "이게 최종 답"이라고 요청)에서는
+새 근거 없이 "확신도 매우 높음"으로 바뀜. 이 프로젝트가 반복해온 API
+추측 오류(`Document.duplicate()`, `getSubstring()` 등) 패턴과 같아
+Claude가 그대로 채택하지 않고 사용자에게 확인 — 사용자가 "Word가 설치
+안 돼 있어 검증 불가, 할 수 있는 것부터 하라"고 답해, **이 사실을
+확정하지 않고 코드가 양쪽 경우 모두 방어적으로 안전하게 처리하도록
+설계를 바꿈**(`RECONCILED_TRANSLATION_MODE_T6D2.md` §0/§4.2). InDesign
+쪽은 반대로 실제 동작 중인 코드(`getParagraphContainerKind`)로 이미
+증명된 사실이라 그대로 확정.
+
+agy의 확정 스펙 최종 검토(자기 답변을 Claude가 종합한 문서를 다시
+agy에게 검토시킴)에서 결함 0건, §4.2 문구 1곳만 다듬으라는 지적을 받아
+반영 후 커밋.
+
+### T6d-2 Change Set 1 구현(공통 계약 + InDesign 표 번역)
+지시서(`TASK_REQUEST_TRANSLATION_MODE_T6D2_1.md`)도 agy가 초안 작성(Claude가
+핵심 인용 몇 곳을 직접 코드 대조로 스팟체크 후 저장·커밋). 이어서 agy가
+`--dangerously-skip-permissions`로 실제 구현까지 수행:
+- `shared/protocol/types.ts`/`src-tauri/src/protocol/messages.rs`에
+  `ContainerKind`/`TableLocator` 추가(하위 호환 optional 필드).
+- `xliffExport.ts`/`xliffImport.ts`에 `<note>` 기반 표 메타데이터
+  직렬화 및 `INVALID_TABLE_LOCATOR` fail-closed 검증.
+- `document_scanner.jsx`의 표 "건너뛰기"를 "수집"으로 전환(같은 `order`
+  카운터 재사용해 본문/표 전역 순서 공유).
+- `atomic_replacer.jsx`에 `resolveTableForParagraphId` 신설(기존
+  `resolveStoryForParagraphId` 완전 보존), `indesign-tablepara-` id
+  역파싱 + cellName/rowSpan/columnSpan 교차검증.
+- `document_generator.jsx`에 표 locator preflight 검증 추가(복제본 열기
+  전 비정상 locator fail-closed 거부).
+- InDesign mock에 Table/Row/Column/Cell 및 병합 셀 시뮬레이션 추가,
+  신규 `plugins/indesign/tests/table_translation.test.ts`(5+1 시나리오:
+  기본 표/병합 셀/빈 셀·다중 문단/본문 중간 표 순서/fingerprint 불일치
+  fail-closed/preflight 비정상 locator 거부).
+- **Word 파일은 전혀 건드리지 않음**(Change Set 2 범위).
+
+**검증**: agy 자체 실행 + Claude 네이티브 재검증(diff도 직접 읽어 확인 —
+이번엔 agy가 구현자이자 유일한 자문 모델이라 교차검증 가치가 줄어든 만큼
+Claude가 직접 diff를 더 꼼꼼히 읽음). `npm test` 264/264(+11),
+`test:indesign` 107/107(+7), `test:word` 46/46(불변), `test:ui`
+480/480(+7), `npm run build`, `cargo check --release` 전부 통과.
+
+### 다음 세션이 참고할 것
+1. **워크플로 상태(Codex 배제, agy 전담) 여전히 유효한지 사용자에게
+   재확인**(위 "워크플로 전환" 절 참고).
+2. T6d-2 **Change Set 2(Word 표 번역)** 지시서 작성부터 시작.
+   `RECONCILED_TRANSLATION_MODE_T6D2.md` §4가 방향을 잡아뒀다 — 특히
+   §4.2의 "body.paragraphs 표 포함 여부 미확정, dual mock fixture로
+   방어적 검증" 요구사항을 반드시 준수할 것(§6의
+   `WordMockWithTableInBody`/`WordMockIsolatedBody` 양쪽 mock 모두
+   통과해야 프로덕션 경로에 연결 가능). Change Set 1이 만든 공통 계약
+   (`ContainerKind`/`TableLocator`, XLIFF `<note>`, 세션 스토어 필드)은
+   이미 완비돼 있어 Change Set 2는 `plugins/word/*`에만 집중하면 된다
+   (agy의 Change Set 1 완료 보고 §5 "인수인계" 참고).
+3. agy에게 지시서/구현을 맡길 때 `--dangerously-skip-permissions` 사용
+   가능함을 계속 활용할 것(단, 매번 실제로 통과하는지 확인 — 과거
+   막혔던 이력도 있어 세션마다 달라질 수 있음).
+
+---
 
 ## 이번 세션 완료(4차 후속) — T6d-1 구현(2라운드) 완료
 
