@@ -5,10 +5,45 @@
 번역) 완료.** Word/InDesign 양쪽 표 번역이 T6d-1 progress/cancel 기반
 위에서 동작한다. 이 라운드부터 **Codex를 배제하고 agy에게만 자문·구현을
 맡기는 방식으로 전환**했다(사용자 지시, 이유는 Codex 사용량 한도 반복
-실패 — 아래 "워크플로 전환" 절 참고). T6d-3 이후(머리말/바닥글/각주 등)는
-아직 범위 밖 — 다음 세션 시작 시 T6d를 여기서 마무리할지, 아니면 이미
-확정된 다음 트랙(문장단위 CAT 정합성 Phase 0 → Kiwi)으로 넘어갈지
-**사용자에게 먼저 확인할 것**.** 아래 이 절을 먼저 읽을 것.
+실패 — 아래 "워크플로 전환" 절 참고).
+
+**다음에 열려 있는 트랙(2026-08-30, 전체 로드맵 재조사로 확정 — 예전 "Phase
+0→Kiwi" 문구는 낡은 계획이었고 이미 대부분 완료돼 있었음, 아래가 최신
+정답):**
+1. QA 카드 Mode A(문장 원클릭 통합 적용)/Mode B(개별 이슈 부분 적용+Diff
+   Rebase) — Phase 0 잔여 과제, 미착수.
+2. 다국어 QA 프로파일 — 영어만 완료, 일본어/중국어 미착수(fail-loud).
+3. T6d-3 이후(머리말/바닥글/각주 등 T6d-2 범위 밖 컨테이너) — 미착수.
+4. 멀티 에디터 확장(VSCode/Antigravity, `BACKLOG_MULTI_EDITOR_SUPPORT.md`) — 미착수.
+5. Kiwi Part A/B는 완료. **Part C(VM 콜드부트 스파이크)만 VirtualBox VM
+   자체가 이 PC에 없어 보류 중**(다른 PC라면 VM 유무부터 확인).
+6. 그 외 낮은 우선순위 백로그(동일 스팬 중복 QA 카드, 다중 Word 창 포커스,
+   Ollama 모델 소실 UX, 조사쌍 으로/로·과/와 확장) — 전부 미착수.
+
+**우선순위는 사용자가 정한다 — 자동 결정 금지.** 다음 세션 시작 시 위
+1~4(또는 6) 중 어느 걸 먼저 할지 사용자에게 먼저 확인할 것.** 아래 이
+절을 먼저 읽을 것.
+
+## 다른 PC로 이 프로젝트를 옮길 때 (2026-08-30 기준 체크리스트)
+
+1. `git clone https://github.com/gulpe315/smartLinter.git` (또는 기존 로컬 clone에서 `git pull`).
+2. `npm install` (`node_modules`는 커밋 안 됨).
+3. git identity 확인: `git config user.name user` / `git config user.email gulpe315@gmail.com`.
+4. **TM 샘플 파일은 git에 없음**(`.gitignore`의 `*.tmx`/`*.sdltm`). `KO-EN.tmx`,
+   `SD.sdltm`을 프로젝트 루트에 별도로 복사해야 TM 작업 가능(실제 고객 데이터일
+   수 있으므로 **절대 커밋 금지**).
+5. **agy/codex CLI 사용법은 PC마다 다시 확인할 것** — 이번 PC에서 확정한 사실
+   (agy는 `명령 실행/파일쓰기/웹조회 금지` 프롬프트 필요, `--dangerously-skip-permissions`
+   플래그로 파일쓰기까지 가능함을 이번 세션에 재확인, codex는 반대로 명령 허용
+   필요)이 다른 PC/버전에서도 그대로인지 보장 없음. 이 지식은 Claude의 로컬
+   메모리(`agy-codex-cli-quirks`)에도 있지만 그 메모리가 새 PC/새 계정 세션에
+   그대로 이어지는지 불확실하므로, 이 문서가 fallback 근거다.
+6. **워크플로 상태 확인**: 이 세션(2026-08-30)은 Codex 사용량 한도 문제로
+   "일단" agy 전담 체제로 전환했다 — 다른 PC/새 세션에서는 Codex 사용량이
+   초기화돼 있을 수 있으니, 막혀 있지 않다면 원래 역할 분담(Codex 초안+agy
+   검토)으로 되돌아가도 된다. 사용자에게 먼저 확인할 것.
+7. Kiwi 스파이크 Part C를 이어가려면 그 PC에 VirtualBox/VM 환경이 있는지부터
+   확인(이 PC엔 없어서 보류 중이었음).
 
 ## 이번 세션 완료(6차 후속) — T6d-2 Change Set 2(Word 표 번역) 완료로 T6d-2 전체 종료
 
