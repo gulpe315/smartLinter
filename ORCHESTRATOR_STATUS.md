@@ -1,6 +1,136 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-29 세션 종료 —
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30 — T6b(InDesign
+새 번역 문서 생성 파이프라인) 구현·검증·커밋까지 완료(로컬 커밋만,
+원격 push 안 함 — 정책대로 전체 작업 마무리 시 한 번에 push). 이
+세션에서 T6 확정 스펙 §2(InDesign 흐름)의 핵심 전제 오류
+(`Document.duplicate()` 부재)도 발견·정정했다. 다음 세션은
+T6c(서식 Materializer, Word+InDesign 공통)부터 시작할 것.** 아래 이
+절을 먼저 읽을 것.
+
+## 이번 세션 완료(2026-08-30) — 백로그: 멀티 에디터 확장(VSCode/Antigravity)
+
+사용자가 SmartLinter를 Word/InDesign 외에 VSCode·Google Antigravity
+등으로 계속 확장할 계획이라고 알려왔다. 지금 진행 중인 T6~Kiwi 트랙을
+끝내고 착수하기로 결정, 상세 배경과 착수 시 첫 단계는
+`BACKLOG_MULTI_EDITOR_SUPPORT.md`에 기록해뒀다 — 착수 신호가 오면
+그 문서부터 읽을 것.
+
+## 이번 세션 완료(2026-08-30) — 트랙 C T6b: InDesign 새 번역 문서 생성 파이프라인
+
+**커밋 3개(`4837e78` T6 스펙 §2 정정, `824aeed` T6b 지시서,
+`ef4698b` T6b 구현 — 아직 원격 push 안 함).**
+
+- **T6 확정 스펙의 사실관계 오류 발견·정정**: T6b 지시서 작성 준비 중
+  Claude가 InDesign ExtendScript 공식 API 문서(`Document` 클래스
+  전체 85개 메서드 전수 확인)로 `Document.duplicate()`가 **존재하지
+  않음**을 확인했다 — `RECONCILED_TRANSLATION_MODE_T6.md` §2 원안의
+  핵심 전제가 틀렸었다. agy(Object Model 전수 검토)와 Codex(Adobe
+  공식 DOM 문서 웹검색)에게 각각 독립적으로 재조율을 요청한 결과 둘
+  다 동일한 결론(`saveACopy()` + `app.open()`이 유일한 정석)에
+  도달했고, `atomic_replacer.jsx`가 "이미 doc을 파라미터로 받는다"는
+  원안 전제도 틀렸음을 확인해(항상 암묵적 `activeDocument` 참조)
+  Word의 `WordDocumentPort`와 동일한 `options.doc` 주입 패턴으로
+  최소 확장하기로 함께 수렴했다. 상세는
+  `RECONCILE_TRANSLATION_MODE_T6B_DUPLICATE_API.md` 및 갱신된
+  `RECONCILED_TRANSLATION_MODE_T6.md` §2 참고.
+- **지시서 작성 자체를 Codex에게 위임**(이번 세션에 새로 확립한 방식,
+  아래 "오케스트레이터 위임" 절 참고): Codex가 1차 초안을 작성 →
+  agy가 독립 검토해 결함 3건 발견(Tauri v2 `dialog:default` capability
+  권한 누락, InDesign 전송 경로가 WebSocket과 COM 사이에서 혼재된
+  서술 — **T3b에서 이미 확정한 "InDesign은 COM DoScript, WebSocket
+  아님"이라는 사실을 Codex가 다시 혼동한 것**, 저장 다이얼로그 호출
+  위치가 지시서 내에서 자체 모순) → Codex가 전부 수정 → agy 최종
+  승인 → 커밋(`824aeed`).
+- **구현(Codex) 1차 라운드 — Codex 자신의 샌드박스 네트워크 제약으로
+  실제 컴파일 검증이 안 된 채 끝남**: Codex가 `cargo check --release`를
+  시도했으나 새 `tauri-plugin-dialog` crate를 crates.io에서 못 받아
+  (네트워크 제한) 끝내지 못했고, `npm test`/`npm run test:ui`도
+  종료 요약 없이 중단됐다고 스스로 보고했다. Claude가 네이티브로
+  같은 명령을 돌려 실제로 **Rust 컴파일 에러**(session.rs가 새
+  `destination_path` 필드를 채우지 않음, `E0063`)와 **vitest 27개
+  파일 실패**(package.json엔 dependency가 추가됐지만 실제
+  `npm install`이 안 돼 `@tauri-apps/plugin-dialog`가 없었음 — 이것도
+  Codex의 네트워크 제약)를 잡아냈다. **Claude의 독립 검증과 agy의
+  diff 리뷰를 병렬로 동시 진행**(순차 아님, 기존 원칙 그대로 유지).
+- **agy 병렬 리뷰가 추가로 결함 2건 발견**: ① `findByOrder`가
+  `document_scanner.jsx`의 표/각주/미주/미배치 스토리 스킵 로직을
+  반영하지 않아, 그런 콘텐츠가 하나라도 있는 문서에서
+  `documentOrderIndex`와 실제 스토리 인덱스가 어긋나 **정상 문서도
+  무조건 `FINGERPRINT_MISMATCH`로 실패**하는 결함(수정: 이미
+  `atomic_replacer.jsx`에 있는 `findParagraphById`로 `paragraphId`
+  직접 조회하도록 교체). ② 성공 경로에서도 `copiedDoc.close()`를
+  호출해버려 스펙("성공 시 열어 둔 채 유지")과 어긋나는 결함(수정:
+  `succeeded` 플래그로 실패했을 때만 `finally`에서 close).
+- **관례대로 Claude가 직접 고치지 않고**, 컴파일 에러 1건 + agy
+  결함 2건 + 경미한 개선 1건(Word처럼 plan 방어적 정렬 추가)을 묶어
+  후속 지시서로 Codex에게 되돌려 한 번에 수정시켰다. 수정 후 Claude
+  독립 재검증(`npm test` 240/240, `npx vitest run` 471/471,
+  `cargo check --release` 클린)과 agy 최종 승인을 모두 받은 뒤
+  커밋(`ef4698b`).
+- **최종 검증**: `npm test`(240/240)·`npx vitest run`(471/471)·
+  `npm run test:indesign`(92/92, T6a 완료 시점 83개 대비 +9)·
+  `npm run build`·`cargo check --release` 전부 통과.
+- **T6b 완료로 InDesign 경로의 "새 번역 문서 생성" 최소 기능도
+  끝났다.** Word(T6a)/InDesign(T6b) 둘 다 plain-text 치환만 가능,
+  서식(굵게/기울임/밑줄) 재적용은 T6c 범위. 이 PC에 InDesign이 없어
+  전부 mock 기반으로만 검증됐다 — 실제 라이브 검증은 안 됨(기존
+  패턴과 동일한 한계, 사용자 방침상 "실사용 중 발견 시 대응").
+
+## 이번 세션에 새로 확립된 원칙 — 오케스트레이터는 위임 우선
+
+사용자가 세션 중 "네가 중간 조율하는 오케스트레이터임에도 토큰
+소모가 월등히 크다"고 명시적으로 지적함(Claude가 T6b 사전조사 중
+API 사실관계 검증을 위해 WebSearch/WebFetch를 직접 여러 차례 반복
+호출한 것). 이후로 **API 사실관계 검증이나 문서 초안 작성도 Claude가
+직접 하지 않고 먼저 Codex/agy에게 위임을 시도**하는 방향으로
+전환했다(이번 T6b 지시서 자체도 Codex가 초안 작성 → agy 검토 →
+Codex 수정 순으로 진행, 위 절 참고). 상세는
+`smartlinter-orchestrator-minimize-own-tokens` 메모리 참고.
+
+## Codex CLI 샌드박스 재고장 및 해결(2026-08-30)
+
+agy 번들 `codex`가 알파 빌드(`0.146.0-alpha.3`)로 업데이트된 뒤
+읽기 명령조차 `codex-windows-sandbox-setup.exe ... program not found`로
+전부 실패했다(이전에 있었던 `codex-command-runner.exe` 고장과는 다른
+증상, 이번엔 필요한 헬퍼 파일이 PC 어디에도 없어 복사로 못 고침).
+`npm install -g @openai/codex@latest`로 공식 안정판(`0.151.0`)을
+별도 설치해 해결 — 단 PATH 우선순위상 agy 번들이 여전히 먼저 잡히므로
+`"C:\Users\gulpe\AppData\Roaming\npm\codex.cmd"` 전체 경로로 직접
+호출해야 한다. 상세는 `agy-codex-cli-quirks` 메모리 참고.
+
+## ⭐ 다음 세션 시작 시 즉시 할 일
+
+1. **T6c(서식 Materializer, Word+InDesign 공통) 설계 자문부터 시작**.
+   `RECONCILED_TRANSLATION_MODE_T6.md` §3에 이미 방향이 잡혀 있다
+   (공통 `RenderedRun` 계약 + 호스트별 writer, `bold`/`italic`/
+   `underline` 세 가지만 v1 범위). T6a/T6b 양쪽의 plain-text 치환
+   경로를 이번에 서식까지 재적용하도록 확장하게 된다.
+2. **지시서 작성 자체를 먼저 Codex에게 위임하는 이번 세션 방식을
+   유지할 것** — Claude가 직접 장문 설계/지시서를 쓰지 말고 Codex
+   초안 → agy 검토 → Codex 수정 → agy 재확인 순서로. API 사실관계
+   검증도 Claude가 WebSearch/WebFetch를 반복하지 말고 먼저 Codex에게
+   맡길 것(`smartlinter-orchestrator-minimize-own-tokens` 메모리).
+3. **Codex 자체 샌드박스 제약(네트워크 다운로드, cargo/vitest 시간
+   제한 등)으로 검증을 못 끝냈다고 보고하면, 그 검증만 Claude가
+   네이티브로 대신 돌리고 agy 리뷰와 병렬로 진행할 것** — 이번
+   세션에 이 방식으로 Codex가 못 잡은 컴파일 에러 1건과 vitest
+   27파일 실패를 실제로 잡아냈다(둘 다 새 npm/cargo 의존성이 실제로
+   설치되지 않은 게 원인이었다 — 새 의존성을 추가하는 라운드에서는
+   특히 이 검증을 빠뜨리지 말 것).
+4. **자문/지시서에 반복해서 등장하는 기존 확정 사실을 다시 틀리는
+   경우가 있다** — 이번에 Codex가 T6b 지시서 초안에서 "InDesign은
+   WebSocket"이라고 다시 서술했는데, 이는 T3b에서 이미 "InDesign은
+   COM DoScript"로 확정된 사실과 모순됐다(agy가 잡아냄). 지시서
+   검토 시 이런 재발 오류가 없는지 특히 주의할 것.
+5. T6c 완료 후 T6d(백로그) → 문장단위 CAT 정합성 Phase 0 → Kiwi VM
+   확인(사용자가 이미 확정한 순서). 멀티 에디터 확장(VSCode/
+   Antigravity)은 이 트랙 전체가 끝난 뒤 `BACKLOG_MULTI_EDITOR_SUPPORT.md`
+   부터 시작.
+
+---
+
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐ 이전 업데이트: 2026-08-29 세션 종료 —
 사용자가 "이 작업이 끝나면 세션 마무리해"로 명시적 종료 요청,
 트랙 C T4 전체 완료 + T6 설계 라운드 완료 + **T6a(Word 파이프라인)
 구현·검증·커밋까지 완료, 원격 push 완료.** 다음 세션은 T6b(InDesign
