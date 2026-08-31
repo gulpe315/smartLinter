@@ -80,12 +80,13 @@ export const QACardItem: React.FC<QACardItemProps> = ({
   const editorConnected = useBridgeStore((state) => state.editorConnected);
   const isStale = card.status === 'stale_refreshing' || card.status === 'stale_rejected' || !!card.isStale;
   const isObsolete = card.status === 'stale_obsolete';
+  const isConflict = card.status === 'stale_conflict';
   const isApplying = propIsApplying || isBatchApplying || card.status === 'applying' || isStale;
   const requiresSuggestionSelection = !!card.suggestions && card.suggestions.length >= 2;
-  const isAcceptDisabled = !editorConnected || isApplying || isObsolete || card.isLocked === true || (
+  const isAcceptDisabled = !editorConnected || isApplying || isObsolete || isConflict || card.isLocked === true || (
     requiresSuggestionSelection && !card.selectedSuggestionSegment
   );
-  const isEditUnavailable = readOnly || isApplying || isObsolete;
+  const isEditUnavailable = readOnly || isApplying || isObsolete || isConflict;
   const readOnlyStatus = card.status === 'applied'
     ? '적용됨'
     : card.status === 'dismissed'
@@ -259,7 +260,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
       onPointerDown={handleCardPointerDown}
       onClick={handleCardClick}
       className={`group relative rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700/80 shadow-md p-4 transition-all duration-300 ease-out hover:shadow-indigo-950/20 hover:shadow-lg ${
-        isObsolete ? 'ring-1 ring-slate-500/60 border-slate-500/60 bg-slate-950/90 opacity-85' : isStale ? 'ring-1 ring-amber-500/50 border-amber-500/40 bg-slate-900' : card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
+        isObsolete ? 'ring-1 ring-slate-500/60 border-slate-500/60 bg-slate-950/90 opacity-85' : isConflict ? 'ring-1 ring-rose-500/50 border-rose-500/40 bg-slate-900' : isStale ? 'ring-1 ring-amber-500/50 border-amber-500/40 bg-slate-900' : card.status === 'applying' ? 'ring-1 ring-indigo-500/50 bg-slate-900' : ''
       } ${
         card.status === 'failed' ? 'border-rose-900/80 bg-rose-950/20' : ''
       } ${
@@ -276,6 +277,12 @@ export const QACardItem: React.FC<QACardItemProps> = ({
       {isObsolete && (
         <div data-testid="qa-card-obsolete-notice" role="status" className="mb-3 px-3 py-2 rounded-lg border border-slate-600/70 bg-slate-800/70 text-xs text-slate-300">
           이 문단은 더 이상 찾을 수 없습니다. 문서가 변경되었을 수 있습니다.
+        </div>
+      )}
+
+      {isConflict && (
+        <div data-testid="qa-card-conflict-notice" role="status" className="mb-3 px-3 py-2 rounded-lg border border-rose-700/70 bg-rose-950/30 text-xs text-rose-200">
+          {card.staleMessage}
         </div>
       )}
 
@@ -405,7 +412,7 @@ export const QACardItem: React.FC<QACardItemProps> = ({
                   data-card-click-exempt
                   data-testid="qa-suggestion-pill"
                   data-selected={isSelected ? 'true' : undefined}
-                  disabled={readOnly}
+                  disabled={isEditUnavailable}
                   onClick={() => selectSuggestion(card.id, suggestion.suggestedSegment)}
                   className={`w-full rounded-md border px-3 py-2 text-left text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                     isSelected
@@ -582,6 +589,11 @@ export const QACardItem: React.FC<QACardItemProps> = ({
               <>
                 <AlertCircle className="w-3.5 h-3.5 text-slate-300" />
                 <span>적용할 수 없음</span>
+              </>
+            ) : isConflict ? (
+              <>
+                <AlertCircle className="w-3.5 h-3.5 text-rose-200" />
+                <span className="text-rose-200">적용 불가</span>
               </>
             ) : isStale ? (
               <>

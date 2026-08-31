@@ -274,6 +274,12 @@ describe('QACardItem Component', () => {
 
     rerender(<QACardItem card={{ ...sampleCard, status: 'stale_refreshing' }} />);
     expect(screen.queryByTestId('qa-edit-suggestion-btn')).not.toBeInTheDocument();
+
+    rerender(<QACardItem card={{ ...sampleCard, status: 'stale_conflict', staleMessage: '다른 제안과 충돌했습니다.' }} />);
+    expect(screen.getByTestId('qa-card-conflict-notice')).toHaveTextContent('다른 제안과 충돌했습니다.');
+    expect(screen.getByTestId('qa-accept-action-btn')).toBeDisabled();
+    expect(screen.getByTestId('qa-dismiss-action-btn')).not.toBeDisabled();
+    expect(screen.queryByTestId('qa-edit-suggestion-btn')).not.toBeInTheDocument();
   });
 
   it('shows a lock indicator and prevents applying a locked card while keeping locate and dismiss enabled', () => {

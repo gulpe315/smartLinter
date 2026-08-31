@@ -17,6 +17,7 @@ import {
   sortHunksReverse,
 } from '../../shared/engine/diff_engine.ts';
 import { planSentenceGroupReplacement } from '../utils/sentenceReplacement.ts';
+import { planSiblingRebase } from '../utils/qaCardRebase.ts';
 import { computeParagraphHash } from '../../shared/engine/hash_util.ts';
 import {
   type AcceptedCorrectionPromptItem,
@@ -61,6 +62,10 @@ export interface PendingCommand {
   baseHash: string;
   /** Bound to the command at dispatch time; callers cannot override it later. */
   autoResolveStale: boolean;
+  baselineParagraphText: string;
+  hunks: TextHunk[];
+  expectedFullText: string;
+  expectedHash: string;
 }
 
 interface QaRestoreContext {
@@ -459,6 +464,7 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
           card.id !== cardId ||
           card.status === 'applying' ||
           card.status === 'stale_obsolete' ||
+          card.status === 'stale_conflict' ||
           card.status === 'stale_refreshing'
         ) {
           return card;
@@ -476,6 +482,7 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
           card.id !== cardId ||
           card.status === 'applying' ||
           card.status === 'stale_obsolete' ||
+          card.status === 'stale_conflict' ||
           card.status === 'stale_refreshing'
         ) {
           return card;
@@ -488,7 +495,7 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
 
   acceptCard: async (cardId, service, options) => {
     const card = get().cards.find((c) => c.id === cardId);
-    if (!card || card.status === 'applying' || card.status === 'stale_obsolete') {
+    if (!card || card.status === 'applying' || card.status === 'stale_obsolete' || card.status === 'stale_conflict') {
       return null;
     }
 
@@ -511,8 +518,11 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
       let hunks: TextHunk[] = [];
       let expectedFullText = suggestedSegment;
 
-      if (paragraphText && paragraphText.includes(originalSegment)) {
-        const startIndex = paragraphText.indexOf(originalSegment);
+      const offsetMatches = card.startOffset !== undefined
+        && card.endOffset !== undefined
+        && paragraphText.slice(card.startOffset, card.endOffset) === originalSegment;
+      if (paragraphText && (offsetMatches || paragraphText.includes(originalSegment))) {
+        const startIndex = offsetMatches ? card.startOffset! : paragraphText.indexOf(originalSegment);
         expectedFullText =
           paragraphText.substring(0, startIndex) +
           suggestedSegment +
@@ -544,6 +554,10 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
           paragraphId: card.paragraphId,
           baseHash,
           autoResolveStale: options?.autoResolveStale ?? false,
+          baselineParagraphText: paragraphText,
+          hunks: command.hunks,
+          expectedFullText,
+          expectedHash,
         });
         return { pendingCommands };
       });
@@ -718,11 +732,13 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
           ? { ...card, status: 'applying', errorMessage: undefined }
           : card),
       }));
+      const expectedFullText = plan.expectedFullText;
+      const expectedHash = computeParagraphHash(expectedFullText);
       const command: ReplacementCommand = {
         commandId: `cmd-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         paragraphId,
         baseHash,
-        expectedHash: computeParagraphHash(plan.expectedFullText),
+        expectedHash,
         hunks: plan.hunks,
       };
       dispatchedCommandId = command.commandId;
@@ -734,6 +750,10 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
           paragraphId,
           baseHash,
           autoResolveStale: false,
+          baselineParagraphText: first.paragraphText,
+          hunks: command.hunks,
+          expectedFullText,
+          expectedHash,
         });
         return { pendingCommands };
       });
@@ -809,6 +829,44 @@ export const useQaStore = create<QAState>()(persist((set, get) => ({
         paragraphId: pendingCommand.paragraphId,
         service: bridgeService,
       });
+    }
+
+    if (result.status === 'SUCCESS' && result.currentHash !== pendingCommand.expectedHash) {
+      set((state) => ({
+        cards: state.cards.map((card) => (
+          card.paragraphId === pendingCommand.paragraphId && card.status === 'pending'
+            ? { ...card, isStale: true }
+            : card
+        )),
+      }));
+    } else if (result.status === 'SUCCESS') {
+      set((state) => ({
+        cards: state.cards.map((card) => {
+          if (card.paragraphId !== pendingCommand.paragraphId || card.status !== 'pending') return card;
+
+          const plan = planSiblingRebase(
+            card,
+            pendingCommand.baselineParagraphText,
+            pendingCommand.expectedFullText,
+            pendingCommand.hunks,
+          );
+          if (plan.outcome === 'rebased') {
+            return {
+              ...card,
+              startOffset: plan.startOffset,
+              endOffset: plan.endOffset,
+              paragraphText: pendingCommand.expectedFullText,
+              paragraphHash: pendingCommand.expectedHash,
+              isStale: false,
+            };
+          }
+          return {
+            ...card,
+            status: 'stale_conflict',
+            staleMessage: '다른 제안이 적용되며 이 제안이 가리키던 원문이 바뀌어 더 이상 안전하게 적용할 수 없습니다.',
+          };
+        }),
+      }));
     }
     return true;
   },

@@ -22,6 +22,7 @@ export type QACardStatus =
   | 'stale_refreshing'
   | 'stale_rejected'
   | 'stale_obsolete'
+  | 'stale_conflict'
   | 'rollback_aborted'
   | 'rolled_back';
 

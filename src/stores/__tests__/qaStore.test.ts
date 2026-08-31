@@ -608,7 +608,8 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     useQaStore.setState((state) => ({
       cards: state.cards.map((card) => card.id === otherCardId ? { ...card, status: 'applying' } : card),
       pendingCommands: new Map([['cmd-target', {
-        cardId: intendedCardId, paragraphId: 'para-command-target', baseHash: 'base-target',
+        cardId: intendedCardId, paragraphId: 'para-command-target', baseHash: 'base-target', autoResolveStale: false,
+        baselineParagraphText: 'teh', hunks: [], expectedFullText: 'the', expectedHash: 'hash-applied',
       }]]),
     }));
 
@@ -628,7 +629,8 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
     });
     useQaStore.setState({
       pendingCommands: new Map([['cmd-duplicate', {
-        cardId, paragraphId: 'para-duplicate-result', baseHash: 'base-duplicate',
+        cardId, paragraphId: 'para-duplicate-result', baseHash: 'base-duplicate', autoResolveStale: false,
+        baselineParagraphText: 'teh', hunks: [], expectedFullText: 'the', expectedHash: 'hash-applied',
       }]]),
     });
     const result = { commandId: 'cmd-duplicate', status: 'SUCCESS' as const, currentHash: 'hash-applied' };
@@ -1048,11 +1050,87 @@ describe('useQaStore - QA Issue Cards & Bridge Replacement Store', () => {
 
     it('processes remaining cards safely when one group card was dismissed before the result arrives', async () => {
       const ids = addGroup();
-      useQaStore.setState({ cards: useQaStore.getState().cards.map((card) => ids.includes(card.id) ? { ...card, status: 'applying' } : card), pendingCommands: new Map([['partial-command', { cardId: ids[0], cardIds: ids, paragraphId, baseHash: paragraphHash, autoResolveStale: false }]]) });
+      useQaStore.setState({ cards: useQaStore.getState().cards.map((card) => ids.includes(card.id) ? { ...card, status: 'applying' } : card), pendingCommands: new Map([['partial-command', { cardId: ids[0], cardIds: ids, paragraphId, baseHash: paragraphHash, autoResolveStale: false, baselineParagraphText: paragraphText, hunks: [], expectedFullText: paragraphText, expectedHash: 'new-hash' }]]) });
       useQaStore.getState().dismissCard(ids[0]);
 
       await expect(useQaStore.getState().processReplacementResult({ commandId: 'partial-command', status: 'SUCCESS', currentHash: 'new-hash' }, mockBridge)).resolves.toBe(true);
       expect(useQaStore.getState().appliedCards).toEqual([expect.objectContaining({ id: ids[1], status: 'applied' })]);
+    });
+  });
+
+  describe('Mode B sibling rebase', () => {
+    const conflictMessage = '다른 제안이 적용되며 이 제안이 가리키던 원문이 바뀌어 더 이상 안전하게 적용할 수 없습니다.';
+
+    it('rebases non-overlapping pending siblings and marks overlapping ones as stale_conflict', async () => {
+      const paragraphText = 'fix alpha and beta now';
+      const targetId = useQaStore.getState().addCard({ id: 'mode-b-target', paragraphId: 'mode-b', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'alpha', suggestedSegment: 'ALPHA!', reason: 'Fix', severity: 'MEDIUM', startOffset: 4, endOffset: 9 });
+      const siblingId = useQaStore.getState().addCard({ id: 'mode-b-sibling', paragraphId: 'mode-b', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'beta', suggestedSegment: 'BETA', reason: 'Fix', severity: 'MEDIUM', startOffset: 14, endOffset: 18, segmentIndex: 9 });
+      const conflictId = useQaStore.getState().addCard({ id: 'mode-b-conflict', paragraphId: 'mode-b', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'pha', suggestedSegment: 'PHA', reason: 'Fix', severity: 'MEDIUM', startOffset: 6, endOffset: 9 });
+      useQaStore.setState((state) => ({
+        cards: state.cards.map((card) => card.id === targetId ? { ...card, status: 'applying' } : card),
+        pendingCommands: new Map([['mode-b-command', {
+          cardId: targetId, paragraphId: 'mode-b', baseHash: 'base', autoResolveStale: false,
+          baselineParagraphText: paragraphText,
+          hunks: [{ start: 4, end: 9, oldText: 'alpha', newText: 'ALPHA!' }],
+          expectedFullText: 'fix ALPHA! and beta now', expectedHash: 'rebased-hash',
+        }]]),
+      }));
+
+      await useQaStore.getState().processReplacementResult({ commandId: 'mode-b-command', status: 'SUCCESS', currentHash: 'rebased-hash' }, mockBridge);
+
+      expect(useQaStore.getState().cards.find((card) => card.id === siblingId)).toMatchObject({
+        status: 'pending', startOffset: 15, endOffset: 19, paragraphText: 'fix ALPHA! and beta now', paragraphHash: 'rebased-hash', isStale: false,
+      });
+      expect(useQaStore.getState().cards.find((card) => card.id === conflictId)).toMatchObject({
+        status: 'stale_conflict', staleMessage: conflictMessage,
+      });
+    });
+
+    it('rebases a remaining sibling after a multi-hunk group command', async () => {
+      const paragraphText = 'fix alpha beta tail';
+      const first = useQaStore.getState().addCard({ id: 'mode-b-group-a', paragraphId: 'mode-b-group', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'alpha', suggestedSegment: 'A', reason: 'Fix', severity: 'MEDIUM' });
+      const second = useQaStore.getState().addCard({ id: 'mode-b-group-b', paragraphId: 'mode-b-group', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'beta', suggestedSegment: 'BETA!', reason: 'Fix', severity: 'MEDIUM' });
+      const sibling = useQaStore.getState().addCard({ id: 'mode-b-group-tail', paragraphId: 'mode-b-group', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'tail', suggestedSegment: 'TAIL', reason: 'Fix', severity: 'MEDIUM', startOffset: 15, endOffset: 19 });
+      useQaStore.setState((state) => ({
+        cards: state.cards.map((card) => card.id === first || card.id === second ? { ...card, status: 'applying' } : card),
+        pendingCommands: new Map([['mode-b-group-command', {
+          cardId: first, cardIds: [first, second], paragraphId: 'mode-b-group', baseHash: 'base', autoResolveStale: false,
+          baselineParagraphText: paragraphText,
+          hunks: [{ start: 4, end: 9, oldText: 'alpha', newText: 'A' }, { start: 10, end: 14, oldText: 'beta', newText: 'BETA!' }],
+          expectedFullText: 'fix A BETA! tail', expectedHash: 'group-hash',
+        }]]),
+      }));
+
+      await useQaStore.getState().processReplacementResult({ commandId: 'mode-b-group-command', status: 'SUCCESS', currentHash: 'group-hash' }, mockBridge);
+
+      expect(useQaStore.getState().cards.find((card) => card.id === sibling)).toMatchObject({ startOffset: 12, endOffset: 16, paragraphText: 'fix A BETA! tail', paragraphHash: 'group-hash' });
+    });
+
+    it('does not modify siblings when the host hash differs from the predicted result', async () => {
+      const paragraphText = 'alpha beta';
+      const target = useQaStore.getState().addCard({ id: 'mode-b-hash-target', paragraphId: 'mode-b-hash', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'alpha', suggestedSegment: 'A', reason: 'Fix', severity: 'MEDIUM' });
+      const sibling = useQaStore.getState().addCard({ id: 'mode-b-hash-sibling', paragraphId: 'mode-b-hash', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'beta', suggestedSegment: 'B', reason: 'Fix', severity: 'MEDIUM', startOffset: 6, endOffset: 10 });
+      useQaStore.setState((state) => ({
+        cards: state.cards.map((card) => card.id === target ? { ...card, status: 'applying' } : card),
+        pendingCommands: new Map([['mode-b-hash-command', {
+          cardId: target, paragraphId: 'mode-b-hash', baseHash: 'base', autoResolveStale: false,
+          baselineParagraphText: paragraphText, hunks: [{ start: 0, end: 5, oldText: 'alpha', newText: 'A' }], expectedFullText: 'A beta', expectedHash: 'expected-hash',
+        }]]),
+      }));
+
+      await useQaStore.getState().processReplacementResult({ commandId: 'mode-b-hash-command', status: 'SUCCESS', currentHash: 'actual-host-hash' }, mockBridge);
+
+      expect(useQaStore.getState().cards.find((card) => card.id === sibling)).toMatchObject({ status: 'pending', paragraphText, paragraphHash: 'base', startOffset: 6, endOffset: 10, isStale: true });
+    });
+
+    it('uses a verified card offset before the legacy first-occurrence fallback', async () => {
+      const paragraphText = 'dup then dup';
+      const cardId = useQaStore.getState().addCard({ paragraphId: 'mode-b-offset', paragraphText, paragraphHash: 'base', category: 'Grammar', originalSegment: 'dup', suggestedSegment: 'fixed', reason: 'Fix', severity: 'MEDIUM', startOffset: 9, endOffset: 12 });
+      const sendSpy = vi.spyOn(mockBridge, 'sendReplacementCommand');
+
+      await useQaStore.getState().acceptCard(cardId, mockBridge);
+
+      expect(sendSpy.mock.calls[0][0].hunks.some((hunk) => hunk.start === 9 && hunk.oldText === 'dup')).toBe(true);
     });
   });
 
