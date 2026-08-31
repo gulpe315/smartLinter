@@ -3,6 +3,7 @@ import type {
     EnumerateDocumentRequest,
     EnumerateDocumentResponse,
     ScannedParagraphEntry,
+    FootnoteLocator,
     TableLocator,
     TaggedSegmentData,
 } from '../../../shared/protocol/types.ts';
@@ -18,7 +19,7 @@ interface TableParagraphEntry {
     consumed: boolean;
 }
 
-/** Enumerates all body and table paragraphs in a single non-invasive Word.run scan. */
+/** Enumerates all body, table and supported footnote paragraphs in one non-invasive Word.run scan. */
 export async function enumerateAllDocumentParagraphs(
     request: EnumerateDocumentRequest,
     wordRunner: (callback: (context: any) => Promise<any>) => Promise<any>,
@@ -29,10 +30,14 @@ export async function enumerateAllDocumentParagraphs(
         await wordRunner(async (context: any) => {
             const bodyParagraphs = context.document.body?.paragraphs;
             const tables = context.document.body?.tables;
+            const footnotes = context.document.body?.footnotes;
             const properties = context.document.properties;
+            const footnotesSupported = (globalThis as any).Office?.context?.requirements
+                ?.isSetSupported?.('WordApi', '1.5') === true;
 
             bodyParagraphs?.load?.('text');
             tables?.load?.('items');
+            if (footnotesSupported) footnotes?.load?.('items');
             if (properties) properties.load?.('title');
 
             if (tables?.items) {
@@ -57,6 +62,13 @@ export async function enumerateAllDocumentParagraphs(
 
             await context.sync();
             sourceDocumentName = properties?.title || '';
+
+            if (footnotesSupported && footnotes?.items) {
+                for (const footnote of footnotes.items) {
+                    footnote.body?.paragraphs?.load?.('text');
+                }
+                await context.sync();
+            }
 
             // 1. Build independent table paragraphs list
             const tableParagraphs: TableParagraphEntry[] = [];
@@ -161,7 +173,37 @@ export async function enumerateAllDocumentParagraphs(
                     });
                 }
             }
+
+            if (footnotesSupported) {
+                const footnoteItems = footnotes?.items || [];
+                for (let fIdx = 0; fIdx < footnoteItems.length; fIdx++) {
+                    const footnote = footnoteItems[fIdx];
+                    const footnoteParagraphs = footnote.body?.paragraphs?.items || [];
+                    for (let pIdx = 0; pIdx < footnoteParagraphs.length; pIdx++) {
+                        const paragraph = footnoteParagraphs[pIdx];
+                        const text = paragraph.text || '';
+                        const hash = computeParagraphHash(text);
+                        const footnoteLocator: FootnoteLocator = {
+                            host: 'Word', footnoteIndex: fIdx, paragraphIndexInFootnote: pIdx,
+                        };
+                        const extraction = await extractParagraphTokens(paragraph, wordRunner);
+                        paragraphs.push({
+                            paragraphId: `word-footnotepara-${fIdx}-${pIdx}`,
+                            text,
+                            hash,
+                            documentOrderIndex: order++,
+                            taggedSource: extraction.ok
+                                ? { sourceTokens: extraction.tokens, tagStatus: 'valid', containerKind: 'FOOTNOTE', footnoteLocator }
+                                : { sourceTokens: [{ type: 'text', value: text }], tagStatus: 'fallback-plain', fallbackReason: extraction.reason, containerKind: 'FOOTNOTE', footnoteLocator },
+                            containerKind: 'FOOTNOTE',
+                            footnoteLocator,
+                        });
+                    }
+                }
+            }
         });
+        const unsupportedFootnotes = (globalThis as any).Office?.context?.requirements
+            ?.isSetSupported?.('WordApi', '1.5') !== true;
         return {
             requestId: request.requestId,
             sourceDocumentName,
@@ -169,6 +211,7 @@ export async function enumerateAllDocumentParagraphs(
             summary: {
                 totalCount: paragraphs.length,
                 scannedParagraphs: paragraphs.length,
+                ...(unsupportedFootnotes ? { skippedUnsupportedCount: 1 } : {}),
             },
         };
     } catch (error: any) {

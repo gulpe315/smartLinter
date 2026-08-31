@@ -1,5 +1,5 @@
 import { type TranslationSessionSegment } from '../stores/translationSessionStore.ts';
-import { type ContainerKind, type InlineToken, type InlineTokenKind, type TableLocator, type TaggedSegmentData, isTableLocator } from '../../shared/protocol/types.ts';
+import { type ContainerKind, type FootnoteLocator, type InlineToken, type InlineTokenKind, type TableLocator, type TaggedSegmentData, isFootnoteLocator, isTableLocator } from '../../shared/protocol/types.ts';
 import { sameInlineCodeStructure, textFromTokens } from './translationFormatting.ts';
 
 export interface ParsedTransUnit {
@@ -12,11 +12,12 @@ export interface ParsedTransUnit {
   inlineCodeIssue?: 'INLINE_CODE_MISMATCH' | 'UNEXPECTED_INLINE_CODE';
   containerKind?: ContainerKind;
   tableLocator?: TableLocator;
+  footnoteLocator?: FootnoteLocator;
 }
 
 export type XliffParseResult =
   | { ok: true; units: ParsedTransUnit[]; toolId: string | null }
-  | { ok: false; reason: 'XML_PARSE_ERROR' | 'UNSUPPORTED_STRUCTURE' | 'INVALID_TABLE_LOCATOR'; message: string };
+  | { ok: false; reason: 'XML_PARSE_ERROR' | 'UNSUPPORTED_STRUCTURE' | 'INVALID_TABLE_LOCATOR' | 'INVALID_FOOTNOTE_LOCATOR'; message: string };
 
 export interface XliffMergeItem { segment: TranslationSessionSegment; incoming: ParsedTransUnit; }
 export interface XliffConflictItem { segment: TranslationSessionSegment; incoming: ParsedTransUnit; }
@@ -114,6 +115,7 @@ export function parseXliffImport(xmlContent: string): XliffParseResult {
 
     let containerKind: ContainerKind | undefined;
     let tableLocator: TableLocator | undefined;
+    let footnoteLocator: FootnoteLocator | undefined;
 
     for (const note of descendantsByLocalName(unit, 'note')) {
       const category = note.getAttribute('category');
@@ -121,6 +123,7 @@ export function parseXliffImport(xmlContent: string): XliffParseResult {
       if (category === 'containerKind') {
         if (text === 'TABLE') containerKind = 'TABLE';
         else if (text === 'BODY') containerKind = 'BODY';
+        else if (text === 'FOOTNOTE') containerKind = 'FOOTNOTE';
       } else if (category === 'tableLocator') {
         try {
           const parsed = JSON.parse(text);
@@ -132,6 +135,17 @@ export function parseXliffImport(xmlContent: string): XliffParseResult {
         } catch {
           return { ok: false, reason: 'INVALID_TABLE_LOCATOR', message: '유효하지 않거나 누락된 표 위치자(tableLocator) 메타데이터입니다.' };
         }
+      } else if (category === 'footnoteLocator') {
+        try {
+          const parsed = JSON.parse(text);
+          if (isFootnoteLocator(parsed)) {
+            footnoteLocator = parsed;
+          } else {
+            return { ok: false, reason: 'INVALID_FOOTNOTE_LOCATOR', message: 'Invalid or missing footnoteLocator metadata.' };
+          }
+        } catch {
+          return { ok: false, reason: 'INVALID_FOOTNOTE_LOCATOR', message: 'Invalid or missing footnoteLocator metadata.' };
+        }
       }
     }
 
@@ -140,6 +154,15 @@ export function parseXliffImport(xmlContent: string): XliffParseResult {
     }
     if (tableLocator && !containerKind) {
       containerKind = 'TABLE';
+    }
+    if (containerKind === 'FOOTNOTE' && (!footnoteLocator || tableLocator)) {
+      return { ok: false, reason: 'INVALID_FOOTNOTE_LOCATOR', message: 'FOOTNOTE units require only a valid footnoteLocator.' };
+    }
+    if (containerKind === 'TABLE' && footnoteLocator) {
+      return { ok: false, reason: 'INVALID_FOOTNOTE_LOCATOR', message: 'TABLE units cannot include a footnoteLocator.' };
+    }
+    if (footnoteLocator && containerKind !== 'FOOTNOTE') {
+      return { ok: false, reason: 'INVALID_FOOTNOTE_LOCATOR', message: 'footnoteLocator requires containerKind FOOTNOTE.' };
     }
 
     units.push({
@@ -151,6 +174,7 @@ export function parseXliffImport(xmlContent: string): XliffParseResult {
       ...(targetTokens ? { targetTokens } : {}),
       ...(containerKind ? { containerKind } : {}),
       ...(tableLocator ? { tableLocator } : {}),
+      ...(footnoteLocator ? { footnoteLocator } : {}),
     });
   }
 
@@ -228,6 +252,7 @@ export function applyXliffImport(
       updatedAt: now,
       ...(incoming.containerKind ? { containerKind: incoming.containerKind } : {}),
       ...(incoming.tableLocator ? { tableLocator: incoming.tableLocator } : {}),
+      ...(incoming.footnoteLocator ? { footnoteLocator: incoming.footnoteLocator } : {}),
       ...(incoming.targetTokens && segment.taggedSource?.tagStatus === 'valid' ? {
         taggedTarget: {
           sourceTokens: segment.taggedSource.sourceTokens,

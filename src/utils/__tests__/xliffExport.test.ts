@@ -156,4 +156,16 @@ describe('buildXliffDocument', () => {
       expect(result.xml).toContain('&quot;cellName&quot;:&quot;1:0&quot;');
     }
   });
+
+  it('round-trips FOOTNOTE metadata with its dedicated locator note', () => {
+    const locator = { host: 'InDesign' as const, storyId: 'story-1', footnoteId: 7, paragraphIndexInFootnote: 1 };
+    const result = buildXliffDocument([segment({
+      segmentId: 'footnote-seg-1', paragraphId: 'indesign-footnotepara-story-1-7-1', containerKind: 'FOOTNOTE', footnoteLocator: locator,
+    })], { sourceLang: 'en', targetLang: 'ko' });
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.xml).toContain('<note category="containerKind">FOOTNOTE</note>');
+    expect(result.xml).toContain('<note category="footnoteLocator">');
+    expect(result.xml).toContain('&quot;footnoteId&quot;:7');
+  });
 });

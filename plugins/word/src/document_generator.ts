@@ -3,6 +3,7 @@ import type {
     DocumentGenerationProgress,
     GenerateTranslatedDocumentRequest,
     GenerateTranslatedDocumentResponse,
+    FootnoteLocator,
     TableLocator,
 } from '../../../shared/protocol/types.ts';
 import { computeParagraphHash } from '../../../shared/engine/hash_util.ts';
@@ -64,9 +65,24 @@ export async function generateTranslatedWordDocument(
                 };
             }
         }
+        if (plan.containerKind === 'FOOTNOTE') {
+            const loc = plan.footnoteLocator as FootnoteLocator | undefined;
+            if (!loc || loc.host !== 'Word' || typeof loc.footnoteIndex !== 'number' || loc.footnoteIndex < 0 || !Number.isInteger(loc.footnoteIndex)
+                || typeof loc.paragraphIndexInFootnote !== 'number' || loc.paragraphIndexInFootnote < 0 || !Number.isInteger(loc.paragraphIndexInFootnote)
+                || loc.storyId !== undefined || loc.footnoteId !== undefined || plan.tableLocator !== undefined) {
+                return { requestId: request.requestId, status: 'FAILED', message: 'Invalid footnote locator in paragraph plan' };
+            }
+        }
+        if (plan.containerKind === 'TABLE' && plan.footnoteLocator !== undefined) {
+            return { requestId: request.requestId, status: 'FAILED', message: 'Invalid mixed container locators in paragraph plan' };
+        }
     }
 
     if (!office?.context?.requirements?.isSetSupported?.('WordApiHiddenDocument', '1.3')) {
+        return { requestId: request.requestId, status: 'UNSUPPORTED_HOST' };
+    }
+    if (request.paragraphPlans.some((plan) => plan.containerKind === 'FOOTNOTE')
+        && !office?.context?.requirements?.isSetSupported?.('WordApi', '1.5')) {
         return { requestId: request.requestId, status: 'UNSUPPORTED_HOST' };
     }
     if (!wordRunner) return { requestId: request.requestId, status: 'FAILED', message: 'Word Office.js API is unavailable' };
@@ -94,8 +110,10 @@ export async function generateTranslatedWordDocument(
             // Load both body paragraphs and tables from the copy document
             const bodyParagraphs = created.body?.paragraphs;
             const tables = created.body?.tables;
+            const footnotes = created.body?.footnotes;
             bodyParagraphs?.load?.('text');
             tables?.load?.('items');
+            if (plans.some((plan) => plan.containerKind === 'FOOTNOTE')) footnotes?.load?.('items');
             if (tables?.items) {
                 for (const table of tables.items) {
                     table.load?.('items');
@@ -116,6 +134,11 @@ export async function generateTranslatedWordDocument(
                 }
             }
             await context.sync();
+
+            if (plans.some((plan) => plan.containerKind === 'FOOTNOTE') && footnotes?.items) {
+                for (const footnote of footnotes.items) footnote.body?.paragraphs?.load?.('text');
+                await context.sync();
+            }
 
             // Build sparse paragraph resolution map
             interface CreatedTablePara {
@@ -182,6 +205,10 @@ export async function generateTranslatedWordDocument(
                     const cell = row?.cells?.items?.[loc.cellIndex];
                     const cellParas = cell?.body?.paragraphs?.items || cell?.paragraphs?.items;
                     return cellParas?.[loc.paragraphIndexInCell] ?? null;
+                }
+                if (plan.containerKind === 'FOOTNOTE') {
+                    const loc = plan.footnoteLocator as FootnoteLocator | undefined;
+                    return footnotes?.items?.[loc?.footnoteIndex ?? -1]?.body?.paragraphs?.items?.[loc?.paragraphIndexInFootnote ?? -1] ?? null;
                 }
                 return resolvedByOrder[plan.documentOrderIndex] ?? null;
             }

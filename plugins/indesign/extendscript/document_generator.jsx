@@ -29,6 +29,13 @@
                     return fail(request, 'FAILED', 'Invalid table locator in paragraph plan');
                 }
             }
+            if (pPlan.containerKind === 'FOOTNOTE') {
+                var footnoteLoc = pPlan.footnoteLocator;
+                if (!footnoteLoc || footnoteLoc.host !== 'InDesign' || typeof footnoteLoc.storyId !== 'string' || !footnoteLoc.storyId ||
+                    typeof footnoteLoc.footnoteId !== 'number' || footnoteLoc.footnoteId <= 0 ||
+                    typeof footnoteLoc.paragraphIndexInFootnote !== 'number' || footnoteLoc.paragraphIndexInFootnote < 0 ||
+                    pPlan.tableLocator !== undefined) return fail(request, 'FAILED', 'Invalid footnote locator in paragraph plan');
+            }
         }
         var sourceDoc = inApp.activeDocument, copiedDoc = null, temporary = tempFile(request.requestId), succeeded = false;
         var cancelled = function() { return options.isCancelled && options.isCancelled() === true; };
@@ -47,13 +54,13 @@
             /* Verify every fingerprint before applying any hunk. */
             progress('verifying-copy');
             for (var i = 0; i < plans.length; i++) {
-                var planned = replacer.findParagraphById(copiedDoc, plans[i].paragraphId, plans[i].expectedSourceHash, plans[i].tableLocator);
+                var planned = replacer.findParagraphById(copiedDoc, plans[i].paragraphId, plans[i].expectedSourceHash, plans[i].containerKind === 'FOOTNOTE' ? plans[i].footnoteLocator : plans[i].tableLocator);
                 if (!planned || hash(planned.contents || '') !== plans[i].expectedSourceHash) return fail(request, 'FINGERPRINT_MISMATCH', 'Copied document paragraph fingerprint mismatch');
             }
             for (var j = 0; j < plans.length; j++) {
                 if (cancelled()) return fail(request, 'CANCELLED', 'Cancellation requested at materialization boundary');
                 progress('materializing', j);
-                var plan = plans[j], paragraph = replacer.findParagraphById(copiedDoc, plan.paragraphId, plan.expectedSourceHash, plan.tableLocator);
+                var plan = plans[j], paragraph = replacer.findParagraphById(copiedDoc, plan.paragraphId, plan.expectedSourceHash, plan.containerKind === 'FOOTNOTE' ? plan.footnoteLocator : plan.tableLocator);
                 if (!paragraph) return fail(request, 'FINGERPRINT_MISMATCH', 'Copied document paragraph fingerprint mismatch');
                 var result = materializer.apply(paragraph, plan);
                 if (!result.ok) return { requestId: request.requestId || 'unknown', status: 'FAILED', message: result.diagnostic.detail || result.diagnostic.reason, diagnostic: result.diagnostic };

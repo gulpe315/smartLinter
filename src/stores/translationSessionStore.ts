@@ -9,7 +9,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { type ContainerKind, type DocumentGenerationParagraphPlan, type DocumentGenerationPhase, type EnumerateDocumentSummary, type GenerationDiagnostic, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TableLocator, type TaggedSegmentData } from '../../shared/protocol/types.ts';
+import { type ContainerKind, type DocumentGenerationParagraphPlan, type DocumentGenerationPhase, type EnumerateDocumentSummary, type FootnoteLocator, type GenerationDiagnostic, type InlineToken, type ParagraphPayload, type ScannedParagraphEntry, type TableLocator, type TaggedSegmentData } from '../../shared/protocol/types.ts';
 import { renderTargetTokensToRuns } from '../utils/translationFormatting.ts';
 import { type IBridgeService, getBridgeService } from '../services/tauriBridge.ts';
 import { useConfigStore } from './configStore.ts';
@@ -50,6 +50,7 @@ export interface TranslationSessionSegment {
   taggedTarget?: TaggedSegmentData;
   containerKind?: ContainerKind;
   tableLocator?: TableLocator;
+  footnoteLocator?: FootnoteLocator;
 }
 
 type SegmentParagraph = Pick<ParagraphPayload, 'paragraphId' | 'text' | 'hash'> & {
@@ -57,6 +58,7 @@ type SegmentParagraph = Pick<ParagraphPayload, 'paragraphId' | 'text' | 'hash'> 
   taggedSource?: TaggedSegmentData;
   containerKind?: ContainerKind;
   tableLocator?: TableLocator;
+  footnoteLocator?: FootnoteLocator;
 };
 
 export type TranslationTmContext = {
@@ -185,6 +187,7 @@ export function createSegmentsFromParagraph(
       ...(sentence.taggedSource === undefined ? {} : { taggedSource: sentence.taggedSource }),
       ...(paragraph.containerKind ? { containerKind: paragraph.containerKind } : {}),
       ...(paragraph.tableLocator ? { tableLocator: paragraph.tableLocator } : {}),
+      ...(paragraph.footnoteLocator ? { footnoteLocator: paragraph.footnoteLocator } : {}),
     } satisfies TranslationSessionSegment;
   });
 }
@@ -242,6 +245,7 @@ export function mergeScannedParagraphs(
         documentOrderIndex: scanned.documentOrderIndex,
         ...(scanned.containerKind ? { containerKind: scanned.containerKind } : {}),
         ...(scanned.tableLocator ? { tableLocator: scanned.tableLocator } : {}),
+        ...(scanned.footnoteLocator ? { footnoteLocator: scanned.footnoteLocator } : {}),
       })));
     } else {
       result.push(...existing.map((segment) => ({ ...segment, status: 'needs-validation' as const, updatedAt: now })));
@@ -283,6 +287,7 @@ export function mergeScannedParagraphs(
       documentOrderIndex: scanned.documentOrderIndex,
       ...(scanned.containerKind ? { containerKind: scanned.containerKind } : {}),
       ...(scanned.tableLocator ? { tableLocator: scanned.tableLocator } : {}),
+      ...(scanned.footnoteLocator ? { footnoteLocator: scanned.footnoteLocator } : {}),
     })));
   }
 
@@ -545,6 +550,7 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
             runs,
             ...(first?.containerKind ? { containerKind: first.containerKind } : {}),
             ...(first?.tableLocator ? { tableLocator: first.tableLocator } : {}),
+            ...(first?.footnoteLocator ? { footnoteLocator: first.footnoteLocator } : {}),
             inDesignDefaultFontFace: defaultFace,
             inDesignFontFaceByFormatId: byFormatId,
           });
@@ -557,6 +563,7 @@ export const useTranslationSessionStore = create<TranslationSessionState>()(pers
             runs,
             ...(first?.containerKind ? { containerKind: first.containerKind } : {}),
             ...(first?.tableLocator ? { tableLocator: first.tableLocator } : {}),
+            ...(first?.footnoteLocator ? { footnoteLocator: first.footnoteLocator } : {}),
           });
         }
       }

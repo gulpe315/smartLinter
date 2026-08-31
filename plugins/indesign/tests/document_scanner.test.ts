@@ -44,15 +44,37 @@ describe('InDesign document scanner', () => {
         assert.equal(included.paragraphs[0].coverageState, 'requires-user-choice');
     });
 
-    it('excludes footnotes, endnotes, and notes with correct counts while scanning tables', () => {
+    it('scans footnotes and excludes endnotes and notes while scanning tables', () => {
         const env = new MockInDesignEnvironment(); env.stories.length = 0;
         const story = env.createStory(['Body'], { id: '30' });
         env.addTableParagraph(story.id, 'Table'); env.addFootnoteParagraph(story.id, 'Footnote'); env.addEndnoteParagraph(story.id, 'Endnote');
         const note: any = env.createParagraph('Note', story.id); note.index = story.paragraphs.length; note.parent = { typename: 'Note' }; story.paragraphs.push(note);
         const result = loadScanner().enumerateAllDocumentParagraphs(env.activeDocument, { requestId: 'scan' });
-        assert.equal(result.paragraphs.length, 2);
+        assert.equal(result.paragraphs.length, 3);
         assert.equal(result.paragraphs[1].containerKind, 'TABLE');
-        assert.deepEqual([result.summary.skippedTablesCount, result.summary.skippedFootnotesCount, result.summary.skippedUnsupportedCount], [0, 1, 2]);
+        assert.equal(result.paragraphs[2].containerKind, 'FOOTNOTE');
+        assert.deepEqual([result.summary.skippedTablesCount, result.summary.skippedFootnotesCount, result.summary.skippedUnsupportedCount], [0, 0, 2]);
+    });
+
+    it('scans single, multi-paragraph, multiple, and empty footnotes with stable locators', () => {
+        const env = new MockInDesignEnvironment(); env.stories.length = 0;
+        const story = env.createStory(['Body'], { id: '31' });
+        const first = env.addFootnoteParagraph(story.id, 'First footnote');
+        const firstFootnote = story.footnotes![0];
+        const secondParagraph = env.createParagraph('', story.id);
+        secondParagraph.index = story.paragraphs.length;
+        secondParagraph.parent = firstFootnote;
+        story.paragraphs.push(secondParagraph); firstFootnote.paragraphs.push(secondParagraph);
+        env.addFootnoteParagraph(story.id, 'Second footnote');
+        const result = loadScanner().enumerateAllDocumentParagraphs(env.activeDocument, { requestId: 'footnotes' });
+        const footnotes = result.paragraphs.filter((p: any) => p.containerKind === 'FOOTNOTE');
+        assert.deepEqual(Array.from(footnotes, (p: any) => p.text), ['First footnote', '', 'Second footnote']);
+        assert.deepEqual(JSON.parse(JSON.stringify(Array.from(footnotes, (p: any) => p.footnoteLocator))), [
+            { host: 'InDesign', storyId: '31', footnoteId: 1, paragraphIndexInFootnote: 0 },
+            { host: 'InDesign', storyId: '31', footnoteId: 1, paragraphIndexInFootnote: 1 },
+            { host: 'InDesign', storyId: '31', footnoteId: 2, paragraphIndexInFootnote: 0 },
+        ]);
+        assert.equal(first.parent?.typename, 'Footnote');
     });
 
     it('returns an error response rather than throwing for absent or failing documents', () => {

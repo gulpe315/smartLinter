@@ -44,6 +44,35 @@ function setup() {
   return { sandbox, app, sourceDoc, get copied() { return copied; } };
 }
 function request(target = 'Translated paragraph') { return { requestId: 't6b-test', destinationPath: '/output/translated.indd', paragraphPlans: [{ paragraphId: 'indesign-para-1-0', documentOrderIndex: 0, expectedSourceHash: computeParagraphHash('Source paragraph'), targetText: target, runs: [{ text: target, bold: false, italic: false, underline: false }], inDesignDefaultFontFace: { fontFamily: 'Minion Pro', fontStyleName: 'Regular' }, inDesignFontFaceByFormatId: {} }] }; }
+function footnoteRequest(source = 'Source footnote', target = 'Translated footnote') {
+  const translated = request(target);
+  translated.paragraphPlans[0] = {
+    ...translated.paragraphPlans[0], paragraphId: 'indesign-footnotepara-1-4-0', expectedSourceHash: computeParagraphHash(source),
+    containerKind: 'FOOTNOTE', footnoteLocator: { host: 'InDesign', storyId: '1', footnoteId: 4, paragraphIndexInFootnote: 0 },
+  };
+  return translated;
+}
+function footnoteSetup(copyText = 'Source footnote') {
+  const env = setup(); let copiedParagraph: any;
+  const originalFootnote = { id: 4, contents: 'Source footnote' };
+  (env.sourceDoc.stories[0] as any).footnotes = [originalFootnote];
+  env.app.open = () => {
+    copiedParagraph = { contents: copyText, isValid: true };
+    const footnote: any = { id: 4, typename: 'Footnote', paragraphs: [copiedParagraph], isValid: true };
+    copiedParagraph.parent = footnote;
+    const stories: any = [{ id: '1', paragraphs: [copiedParagraph], footnotes: [footnote] }];
+    stories.itemByID = (id: any) => stories.find((candidate: any) => String(candidate.id) === String(id)) || null;
+    const copied: any = { stories, saveAs: (file: any) => { env.app.savedAs = file.fsName; }, close: (option: any) => { env.app.closedWith = option; } };
+    return copied;
+  };
+  env.sandbox.SmartLinterAtomicReplacer = function() {
+    this.findParagraphById = (doc: any, paragraphId: string, baseHash: string, locator: any) => {
+      const paragraph = doc.stories.itemByID(locator?.storyId)?.footnotes?.find((note: any) => note.id === locator?.footnoteId)?.paragraphs?.[locator?.paragraphIndexInFootnote];
+      return paragraphId === 'indesign-footnotepara-1-4-0' && paragraph && computeParagraphHash(paragraph.contents) === baseHash ? paragraph : null;
+    };
+  };
+  return { env, originalFootnote, get copiedParagraph() { return copiedParagraph; } };
+}
 
 describe('InDesign translated-document generator (T6b)', () => {
   it('copies, translates, saves, removes temp, and never changes source', () => {
@@ -100,5 +129,22 @@ describe('InDesign translated-document generator (T6b)', () => {
     const env = setup(); let checks = 0;
     const result = env.sandbox.SmartLinterDocumentGenerator.generateTranslatedDocument(request(), { appInstance: env.app, isCancelled: () => ++checks >= 3 });
     assert.equal(result.status, 'CANCELLED'); assert.equal(env.app.closedWith, 'NO'); assert.equal(env.app.tempRemoved, true); assert.equal(env.app.savedAs, undefined);
+  });
+  it('re-resolves a footnote in the copied document by locator and matching hash before saving', () => {
+    const h = footnoteSetup(); const result = h.env.sandbox.SmartLinterDocumentGenerator.generateTranslatedDocument(footnoteRequest());
+    assert.equal(result.status, 'SUCCESS'); assert.equal(h.copiedParagraph.contents, 'Translated footnote'); assert.equal(h.env.app.savedAs, '/output/translated.indd');
+  });
+  it('does not open a destination or save when any copied footnote fingerprint is tampered', () => {
+    const h = footnoteSetup('Tampered footnote'); const result = h.env.sandbox.SmartLinterDocumentGenerator.generateTranslatedDocument(footnoteRequest());
+    assert.equal(result.status, 'FINGERPRINT_MISMATCH'); assert.equal(h.env.app.savedAs, undefined); assert.equal(h.env.app.closedWith, 'NO');
+  });
+  it('keeps original footnote fingerprints unchanged on cancellation and format failure', () => {
+    const cancelled = footnoteSetup(); const beforeCancel = computeParagraphHash(cancelled.originalFootnote.contents);
+    const cancelResult = cancelled.env.sandbox.SmartLinterDocumentGenerator.generateTranslatedDocument(footnoteRequest(), { appInstance: cancelled.env.app, isCancelled: () => true });
+    assert.equal(cancelResult.status, 'CANCELLED'); assert.equal(computeParagraphHash(cancelled.originalFootnote.contents), beforeCancel);
+    const failed = footnoteSetup(); const beforeFailure = computeParagraphHash(failed.originalFootnote.contents);
+    failed.env.sandbox.SmartLinterInDesignTranslationMaterializer = function() { this.apply = () => ({ ok: false, diagnostic: { reason: 'FORMAT_APPLY_FAILED', detail: 'format failed' } }); };
+    const failedResult = failed.env.sandbox.SmartLinterDocumentGenerator.generateTranslatedDocument(footnoteRequest());
+    assert.equal(failedResult.status, 'FAILED'); assert.equal(computeParagraphHash(failed.originalFootnote.contents), beforeFailure);
   });
 });

@@ -131,6 +131,7 @@ export interface MockStory {
     index: number;
     paragraphs: MockParagraph[];
     tables?: MockTable[] & { itemByID?: (id: string) => MockTable | null };
+    footnotes?: Array<{ id: number; typename: 'Footnote'; parent: MockStory; paragraphs: MockParagraph[]; isValid: boolean }>;
     textContainers: MockTextFrame[];
     overflows: boolean;
     isValid: boolean;
@@ -613,7 +614,19 @@ export class MockInDesignEnvironment {
     }
 
     public addFootnoteParagraph(storyId: string, text: string): MockParagraph {
-        return this.addContainerParagraph(storyId, text, { typename: 'Footnote' });
+        const story = this.stories.find((candidate) => candidate.id === storyId);
+        if (!story) throw new Error(`Story not found: ${storyId}`);
+        const footnote = {
+            id: (story.footnotes?.length ?? 0) + 1,
+            typename: 'Footnote' as const,
+            parent: story,
+            paragraphs: [] as MockParagraph[],
+            isValid: true,
+        };
+        const paragraph = this.addContainerParagraph(storyId, text, footnote);
+        footnote.paragraphs.push(paragraph);
+        (story.footnotes ??= []).push(footnote);
+        return paragraph;
     }
 
     public addEndnoteParagraph(storyId: string, text: string): MockParagraph {

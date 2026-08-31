@@ -45,6 +45,33 @@
         return { cell: cell, table: table };
     }
 
+    function findFootnote(para) {
+        if (!para || !para.parent) return null;
+        var curr = para.parent;
+        var depth = 0;
+        while (curr && depth < 16) {
+            if (curr.typename === 'Footnote') return curr;
+            if (curr.typename === 'Story' || curr.typename === 'Document' || curr.typename === 'Application') break;
+            curr = curr.parent;
+            depth++;
+        }
+        return null;
+    }
+
+    function getFootnoteIndexInStory(story, footnote) {
+        if (!story || !story.footnotes || !footnote) return 0;
+        for (var i = 0; i < story.footnotes.length; i++) {
+            if (story.footnotes[i] === footnote || (footnote.id && story.footnotes[i].id === footnote.id)) return i;
+        }
+        return 0;
+    }
+
+    function getParagraphIndexInFootnote(footnote, para) {
+        if (!footnote || !footnote.paragraphs) return 0;
+        for (var i = 0; i < footnote.paragraphs.length; i++) if (footnote.paragraphs[i] === para) return i;
+        return 0;
+    }
+
     function getTableIndexInStory(story, table) {
         if (!story || !story.tables || !table) return 0;
         for (var t = 0; t < story.tables.length; t++) {
@@ -150,7 +177,41 @@
                         if (overset) summary.oversetParagraphsIncluded++;
                         continue;
                     }
-                    if (kind === 'FOOTNOTE') { summary.skippedFootnotesCount++; continue; }
+                    if (kind === 'FOOTNOTE') {
+                        // v1 deliberately excludes footnotes nested in tables.
+                        if (findCellAndTable(para).table) { summary.skippedUnsupportedCount++; continue; }
+                        if (!placed && !options.includeUnplacedStories) {
+                            summary.unplacedParagraphsPendingChoice++;
+                            continue;
+                        }
+                        var footnote = findFootnote(para);
+                        if (!footnote || footnote.isValid === false || typeof footnote.id !== 'number' || footnote.id <= 0) {
+                            summary.skippedUnsupportedCount++;
+                            continue;
+                        }
+                        var footnoteText = String(para.contents || '');
+                        var footnoteExtraction = SmartLinterInlineTagExtractor.extractParagraphTokens(para);
+                        var pInFootnote = getParagraphIndexInFootnote(footnote, para);
+                        response.paragraphs.push({
+                            paragraphId: 'indesign-footnotepara-' + storyId + '-' + footnote.id + '-' + pInFootnote,
+                            text: footnoteText,
+                            hash: hashUtil.computeParagraphHash(footnoteText, true),
+                            documentOrderIndex: order++,
+                            storyId: storyId,
+                            isOverset: overset,
+                            coverageState: placed ? 'included' : 'requires-user-choice',
+                            taggedSource: footnoteExtraction.ok
+                                ? { sourceTokens: footnoteExtraction.tokens, tagStatus: 'valid', inDesignFontFaces: footnoteExtraction.inDesignFontFaces, containerKind: 'FOOTNOTE', footnoteLocator: { host: 'InDesign', storyId: storyId, footnoteId: footnote.id, paragraphIndexInFootnote: pInFootnote } }
+                                : { sourceTokens: [{ type: 'text', value: footnoteText }], tagStatus: 'fallback-plain', fallbackReason: footnoteExtraction.reason, containerKind: 'FOOTNOTE', footnoteLocator: { host: 'InDesign', storyId: storyId, footnoteId: footnote.id, paragraphIndexInFootnote: pInFootnote } },
+                            containerKind: 'FOOTNOTE',
+                            footnoteLocator: { host: 'InDesign', storyId: storyId, footnoteId: footnote.id, paragraphIndexInFootnote: pInFootnote }
+                        });
+                        // Retained as a locator fallback reference; never used as the primary key.
+                        getFootnoteIndexInStory(story, footnote);
+                        summary.scannedParagraphs++;
+                        if (overset) summary.oversetParagraphsIncluded++;
+                        continue;
+                    }
                     if (kind === 'ENDNOTE' || kind === 'NOTE') { summary.skippedUnsupportedCount++; continue; }
                     if (!placed && !options.includeUnplacedStories) {
                         summary.unplacedParagraphsPendingChoice++;

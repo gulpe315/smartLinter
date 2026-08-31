@@ -193,6 +193,8 @@ pub struct ScannedParagraphEntry {
     pub container_kind: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub table_locator: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub footnote_locator: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -231,6 +233,8 @@ pub struct DocumentGenerationParagraphPlan {
     pub container_kind: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub table_locator: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub footnote_locator: Option<serde_json::Value>,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

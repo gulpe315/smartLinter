@@ -305,3 +305,39 @@ describe('Table metadata notes and INVALID_TABLE_LOCATOR fail-closed handling', 
     });
   });
 });
+
+describe('Footnote metadata notes fail closed', () => {
+  const wordLocator = { host: 'Word', footnoteIndex: 0, paragraphIndexInFootnote: 0 };
+
+  it('round-trips valid FOOTNOTE metadata and applies it to the segment', () => {
+    const current = segment({ segmentId: 'footnote-1', targetDraft: 'Old' });
+    const built = buildXliffDocument([segment({
+      segmentId: 'footnote-1', targetDraft: 'Translated footnote', containerKind: 'FOOTNOTE', footnoteLocator: wordLocator,
+    })], { sourceLang: 'en', targetLang: 'ko' });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const parsed = parseXliffImport(built.xml);
+    expect(parsed).toMatchObject({ ok: true });
+    if (!parsed.ok) return;
+    expect(parsed.units[0]).toMatchObject({ containerKind: 'FOOTNOTE', footnoteLocator: wordLocator });
+    const applied = applyXliffImport([current], [{ segment: current, incoming: parsed.units[0] }], [], 2);
+    expect(applied[0]).toMatchObject({ containerKind: 'FOOTNOTE', footnoteLocator: wordLocator, targetDraft: 'Translated footnote' });
+  });
+
+  it.each([
+    ['missing locator', '<note category="containerKind">FOOTNOTE</note>'],
+    ['invalid locator', '<note category="containerKind">FOOTNOTE</note><note category="footnoteLocator">{bad}</note>'],
+    ['wrong locator type', '<note category="containerKind">FOOTNOTE</note><note category="footnoteLocator">{"host":"Word","footnoteIndex":"0","paragraphIndexInFootnote":0}</note>'],
+  ])('rejects FOOTNOTE with %s', (_label, notes) => {
+    const parsed = parseXliffImport(xml(`<trans-unit id="footnote"><source>Footnote</source><target>Target</target>${notes}</trans-unit>`));
+    expect(parsed).toMatchObject({ ok: false, reason: 'INVALID_FOOTNOTE_LOCATOR' });
+  });
+
+  it.each([
+    ['FOOTNOTE with tableLocator', '<note category="containerKind">FOOTNOTE</note><note category="tableLocator">{"tableIndex":0,"cellIndex":0,"cellName":"0:0","paragraphIndexInCell":0,"rowSpan":1,"columnSpan":1}</note>'],
+    ['TABLE with footnoteLocator', `<note category="containerKind">TABLE</note><note category="tableLocator">{"tableIndex":0,"cellIndex":0,"cellName":"0:0","paragraphIndexInCell":0,"rowSpan":1,"columnSpan":1}</note><note category="footnoteLocator">${JSON.stringify(wordLocator)}</note>`],
+  ])('rejects locator cross-combination: %s', (_label, notes) => {
+    const parsed = parseXliffImport(xml(`<trans-unit id="mixed"><source>Text</source><target>Target</target>${notes}</trans-unit>`));
+    expect(parsed.ok).toBe(false);
+  });
+});

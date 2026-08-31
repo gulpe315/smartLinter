@@ -306,7 +306,7 @@ describe('Shared Protocol Serialization & Compatibility Tests', () => {
         it('validates ContainerKind correctly', () => {
             assert.equal(isContainerKind('BODY'), true);
             assert.equal(isContainerKind('TABLE'), true);
-            assert.equal(isContainerKind('FOOTNOTE'), false);
+            assert.equal(isContainerKind('FOOTNOTE'), true);
             assert.equal(isContainerKind(''), false);
             assert.equal(isContainerKind(null), false);
         });

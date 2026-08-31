@@ -98,7 +98,7 @@ fn test_enumerate_document_indesign_fields_roundtrip_and_word_compatibility() {
         paragraphs: vec![ScannedParagraphEntry {
             paragraph_id: "indesign-para-42-0".to_string(), text: "Body".to_string(), hash: "hash".to_string(), document_order_index: 0,
             story_id: Some("42".to_string()), is_overset: Some(true), coverage_state: Some("included".to_string()),
-            container_kind: None, table_locator: None,
+            container_kind: None, table_locator: None, footnote_locator: None,
         }],
         summary: Some(EnumerateDocumentSummary { total_count: 1, scanned_paragraphs: Some(1), overset_paragraphs_included: Some(1), unplaced_stories: Some(0), unplaced_paragraphs_pending_choice: Some(0), skipped_tables_count: Some(2), skipped_footnotes_count: Some(3), skipped_unsupported_count: Some(4) }),
         error: None,

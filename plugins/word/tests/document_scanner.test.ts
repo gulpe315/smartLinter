@@ -18,6 +18,33 @@ function runnerFor(texts: string[], title = 'Document.docx') {
 }
 
 describe('Word document scanner', () => {
+    it('scans footnotes only when WordApi 1.5 is supported, without partial footnote output otherwise', async () => {
+        const priorOffice = (globalThis as any).Office;
+        const footnoteParagraph = { text: 'Footnote text', load: () => {} };
+        const runner = async (callback: (context: any) => Promise<any>) => callback({
+            document: {
+                body: {
+                    paragraphs: { items: [{ text: 'Body text', load: () => {} }], load: () => {} },
+                    footnotes: { items: [{ body: { paragraphs: { items: [footnoteParagraph], load: () => {} } } }], load: () => {} },
+                },
+                properties: { title: 'Footnotes.docx', load: () => {} },
+            }, sync: async () => {},
+        });
+        try {
+            (globalThis as any).Office = { context: { requirements: { isSetSupported: (_set: string, version: string) => version === '1.5' } } };
+            const supported = await enumerateAllDocumentParagraphs({ requestId: 'notes-supported' }, runner);
+            assert.deepEqual(supported.paragraphs.map((p) => p.containerKind), [undefined, 'FOOTNOTE']);
+            assert.deepEqual(supported.paragraphs[1].footnoteLocator, { host: 'Word', footnoteIndex: 0, paragraphIndexInFootnote: 0 });
+
+            (globalThis as any).Office.context.requirements.isSetSupported = () => false;
+            const unsupported = await enumerateAllDocumentParagraphs({ requestId: 'notes-unsupported' }, runner);
+            assert.deepEqual(unsupported.paragraphs.map((p) => p.text), ['Body text']);
+            assert.equal(unsupported.summary?.skippedUnsupportedCount, 1);
+        } finally {
+            (globalThis as any).Office = priorOffice;
+        }
+    });
+
     it('enumerates paragraphs in body order with document title', async () => {
         const response = await enumerateAllDocumentParagraphs({ requestId: 'scan-1' }, runnerFor(['First', 'Second', 'Third']));
         assert.equal(response.sourceDocumentName, 'Document.docx');

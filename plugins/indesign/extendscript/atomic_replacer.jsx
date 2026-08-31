@@ -186,6 +186,33 @@
         return paragraph;
     }
 
+    function resolveFootnoteForParagraphId(doc, paragraphId, locator) {
+        var prefix = 'indesign-footnotepara-';
+        if (!doc || typeof paragraphId !== 'string' || paragraphId.indexOf(prefix) !== 0) return null;
+        var suffix = paragraphId.substring(prefix.length);
+        var lastDash = suffix.lastIndexOf('-');
+        if (lastDash <= 0) return null;
+        var pText = suffix.substring(lastDash + 1), rem = suffix.substring(0, lastDash);
+        var secondDash = rem.lastIndexOf('-');
+        if (secondDash <= 0) return null;
+        var footnoteIdText = rem.substring(secondDash + 1), storyId = rem.substring(0, secondDash);
+        if (!/^\d+$/.test(pText) || !/^\d+$/.test(footnoteIdText)) return null;
+        var pIndex = parseInt(pText, 10), footnoteId = parseInt(footnoteIdText, 10);
+        if (locator && (locator.host !== 'InDesign' || String(locator.storyId) !== storyId || locator.footnoteId !== footnoteId || locator.paragraphIndexInFootnote !== pIndex)) return null;
+        if (pIndex < 0 || footnoteId <= 0 || !doc.stories || typeof doc.stories.itemByID !== 'function') return null;
+        var numericStoryId = parseInt(storyId, 10);
+        var story = isNaN(numericStoryId) ? doc.stories.itemByID(storyId) : doc.stories.itemByID(numericStoryId);
+        if (!story || story.isValid === false || !story.footnotes) return null;
+        var footnote = null;
+        // The persistent InDesign object id is authoritative; never resolve by index first.
+        for (var i = 0; i < story.footnotes.length; i++) {
+            if (story.footnotes[i] && story.footnotes[i].id === footnoteId) { footnote = story.footnotes[i]; break; }
+        }
+        if (!footnote || footnote.isValid === false || !footnote.paragraphs || pIndex >= footnote.paragraphs.length) return null;
+        var paragraph = footnote.paragraphs[pIndex];
+        return paragraph && paragraph.isValid !== false ? paragraph : null;
+    }
+
     function scanStoryForHashMatches(story, baseHash) {
         var matches = [];
         for (var i = 0; i < story.paragraphs.length; i++) {
@@ -201,6 +228,12 @@
 
     function findParagraphById(doc, paragraphId, baseHash, locator) {
         try {
+            if (typeof paragraphId === 'string' && paragraphId.indexOf('indesign-footnotepara-') === 0) {
+                var footnoteParagraph = resolveFootnoteForParagraphId(doc, paragraphId, locator);
+                if (!footnoteParagraph) return null;
+                if (!baseHash) return footnoteParagraph;
+                return getHashUtil().computeParagraphHash(footnoteParagraph.contents || '', true).toLowerCase() === baseHash.toLowerCase() ? footnoteParagraph : null;
+            }
             if (typeof paragraphId === 'string' && paragraphId.indexOf('indesign-tablepara-') === 0) {
                 var tableParagraph = resolveTableForParagraphId(doc, paragraphId, locator);
                 if (!tableParagraph) {
@@ -359,6 +392,9 @@
 
     SmartLinterAtomicReplacer.prototype.resolveTableForParagraphId = function(doc, paragraphId, locator) {
         return resolveTableForParagraphId(doc, paragraphId, locator);
+    };
+    SmartLinterAtomicReplacer.prototype.resolveFootnoteForParagraphId = function(doc, paragraphId, locator) {
+        return resolveFootnoteForParagraphId(doc, paragraphId, locator);
     };
 
     /**
@@ -685,7 +721,9 @@
 
         var isTablePara = typeof command.paragraphId === 'string' &&
             command.paragraphId.indexOf('indesign-tablepara-') === 0;
-        var hasResolvableParagraphId = isTablePara || (typeof command.paragraphId === 'string' &&
+        var isFootnotePara = typeof command.paragraphId === 'string' &&
+            command.paragraphId.indexOf('indesign-footnotepara-') === 0;
+        var hasResolvableParagraphId = isTablePara || isFootnotePara || (typeof command.paragraphId === 'string' &&
             command.paragraphId.indexOf('indesign-para-') === 0 &&
             command.paragraphId.substring('indesign-para-'.length).lastIndexOf('-') > 0);
 
@@ -693,7 +731,7 @@
         // cursor/selection redirect a real command to another paragraph.
         if (hasResolvableParagraphId) {
             var doc = options.doc || (inApp ? inApp.activeDocument : null);
-            targetParagraph = findParagraphById(doc, command.paragraphId, command.baseHash, command.tableLocator);
+            targetParagraph = findParagraphById(doc, command.paragraphId, command.baseHash, isFootnotePara ? command.footnoteLocator : command.tableLocator);
             if (targetParagraph) {
                 currentText = targetParagraph.contents || '';
             }

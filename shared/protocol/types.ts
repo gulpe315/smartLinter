@@ -17,7 +17,7 @@ export type InlineToken =
     | { type: 'close'; id: string; kind: InlineTokenKind }
     | { type: 'placeholder'; id: string; kind: string };
 
-export type ContainerKind = 'BODY' | 'TABLE';
+export type ContainerKind = 'BODY' | 'TABLE' | 'FOOTNOTE';
 
 export interface TableLocator {
     tableIndex: number;
@@ -29,6 +29,14 @@ export interface TableLocator {
     columnSpan?: number;
 }
 
+export interface FootnoteLocator {
+    host: 'Word' | 'InDesign';
+    paragraphIndexInFootnote: number;
+    footnoteIndex?: number;
+    storyId?: string;
+    footnoteId?: number;
+}
+
 /** Tagged source/target data for one translation segment. */
 export interface TaggedSegmentData {
     sourceTokens: InlineToken[];
@@ -38,6 +46,7 @@ export interface TaggedSegmentData {
     inDesignFontFaces?: InDesignFontFaceMetadata;
     containerKind?: ContainerKind;
     tableLocator?: TableLocator;
+    footnoteLocator?: FootnoteLocator;
 }
 
 /** Text replacement execution outcomes */
@@ -148,6 +157,7 @@ export interface ScannedParagraphEntry {
     taggedSource?: TaggedSegmentData;
     containerKind?: ContainerKind;
     tableLocator?: TableLocator;
+    footnoteLocator?: FootnoteLocator;
 }
 
 export interface EnumerateDocumentSummary {
@@ -183,6 +193,7 @@ export interface DocumentGenerationParagraphPlan {
     inDesignFontFaceByFormatId?: Record<string, InDesignSourceFontFace>;
     containerKind?: ContainerKind;
     tableLocator?: TableLocator;
+    footnoteLocator?: FootnoteLocator;
 }
 
 export interface RenderedRun {
@@ -346,7 +357,7 @@ export function isInlineToken(val: unknown): val is InlineToken {
 }
 
 export function isContainerKind(val: unknown): val is ContainerKind {
-    return val === 'BODY' || val === 'TABLE';
+    return val === 'BODY' || val === 'TABLE' || val === 'FOOTNOTE';
 }
 
 export function isTableLocator(val: unknown): val is TableLocator {
@@ -367,6 +378,31 @@ export function isTableLocator(val: unknown): val is TableLocator {
         && (obj.columnSpan === undefined || (typeof obj.columnSpan === 'number' && Number.isInteger(obj.columnSpan) && obj.columnSpan >= 1));
 }
 
+export function isFootnoteLocator(val: unknown): val is FootnoteLocator {
+    if (typeof val !== 'object' || val === null) return false;
+    const obj = val as Record<string, unknown>;
+    const validParagraphIndex = typeof obj.paragraphIndexInFootnote === 'number'
+        && Number.isInteger(obj.paragraphIndexInFootnote)
+        && obj.paragraphIndexInFootnote >= 0;
+    if (!validParagraphIndex) return false;
+    if (obj.host === 'Word') {
+        return typeof obj.footnoteIndex === 'number'
+            && Number.isInteger(obj.footnoteIndex)
+            && obj.footnoteIndex >= 0
+            && obj.storyId === undefined
+            && obj.footnoteId === undefined;
+    }
+    if (obj.host === 'InDesign') {
+        return typeof obj.storyId === 'string'
+            && obj.storyId.length > 0
+            && typeof obj.footnoteId === 'number'
+            && Number.isInteger(obj.footnoteId)
+            && obj.footnoteId > 0
+            && obj.footnoteIndex === undefined;
+    }
+    return false;
+}
+
 export function isTaggedSegmentData(val: unknown): val is TaggedSegmentData {
     if (typeof val !== 'object' || val === null) return false;
     const obj = val as Record<string, unknown>;
@@ -377,7 +413,8 @@ export function isTaggedSegmentData(val: unknown): val is TaggedSegmentData {
         && (obj.fallbackReason === undefined || typeof obj.fallbackReason === 'string')
         && (obj.inDesignFontFaces === undefined || isInDesignFontFaceMetadata(obj.inDesignFontFaces))
         && (obj.containerKind === undefined || isContainerKind(obj.containerKind))
-        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator));
+        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator))
+        && (obj.footnoteLocator === undefined || isFootnoteLocator(obj.footnoteLocator));
 }
 
 export function isReplacementStatus(val: unknown): val is ReplacementStatus {
@@ -502,7 +539,8 @@ export function isScannedParagraphEntry(val: unknown): val is ScannedParagraphEn
         && (obj.coverageState === undefined || isCoverageState(obj.coverageState))
         && (obj.taggedSource === undefined || isTaggedSegmentData(obj.taggedSource))
         && (obj.containerKind === undefined || isContainerKind(obj.containerKind))
-        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator));
+        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator))
+        && (obj.footnoteLocator === undefined || isFootnoteLocator(obj.footnoteLocator));
 }
 
 export function isEnumerateDocumentSummary(val: unknown): val is EnumerateDocumentSummary {
@@ -535,7 +573,12 @@ export function isDocumentGenerationParagraphPlan(val: unknown): val is Document
         && (obj.inDesignDefaultFontFace === undefined || isInDesignSourceFontFace(obj.inDesignDefaultFontFace))
         && (obj.inDesignFontFaceByFormatId === undefined || (typeof obj.inDesignFontFaceByFormatId === 'object' && obj.inDesignFontFaceByFormatId !== null && Object.values(obj.inDesignFontFaceByFormatId).every(isInDesignSourceFontFace)))
         && (obj.containerKind === undefined || isContainerKind(obj.containerKind))
-        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator));
+        && (obj.tableLocator === undefined || isTableLocator(obj.tableLocator))
+        && (obj.footnoteLocator === undefined || isFootnoteLocator(obj.footnoteLocator))
+        && !(obj.containerKind === 'FOOTNOTE' && obj.tableLocator !== undefined)
+        && !(obj.containerKind === 'TABLE' && obj.footnoteLocator !== undefined)
+        && !(obj.containerKind === 'FOOTNOTE' && obj.footnoteLocator === undefined)
+        && !(obj.containerKind === 'TABLE' && obj.tableLocator === undefined);
 }
 
 export function isRenderedRun(val: unknown): val is RenderedRun {
