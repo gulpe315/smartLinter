@@ -1,17 +1,25 @@
 # SmartLinter — 오케스트레이터 현황판
 
 **⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-31(새 PC,
-git pull 후 세션) — QA 카드 Mode B(개별 이슈 부분 적용 + Diff Rebase)
-완료(커밋 `1021fdb` 사전 버그 수정, `d5d484f` Mode B 본체).** 워크플로는
-원래 역할 분담(Codex 구현/agy 검증/Claude 오케스트레이션)으로 복귀함 —
-이 PC에서 Codex 사용량이 정상 작동함을 실측 확인. Mode A(2026-08-29
-완료)로 문장 전체 원자 적용은 이미 되던 상태에서, Mode B가 그 사이 빈틈
-(카드 하나 적용 시 같은 문단의 다른 pending 카드가 다음 `validateLiveCards`
-전체 재분석 전까지 오프셋이 안 맞는 채로 방치되던 문제)을 메웠다: 겹치지
+git pull 후 세션, 같은 세션 후속) — Translation Mode T6d-3(각주/
+FOOTNOTE 컨테이너, Word+InDesign 둘 다) 완료(커밋 `7c12613`).** 같은
+세션에서 QA 카드 Mode B도 먼저 완료(커밋 `1021fdb`/`d5d484f`, 아래
+"QA Mode B" 절). **이번 T6d-3부터 워크플로가 한 번 더 바뀜 — 사용자
+지시(토큰 절약): Codex 구현 → 검증(diff 대조+테스트 실행)은 agy가
+전담 → Claude는 결과 확인+최종 조율만.** 상세는
+`feedback_smartlinter_orchestrator_minimize_own_tokens` 메모리와 아래
+"이번 세션 완료 — T6d-3" 절 참고. 워크플로는 원래 역할 분담(Codex 구현/
+agy 검증/Claude 오케스트레이션)이고, 이 PC에서 Codex 사용량이 정상
+작동함을 실측 확인함.
+
+**QA Mode B 요약(이 세션 먼저 완료):** Mode A(2026-08-29 완료)로 문장
+전체 원자 적용은 이미 되던 상태에서, Mode B가 그 사이 빈틈(카드 하나
+적용 시 같은 문단의 다른 pending 카드가 다음 `validateLiveCards` 전체
+재분석 전까지 오프셋이 안 맞는 채로 방치되던 문제)을 메웠다: 겹치지
 않는 형제 카드는 LLM 재호출 없이 로컬 오프셋 재계산(rebase)으로 `pending`
 유지, 겹치는 카드는 신규 상태 `stale_conflict`로 무효화. Codex 설계
 자문 답변의 fail-closed 결함(자기 겹침 문자열 오판)을 agy 독립 리뷰가
-잡아내 재수정 완료. 상세는 아래 "이번 세션 완료" 절.
+잡아내 재수정 완료. 상세는 아래 "이번 세션 완료 — QA Mode B" 절.
 
 **같은 세션에서 로드맵 문서 자체의 오류 2건도 정정함(아래 "2026-08-31
 재검증" 절) — 다음 세션은 이 절을 최상단에서 다시 읽을 필요 없이 바로
@@ -41,8 +49,11 @@ git pull 후 세션) — QA 카드 Mode B(개별 이슈 부분 적용 + Diff Reb
    끝났으니 바로 구현"이라고 잘못 판단해 실제로 착수하려다 발견됨
    (2026-08-31), 다음부터는 로드맵 항목을 실행 근거로 쓰기 전에
    `git log`로 실제 구현 여부부터 확인할 것.
-3. T6d-3 이후(머리말/바닥글/각주 등 T6d-2 범위 밖 컨테이너) — git log
-   재확인 결과 미착수 맞음.
+3. ~~T6d-3~~ — **각주(FOOTNOTE) 완료**(Word+InDesign 둘 다, 커밋
+   `7c12613`, 2026-08-31 같은 세션). 나머지 5개 컨테이너(머리말/바닥글/
+   미주/텍스트 상자/InDesign Note)는 여전히 범위 밖 — 다음 후보 순서는
+   미주 → Word 머리말/바닥글 → InDesign Note → 텍스트 상자
+   (`RECONCILED_TRANSLATION_MODE_T6D3.md` 참고, 확정 아님).
 4. 멀티 에디터 확장(VSCode/Antigravity, `BACKLOG_MULTI_EDITOR_SUPPORT.md`) —
    미착수 맞음. 단 사용자가 이미 "CAT정합성/Kiwi 끝난 뒤 별도 라운드로"
    후순위 확정해둔 항목(백로그 파일 자체에 명시).
@@ -75,6 +86,63 @@ git 커밋보다 뒤처지는 일이 이미 두 번(①②) 확인됨. **다음 
 전담) 체제는 종료됨. 다음 작업부터 이 분담으로 진행할 것 — 단, Codex가
 다시 한도에 걸리면 그때만 임시로 agy 단독 체제로 전환(이번처럼 매번
 세션/PC 시작 시 재확인).
+
+## 이번 세션 완료(같은 세션 후속) — T6d-3: 각주(FOOTNOTE) 컨테이너 지원
+
+**QA Mode B 완료 직후, 사용자 지시로 다음 트랙으로 착수.** 설계 자문
+(`DESIGN_REQUEST_TRANSLATION_MODE_T6D3.md` → `AGY_ANSWER_.../
+CODEX_ANSWER_...` → `RECONCILED_TRANSLATION_MODE_T6D3.md`)에서 두
+자문 모두 **각주(FOOTNOTE)를 1순위**로 추천(InDesign 스캐너가 이미
+판별 로직만 갖고 skip하던 상태라 진입 비용 최저). 이견은 "Word 포함
+여부" 하나뿐 — agy는 Word의 기존 `WordApiHiddenDocument 1.3` 체크를
+근거로 Word 전체 제외를 제안했고, Codex는 `WordApi 1.5`(각주 API)가
+공식 문서로 확인된다며 양쪽 다 설계하되 런타임 게이트를 두자고 제안.
+**Claude가 `document_generator.ts:69`를 직접 읽어 확인한 결과 이 둘은
+서로 다른 별개의 requirement set**(하나는 숨김 문서 생성용, 하나는
+일반 문서 각주 접근용)이라 실제로는 상충하는 사실이 아님을 확인하고
+Codex 안(Word+InDesign 둘 다, `isSetSupported('WordApi','1.5')` 런타임
+게이트로 미지원 시 fail-closed) 채택.
+
+**워크플로 변경(사용자 지시, 토큰 절약) — 이 태스크부터 처음 적용:**
+Codex 구현 → **검증(스펙 대조 diff 리뷰 + 실제 `npm test`/`npx vitest
+run`/`npm run build`/`cargo test --release` 재실행)은 전부 agy가 수행**
+→ Claude는 agy 보고를 읽고 가벼운 스팟체크(`git status --short` 정도)만
+한 뒤 품질기준 미달 여부만 판단하는 최종 조율 역할로 축소. 상세 원칙은
+`feedback_smartlinter_orchestrator_minimize_own_tokens` 메모리 참고.
+
+**agy 1차 검증에서 실제 결함 2건 발견**(둘 다 "형식적 구현 완료"가
+아니라 진짜 문제였음):
+1. 기존 테스트 2건이 `FOOTNOTE` 추가로 깨졌는데 안 고쳐짐(`npm test`
+   270/272) — `isContainerKind('FOOTNOTE')`가 이제 `true`여야 하는데
+   구식 `false` 단언문 방치, InDesign mock 각주 헬퍼가 `id` 없는
+   객체를 만들어 스캐너가 각주를 전부 `skippedUnsupportedCount`로
+   오분류.
+2. 지시서(`TASK_REQUEST_TRANSLATION_MODE_T6D3.md`)의 "테스트(최소
+   목록)" 절이 명시한 신규 테스트(Word 1.5 mock 양쪽, InDesign 복제본
+   재탐색·fingerprint 불변, XLIFF FOOTNOTE round-trip·교차오염 거부)가
+   하나도 추가 안 됨.
+
+Claude가 이 두 지적을 그대로 Codex에게 후속 지시(직접 고치지 않고
+위임 — 기존 관례 유지), Codex 재수정 후 **agy 2차 검증(자체 보고 신뢰
+않고 전부 재실행)에서 두 지적 모두 실제로 해소됐고 신규 테스트도
+"형식적 개수 늘리기가 아니라 실질적 fail-closed/round-trip 커버"임을
+확인**. `translationSessionStore.ts`(지시서 A~G 목록엔 없던 파일)도
+agy가 "스캔된 footnoteLocator가 세션 상태를 거쳐 XLIFF/생성 플랜까지
+전달되려면 반드시 필요한 파이프라인 연계 변경"이라고 판단 근거와 함께
+정당화 — 스코프 이탈 아님으로 결론.
+
+**최종 검증(agy 2차, 전부 실제 재실행):** `npm test` 278/278,
+`npx vitest run` 497/497, `npm run build` 성공, `cargo test --release`
+164/164(1 ignored). 19개 파일 변경, 지시서 범위와 정확히 일치. 커밋
+`7c12613`.
+
+나머지 5개 컨테이너(머리말/바닥글/미주/텍스트 상자/InDesign Note)는
+여전히 범위 밖. `CODEX_ANSWER_TRANSLATION_MODE_T6D3.md`가 제안한 다음
+순서(미주 → Word 머리말/바닥글 → InDesign Note → 텍스트 상자)는
+참고용일 뿐 확정 아님 — 다음 세션 착수 전 사용자에게 재확인할 것.
+
+실라이브(Word/InDesign) 검증은 아직 안 함 — 사용자 지시로 전체 개발
+완료 후 진행 예정.
 
 ## 이번 세션 완료 — QA 카드 Mode B(개별 이슈 부분 적용 + Diff Rebase)
 
