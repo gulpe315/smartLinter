@@ -1,19 +1,31 @@
 # SmartLinter — 오케스트레이터 현황판
 
-**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-30(같은 세션
-6차 후속) — **T6d-2 전체(Change Set 1 InDesign + Change Set 2 Word 표
-번역) 완료.** Word/InDesign 양쪽 표 번역이 T6d-1 progress/cancel 기반
-위에서 동작한다. 이 라운드부터 **Codex를 배제하고 agy에게만 자문·구현을
-맡기는 방식으로 전환**했다(사용자 지시, 이유는 Codex 사용량 한도 반복
-실패 — 아래 "워크플로 전환" 절 참고).
+**⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐ 마지막 업데이트: 2026-08-31(새 PC,
+git pull 후 세션) — QA 카드 Mode B(개별 이슈 부분 적용 + Diff Rebase)
+완료(커밋 `1021fdb` 사전 버그 수정, `d5d484f` Mode B 본체).** 워크플로는
+원래 역할 분담(Codex 구현/agy 검증/Claude 오케스트레이션)으로 복귀함 —
+이 PC에서 Codex 사용량이 정상 작동함을 실측 확인. Mode A(2026-08-29
+완료)로 문장 전체 원자 적용은 이미 되던 상태에서, Mode B가 그 사이 빈틈
+(카드 하나 적용 시 같은 문단의 다른 pending 카드가 다음 `validateLiveCards`
+전체 재분석 전까지 오프셋이 안 맞는 채로 방치되던 문제)을 메웠다: 겹치지
+않는 형제 카드는 LLM 재호출 없이 로컬 오프셋 재계산(rebase)으로 `pending`
+유지, 겹치는 카드는 신규 상태 `stale_conflict`로 무효화. Codex 설계
+자문 답변의 fail-closed 결함(자기 겹침 문자열 오판)을 agy 독립 리뷰가
+잡아내 재수정 완료. 상세는 아래 "이번 세션 완료" 절.
+
+**같은 세션에서 로드맵 문서 자체의 오류 2건도 정정함(아래 "2026-08-31
+재검증" 절) — 다음 세션은 이 절을 최상단에서 다시 읽을 필요 없이 바로
+아래 "다음에 열려 있는 트랙"만 참고하면 됨.**
 
 **다음에 열려 있는 트랙 — 2026-08-31 재검증 결과 위 2026-08-30 "전체
 로드맵 재조사"가 이미 두 항목(①②)에서 틀린 것으로 확인됨(git log 실측
 대조). 아래가 실측 기준 최신 정답:**
-1. ~~QA 카드 Mode A~~ — **이미 완료돼 있었음**(커밋 `5543aca`/`674ced6`,
-   2026-08-29, 로드맵 재조사보다 하루 전인데 누락됨). **Mode B(개별
-   이슈 부분 적용+Diff Rebase)만 미착수** — 설계 자문부터 새로 시작해야
-   함(Mode A 설계에서 명시적으로 스코프 제외).
+1. ~~QA 카드 Mode A/Mode B~~ — **둘 다 완료.** Mode A는 커밋
+   `5543aca`/`674ced6`(2026-08-29, 로드맵 재조사보다 하루 전인데
+   누락됐던 것). Mode B(개별 이슈 부분 적용+Diff Rebase)는 이번 세션에
+   완료(커밋 `1021fdb`/`d5d484f`, 2026-08-31) — 설계 자문
+   `RECONCILED_QA_MODE_B.md` → Codex 구현 → agy 독립 리뷰(fail-closed
+   버그 1건 발견) → Codex 재수정 → Claude 전체 재검증 사이클로 진행.
 2. ~~다국어 QA 프로파일 — 영어만 완료~~ — **부정확.** 실제로는
    Part 1(source 필드 버그 수정, `1ee86e3`)/Part 2(targetLanguage·
    explanationLanguage 배관, `4744c5f`)/UI 언어 드롭다운(`fe34d2c`)/
@@ -63,6 +75,50 @@ git 커밋보다 뒤처지는 일이 이미 두 번(①②) 확인됨. **다음 
 전담) 체제는 종료됨. 다음 작업부터 이 분담으로 진행할 것 — 단, Codex가
 다시 한도에 걸리면 그때만 임시로 agy 단독 체제로 전환(이번처럼 매번
 세션/PC 시작 시 재확인).
+
+## 이번 세션 완료 — QA 카드 Mode B(개별 이슈 부분 적용 + Diff Rebase)
+
+**배경:** Mode A(문장 전체 원자 적용)는 이미 됐지만, 카드 하나만 적용해도
+같은 문단의 다른 pending 카드는 다음 `validateLiveCards`(윈도우 포커스
+복귀/재연결 시에만 발동, 전체 LLM 재분석)까지 오프셋이 안 맞는 채로
+방치되던 빈틈이 있었음(`CODEX_ANSWER_QA_SENTENCE_MODE_A_APPLY.md`가
+"이건 Mode B의 영역"이라 명시해뒀던 부분).
+
+**설계 자문(1라운드, `DESIGN_REQUEST_QA_MODE_B.md` → `AGY_ANSWER_.../
+CODEX_ANSWER_...` → `RECONCILED_QA_MODE_B.md`):** 트리거 위치(`processReplacementResult`
+성공 훅)·rebase 델타 계산·batch 상호작용은 두 자문이 처음부터 일치.
+이견 2건은 Claude가 코드로 직접 검증해 해소(강제 합의 아님):
+- 겹치는 형제 카드 처리: agy는 기존 `stale_obsolete` 재사용을 제안했으나,
+  `QACardItem.tsx`의 `isObsolete` 블록이 `card.staleMessage`를 렌더링하지
+  않고 "문단을 찾을 수 없음" 하드코딩 문구만 표시한다는 걸 확인해 Codex의
+  신규 `stale_conflict` 상태 도입안을 채택.
+- 호스트 해시 불일치 시 처리: `ReplacementResult`에 실제 텍스트 필드가
+  없다는 걸 확인해(`shared/protocol/types.ts:93-102`), agy의 "일단
+  currentHash로 커밋" 안 대신 Codex의 "expectedHash와 다르면 rebase
+  아예 안 하고 형제를 stale로 남겨 다음 validateLiveCards에 위임" 안 채택.
+
+**구현(Codex) → agy 독립 리뷰 → Codex 재수정 → Claude 전체 재검증**
+(커밋 `1021fdb`, `d5d484f`):
+- 신규 `src/utils/qaCardRebase.ts`(`planSiblingRebase`, 순수 함수) +
+  `qaStore.ts`의 `processReplacementResult` 성공 훅 + `QACardStatus`에
+  `stale_conflict` 추가 + `QACardItem.tsx` 전용 UI + `acceptCard`의
+  오프셋 우선순위 버그(기존 코드가 `startOffset`을 아예 안 쓰고 항상
+  `indexOf` 첫 occurrence를 쓰던 것) 동시 수정.
+- **agy 독립 리뷰가 실제 fail-closed 버그 1건 발견**: `findUniqueOccurrence`가
+  두 번째 occurrence 탐색 시 `first + needle.length`만큼 건너뛰어서,
+  자기 겹침 문자열("banana" 안의 "ana" — 인덱스 1·3에 겹쳐서 2번 등장)을
+  "유일하다"고 오판. Claude가 Node로 직접 재현해 확정 후 Codex에게
+  재수정(`first + 1`) + 회귀 테스트 지시, 완료 확인.
+- **부수 발견 — 이번 세션과 무관한 기존 버그(커밋 `1021fdb`로 별도
+  수정):** `cargo test --release`가 아예 컴파일 안 되고 있었음(`8/30`
+  T6d-2 Change Set 1이 `ScannedParagraphEntry`에 필드 2개를 추가하면서
+  `protocol_serialization_test.rs`의 픽스처는 안 고쳤던 것 — 이 세션
+  전까지 아무도 `cargo test --release`를 안 돌려봐서 발견 안 됐음).
+  Claude가 2줄짜리 명확한 수정이라 직접 핀셋 수정.
+- **Claude 최종 독립 검증(양쪽 라운드 후 전부 재실행):** `npm test`
+  272/272, `npx vitest run` 490/490, `npm run build` 성공, `cargo test
+  --release` 전체 통과(115+ Rust 테스트, 라이브 Ollama 1건만 ignored).
+- 실라이브(Word/InDesign) 검증은 아직 안 함 — 다음 세션이 필요하면 진행.
 
 ## 다른 PC로 이 프로젝트를 옮길 때 (2026-08-30 기준 체크리스트)
 
